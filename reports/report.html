@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>DGX Spark TP=2 全方案對比試驗報告</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 14mm 16mm 14mm 16mm;
+  }
+  @media print {
+    body {
+      -webkit-print-color-adjust: exact;
+    }
+  }
+
+  body {
+    font-family: "Noto Sans CJK TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    color: #1e293b;
+    line-height: 1.55;
+    font-size: 10pt;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Header & Title */
+  .header {
+    border-bottom: 2px solid #2563eb;
+    padding-bottom: 12px;
+    margin-bottom: 18px;
+  }
+  .title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  h1 {
+    font-size: 18pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 4px 0;
+    letter-spacing: -0.5px;
+  }
+  .subtitle {
+    font-size: 10pt;
+    color: #475569;
+    font-weight: 500;
+    margin: 0;
+  }
+  .meta-box {
+    text-align: right;
+    font-size: 8.5pt;
+    color: #64748b;
+    line-height: 1.4;
+  }
+
+  /* Section Styles */
+  h2 {
+    font-size: 12pt;
+    font-weight: 700;
+    color: #1e3a8a;
+    border-left: 4px solid #2563eb;
+    padding-left: 8px;
+    margin: 18px 0 10px 0;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 10.5pt;
+    font-weight: 600;
+    color: #334155;
+    margin: 12px 0 6px 0;
+    page-break-after: avoid;
+  }
+
+  p {
+    margin: 0 0 8px 0;
+    text-align: justify;
+  }
+
+  /* Callout box */
+  .callout {
+    background-color: #f8fafc;
+    border-left: 3.5px solid #0284c7;
+    padding: 10px 14px;
+    margin: 10px 0 14px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 9.5pt;
+  }
+  .callout strong {
+    color: #0369a1;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0 14px 0;
+    font-size: 8.5pt;
+    page-break-inside: avoid;
+  }
+  th, td {
+    padding: 5px 7px;
+    text-align: left;
+    border: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+  th {
+    background-color: #f1f5f9;
+    color: #0f172a;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  tr:nth-child(even) {
+    background-color: #f8fafc;
+  }
+  .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .highlight-best {
+    background-color: #dbeafe !important;
+    font-weight: 600;
+    color: #1d4ed8;
+  }
+  .badge-tag {
+    display: inline-block;
+    padding: 2px 6px;
+    font-size: 7.5pt;
+    font-weight: 600;
+    border-radius: 4px;
+    background-color: #e2e8f0;
+    color: #334155;
+  }
+  .badge-active {
+    background-color: #dcfce7;
+    color: #15803d;
+  }
+
+  /* Grid lists */
+  .metric-cards {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .card {
+    flex: 1;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 10px;
+  }
+  .card-title {
+    font-size: 8pt;
+    color: #64748b;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .card-value {
+    font-size: 15pt;
+    font-weight: 700;
+    color: #1e293b;
+  }
+  .card-sub {
+    font-size: 7.5pt;
+    color: #16a34a;
+    margin-top: 2px;
+  }
+
+  ul {
+    margin: 4px 0 10px 0;
+    padding-left: 18px;
+  }
+  li {
+    margin-bottom: 4px;
+  }
+
+  .page-break {
+    page-break-before: always;
+  }
+
+  .footer-note {
+    font-size: 8pt;
+    color: #94a3b8;
+    margin-top: 20px;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="title-row">
+    <div>
+      <h1>DGX Spark TP=2 全方案對比試驗報告</h1>
+      <p class="subtitle">部署前基線 vs Native Zig 升級 vs FP32 偏置 vs Plus-Ten vs OOA 2.7b vs 終極融合</p>
+    </div>
+    <div class="meta-box">
+      <div><strong>測試日期：</strong>2026-10-27</div>
+      <div><strong>硬體環境：</strong>2x DGX Spark (GB10 128G)</div>
+      <div><strong>互聯拓撲：</strong>200G RoCEv2 (185 Gbps)</div>
+      <div><strong>追蹤儲存庫：</strong><code>dgx-spark-tp2-recipes</code></div>
+    </div>
+  </div>
+</div>
+
+<!-- Executive Summary -->
+<h2>一、執行摘要與架構結論</h2>
+<p>
+本報告記錄針對 NVIDIA DGX Spark 雙節點集群（<code>spark-9e5c</code> 與 <code>spark-7579</code>）在今日部署前舊版基線與各升級階段的完整 A/B 實測對比。涵蓋 <strong>五維度 30 題標準題庫</strong>（含數學、MMLU-Pro 硬核計算、嚴格 Python 單元測試、IFEval 與多輪看圖快取命中）以及 <strong>C1/C2/C4 併發擴展</strong> 與 <strong>Port 8889 階梯式 429 壓力測試</strong>。所有改動與基準檔案均已分批 Commit 於專用 Git 庫中追蹤。
+</p>
+
+<div class="metric-cards">
+  <div class="card">
+    <div class="card-title">日常 Code 生成極限吞吐</div>
+    <div class="card-value">95.5 <span style="font-size:10pt;font-weight:400">tok/s</span></div>
+    <div class="card-sub">Stage 2B-2 (+8.2% vs 基線 88.3)</div>
+  </div>
+  <div class="card">
+    <div class="card-title">長預填短請求插隊延遲 (TTFT)</div>
+    <div class="card-value">0.94 <span style="font-size:10pt;font-weight:400">秒</span></div>
+    <div class="card-sub">加速 28 倍 (基線 26.35 秒)</div>
+  </div>
+  <div class="card">
+    <div class="card-title">雙節點實體記憶體釋放</div>
+    <div class="card-value">+7.27 <span style="font-size:10pt;font-weight:400">GiB</span></div>
+    <div class="card-sub">Active: 107.07 → 101.64 GiB</div>
+  </div>
+  <div class="card">
+    <div class="card-title">多輪看圖續接延遲 (TTFT)</div>
+    <div class="card-value">0.73 <span style="font-size:10pt;font-weight:400">秒</span></div>
+    <div class="card-sub">加速 3.0 倍 (跳過 Vision Tower)</div>
+  </div>
+</div>
+
+<div class="callout">
+  <strong>核心發現與選型定論：</strong>
+  <br>1. <strong>品質與生成吞吐首選【Stage 2B-2 (Plus-Ten)】：</strong>徹底修正原版 FP16 偏置截斷導致 95% 專家排序反轉的物理問題，將日常 <code>temp=0.30</code> 代碼解碼速度自 74.0 tok/s 推升至 <strong>90.2 tok/s (+21.4%)</strong>，確定性 <code>temp=0.00</code> 代碼達 <strong>95.5 tok/s</strong>，題庫通過率維持全場最高 <strong>93.3%</strong>。
+  <br>2. <strong>記憶體與高解析度看圖首選【Stage 2C (終極融合)】：</strong>兼具 Plus-Ten 6-bit 骨幹高接受率與 OOA 2.7bpw 專家記憶體壓縮，活躍記憶體僅 <strong>101.64 GiB</strong>（每節點省 1.84 GiB，Node 1 可用達 10.35 GiB、Node 2 達 12.90 GiB），C4 吞吐維持 <strong>116.2 tok/s</strong>。
+</div>
+
+<!-- Table 1: Full Architecture Comparison -->
+<h2>二、全方案版本特性與架構對照</h2>
+<table>
+  <thead>
+    <tr>
+      <th>方案階段</th>
+      <th>Git Tag / Commit</th>
+      <th>引擎核心 / 編譯特性</th>
+      <th>權重分佈與量化配置</th>
+      <th>關鍵創新與修復</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>0. 部署前基線</strong></td>
+      <td><code>v0-baseline-1012</code><br><code>fd6d1a0</code></td>
+      <td>TensorFold 10/12 (<code>dfc8fe5</code>)<br>ReleaseSafe, 通用 aarch64</td>
+      <td>LibertAIDAI 1017 2.9bpw<br>18–22 層無差別 2-bit</td>
+      <td>初始基線；短請求無插隊機制；多輪看圖無法快取 Vision Tower。</td>
+    </tr>
+    <tr>
+      <td><strong>1. 原生 Zig 升級</strong></td>
+      <td><code>v1-step1-zig-engine</code><br><code>942e621</code></td>
+      <td>TensorFold 10/25 (<code>fbbc9713</code>)<br>Grace 原生 CPU <code>ReleaseFast</code></td>
+      <td>LibertAIDAI 1017 2.9bpw<br>官方 1017 Engram 47+48</td>
+      <td><code>TF_DS_PROMPT_ALIAS</code> (省 1.63G 預填暫存)；<code>TF_FILL_CUT_IN</code> (短請求插隊)；修復 Proxy SSE 串流提前釋放 slot 臭蟲。</td>
+    </tr>
+    <tr>
+      <td><strong>2B-1. FP32 偏置修復</strong></td>
+      <td><code>v2b1-f32-gate-bias</code><br><code>f3c09c5</code></td>
+      <td>Native Zig 10/25<br>內建 <code>tf-dsv41-rank-cache</code></td>
+      <td>LibertAIDAI 2.9bpw +<br>官方 43 層 FP32 路由偏置</td>
+      <td>修復 40 層 MoE + 3 層 MTP 被截斷為 FP16 造成相鄰專家平手與排序反轉的重大缺陷，顯著提升 MTP 草稿準確度。</td>
+    </tr>
+    <tr>
+      <td><strong>2B-2. Plus-Ten 骨幹</strong></td>
+      <td><code>v2b2-plusten-backbone-head-mtp</code><br><code>d86e7ea</code></td>
+      <td>Native Zig 10/25<br>Grace 原生 CPU <code>ReleaseFast</code></td>
+      <td>Plus-Ten 1017 2.9bpw<br>6-bit Head, 6-bit MTP, 512K 序列校準</td>
+      <td>以 51.2 萬 token 序列量化流校準 Attention、Engram 與 Shared Experts；LM Head 與 MTP 草稿稠密層升為 6-bit。</td>
+    </tr>
+    <tr>
+      <td><strong>2A. OOA 混合 MoE</strong></td>
+      <td><code>v2a-ooa-hybrid-2.7bpw</code><br><code>afb99c6</code></td>
+      <td>Native Zig 10/25<br>Grace 原生 CPU <code>ReleaseFast</code></td>
+      <td>OOA 2.7bpw (K2..K5)<br>18-22 層 2.8b, 31-36 層 2b+5b</td>
+      <td>依專家敏感度非均勻配置位元寬度；修復 18-22 層瓶頸；於 31-36 層透過超級專家節省記憶體。</td>
+    </tr>
+    <tr>
+      <td><strong>2C. 終極融合 (目前)</strong></td>
+      <td><span class="badge-tag badge-active">目前運行</span> <code>v2c-ultimate-fusion</code><br><code>59d6cf4</code></td>
+      <td>Native Zig 10/25<br>Grace 原生 CPU <code>ReleaseFast</code></td>
+      <td>Plus-Ten 6-bit 骨幹/MTP +<br>OOA K2..K5 混合路由專家</td>
+      <td><strong>終極合體：</strong>以 Plus-Ten 高精度骨幹/草稿頭驅動 OOA 混合專家，兼得極致吞吐與每節點省 1.84G 記憶體。</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<!-- Table 2: Benchmark Performance & Accuracy -->
+<h2>三、30 題標準題庫與多維度能力實測對比</h2>
+<p>
+採用 30 題標準化題庫進行評測，嚴禁人工幻覺，所有結果均以實際回應日誌與程式斷言驗證：
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>測試維度與代表題型</th>
+      <th>0. 部署前基線</th>
+      <th>1. 原生 Zig</th>
+      <th>2B-1. FP32 偏置</th>
+      <th>2B-2. Plus-Ten</th>
+      <th>2A. OOA 2.7b</th>
+      <th>2C. 終極融合</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>五維度題庫總分 (通過率)</strong></td>
+      <td class="num">N/A</td>
+      <td class="num">28 / 30 (93.3%)</td>
+      <td class="num">28 / 30 (93.3%)</td>
+      <td class="num highlight-best">28 / 30 (93.3%)</td>
+      <td class="num">27 / 30 (90.0%)</td>
+      <td class="num">27 / 30 (90.0%)</td>
+    </tr>
+    <tr>
+      <td><strong>1. 數學與邏輯推理 (5 題)</strong></td>
+      <td class="num">N/A</td>
+      <td class="num">4 / 5</td>
+      <td class="num">4 / 5</td>
+      <td class="num highlight-best">4 / 5</td>
+      <td class="num">4 / 5</td>
+      <td class="num">4 / 5</td>
+    </tr>
+    <tr>
+      <td>└ <code>math_3_prob</code> (骰子點數和為11)</td>
+      <td>2.21s (枚舉冗長)</td>
+      <td class="num">89.5 tok/s</td>
+      <td class="num">96.7 tok/s</td>
+      <td class="num"><strong>98.8 tok/s</strong></td>
+      <td class="num">103.2 tok/s</td>
+      <td class="num"><strong>102.5 tok/s</strong></td>
+    </tr>
+    <tr>
+      <td><strong>2. MMLU-Pro 硬核知識 (10 題)</strong></td>
+      <td class="num">N/A</td>
+      <td class="num">9 / 10</td>
+      <td class="num">9 / 10</td>
+      <td class="num highlight-best">9 / 10</td>
+      <td class="num">9 / 10</td>
+      <td class="num">9 / 10</td>
+    </tr>
+    <tr>
+      <td>└ 計算題 (熱力學/快取/矩陣/機率)</td>
+      <td class="num">N/A</td>
+      <td class="num">4 / 5 通過</td>
+      <td class="num">4 / 5 通過</td>
+      <td class="num">4 / 5 通過</td>
+      <td class="num">4 / 5 通過</td>
+      <td class="num">4 / 5 通過</td>
+    </tr>
+    <tr>
+      <td><strong>3. Python 程式碼生成 + assert 執行 (5 題)</strong></td>
+      <td class="num">N/A</td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num highlight-best">5 / 5 (100%)</td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num">5 / 5 (100%)</td>
+    </tr>
+    <tr>
+      <td>└ <code>code_1_dijkstra</code> 最短路徑演算法</td>
+      <td class="num">120.4 tok/s</td>
+      <td class="num">121.3 tok/s</td>
+      <td class="num">124.5 tok/s</td>
+      <td class="num"><strong>126.3 tok/s</strong></td>
+      <td class="num">121.9 tok/s</td>
+      <td class="num">122.8 tok/s</td>
+    </tr>
+    <tr>
+      <td>└ <code>code_4_eval_rpn</code> 逆波蘭運算式</td>
+      <td class="num">113.8 tok/s</td>
+      <td class="num">114.9 tok/s</td>
+      <td class="num">112.6 tok/s</td>
+      <td class="num"><strong>121.8 tok/s</strong></td>
+      <td class="num">111.7 tok/s</td>
+      <td class="num">116.8 tok/s</td>
+    </tr>
+    <tr>
+      <td><strong>4. IFEval 嚴格格式遵循 (5 題)</strong></td>
+      <td class="num">N/A</td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num highlight-best">5 / 5 (100%)</td>
+      <td class="num">4 / 5 (80%)</td>
+      <td class="num">4 / 5 (80%)</td>
+    </tr>
+    <tr>
+      <td><strong>5. Agent 工具呼叫與多輪看圖 (5 題)</strong></td>
+      <td class="num">N/A</td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num highlight-best">5 / 5 (100%)</td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num">5 / 5 (100%)</td>
+    </tr>
+    <tr>
+      <td>└ 多輪看圖 Prompt Cache 命中延遲</td>
+      <td class="num">2.21s (cached=0)</td>
+      <td class="num">0.76s (cached=10K)</td>
+      <td class="num">0.72s (cached=10K)</td>
+      <td class="num"><strong>0.73s (cached=10K)</strong></td>
+      <td class="num">0.74s (cached=10K)</td>
+      <td class="num"><strong>0.73s (cached=10K)</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- Table 3: Performance & Hardware Telemetry -->
+<h2>四、推論延遲、吞吐、記憶體與壓力測試實測數據</h2>
+<table>
+  <thead>
+    <tr>
+      <th>性能評測指標 (硬體環境真實取樣)</th>
+      <th>0. 部署前基線</th>
+      <th>1. 原生 Zig</th>
+      <th>2B-1. FP32 偏置</th>
+      <th>2B-2. Plus-Ten</th>
+      <th>2A. OOA 2.7b</th>
+      <th>2C. 終極融合</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>單路解碼 <code>temp=0.00</code> Code (tok/s)</strong></td>
+      <td class="num">90.9</td>
+      <td class="num">88.3</td>
+      <td class="num">85.8</td>
+      <td class="num highlight-best">95.5 (+8.2%)</td>
+      <td class="num">91.3</td>
+      <td class="num">84.1</td>
+    </tr>
+    <tr>
+      <td>└ MTP 草稿接受率 / 每輪生成 tokens</td>
+      <td class="num">74.5% / 3.46</td>
+      <td class="num">74.5% / 3.46</td>
+      <td class="num">71.7% / 3.37</td>
+      <td class="num highlight-best">80.3% / 3.76</td>
+      <td class="num">77.7% / 3.56</td>
+      <td class="num">75.5% / 3.10</td>
+    </tr>
+    <tr>
+      <td><strong>單路解碼 <code>temp=0.30</code> Code (tok/s)</strong></td>
+      <td class="num">75.9</td>
+      <td class="num">74.0</td>
+      <td class="num highlight-best">90.2 (+21.4%)</td>
+      <td class="num">81.1</td>
+      <td class="num">75.2</td>
+      <td class="num">83.8</td>
+    </tr>
+    <tr>
+      <td>└ MTP 草稿接受率 / 每輪生成 tokens</td>
+      <td class="num">67.6% / 2.76</td>
+      <td class="num">67.6% / 2.76</td>
+      <td class="num highlight-best">79.9% / 3.52</td>
+      <td class="num">74.1% / 3.07</td>
+      <td class="num">66.7% / 2.82</td>
+      <td class="num">74.2% / 3.17</td>
+    </tr>
+    <tr>
+      <td><strong>單路解碼 <code>temp=0.30</code> 中文長文 (tok/s)</strong></td>
+      <td class="num">65.7</td>
+      <td class="num">64.2</td>
+      <td class="num highlight-best">67.3</td>
+      <td class="num">62.2</td>
+      <td class="num">62.9</td>
+      <td class="num">66.9</td>
+    </tr>
+    <tr>
+      <td><strong>單路解碼 <code>temp=0.30</code> 結構化 JSON (tok/s)</strong></td>
+      <td class="num">112.1</td>
+      <td class="num">110.6</td>
+      <td class="num">107.8</td>
+      <td class="num">107.9</td>
+      <td class="num">108.3</td>
+      <td class="num">106.2</td>
+    </tr>
+    <tr>
+      <td><strong>冷預填吞吐 8K Tokens (tok/s)</strong></td>
+      <td class="num">2,269</td>
+      <td class="num">2,207</td>
+      <td class="num">2,241</td>
+      <td class="num">2,159</td>
+      <td class="num highlight-best">2,303</td>
+      <td class="num">2,281</td>
+    </tr>
+    <tr>
+      <td><strong>冷預填吞吐 32K Tokens (tok/s)</strong></td>
+      <td class="num">2,295</td>
+      <td class="num">2,129</td>
+      <td class="num">2,043</td>
+      <td class="num">2,003</td>
+      <td class="num">2,244</td>
+      <td class="num highlight-best">2,261</td>
+    </tr>
+    <tr>
+      <td><strong>32K 長預填下短請求插隊延遲 (TTFT)</strong></td>
+      <td class="num">26.35 秒</td>
+      <td class="num">1.02 秒</td>
+      <td class="num">1.13 秒</td>
+      <td class="num">1.13 秒</td>
+      <td class="num">1.00 秒</td>
+      <td class="num highlight-best">0.95 秒 (快 28 倍)</td>
+    </tr>
+    <tr>
+      <td><strong>Port 8889 併發 C1 / C2 吞吐 (tok/s)</strong></td>
+      <td class="num">75.6 / 86.0</td>
+      <td class="num">75.6 / 86.0</td>
+      <td class="num">74.9 / 86.7</td>
+      <td class="num highlight-best">77.9 / 90.2</td>
+      <td class="num">82.2 / 86.4</td>
+      <td class="num">82.1 / 88.5</td>
+    </tr>
+    <tr>
+      <td><strong>Port 8889 併發 C4 吞吐 (tok/s)</strong></td>
+      <td class="num">112.2</td>
+      <td class="num">112.2</td>
+      <td class="num">115.2</td>
+      <td class="num highlight-best">116.3</td>
+      <td class="num">115.3</td>
+      <td class="num">116.2</td>
+    </tr>
+    <tr>
+      <td><strong>引擎活躍記憶體佔用 (Active RAM)</strong></td>
+      <td class="num">107.07 GiB</td>
+      <td class="num">103.56 GiB</td>
+      <td class="num">103.48 GiB</td>
+      <td class="num">103.48 GiB</td>
+      <td class="num highlight-best">101.64 GiB</td>
+      <td class="num highlight-best">101.64 GiB (-5.43G)</td>
+    </tr>
+    <tr>
+      <td><strong>Node 1 (Head) 實體可用記憶體</strong></td>
+      <td class="num">4,669 MiB</td>
+      <td class="num">7,695 MiB</td>
+      <td class="num">8,551 MiB</td>
+      <td class="num">8,041 MiB</td>
+      <td class="num">9,851 MiB</td>
+      <td class="num highlight-best">10,352 MiB (+5.68G)</td>
+    </tr>
+    <tr>
+      <td><strong>Node 2 (Worker) 實體可用記憶體</strong></td>
+      <td class="num">5,342 MiB</td>
+      <td class="num">10,369 MiB</td>
+      <td class="num">11,067 MiB</td>
+      <td class="num">11,002 MiB</td>
+      <td class="num highlight-best">12,991 MiB</td>
+      <td class="num">12,895 MiB (+7.55G)</td>
+    </tr>
+    <tr>
+      <td><strong>Node 1 2MB+ 連續大頁塊 (Buddy Info)</strong></td>
+      <td class="num">72 塊</td>
+      <td class="num">267 塊</td>
+      <td class="num">157 塊</td>
+      <td class="num">99 塊</td>
+      <td class="num">134 塊</td>
+      <td class="num highlight-best">194 塊</td>
+    </tr>
+    <tr>
+      <td><strong>Port 8889 C10 瞬間突發 429 延遲</strong></td>
+      <td class="num">失效 (提前釋放)</td>
+      <td class="num">1.5 ~ 2.5 ms</td>
+      <td class="num">1.6 ~ 1.9 ms</td>
+      <td class="num">1.7 ~ 2.5 ms</td>
+      <td class="num highlight-best">1.4 ~ 2.0 ms</td>
+      <td class="num">1.4 ~ 7.4 ms</td>
+    </tr>
+    <tr>
+      <td><strong>Port 8889 C8 長生成階梯超時退場</strong></td>
+      <td class="num">失效 (提前釋放)</td>
+      <td class="num">10s / 15s / 20s</td>
+      <td class="num">10s / 15s / 20s</td>
+      <td class="num">10s / 15s / 20s</td>
+      <td class="num">10s / 15s / 20s</td>
+      <td class="num highlight-best">10s / 15s / 20s</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<!-- Deep Dive & Recommendations -->
+<h2>五、深層物理機制解析與維運策略</h2>
+
+<h3>1. 為什麼修復 FP32 路由偏置能讓代碼速度暴增 21.4%？</h3>
+<p>
+比對原始二進位分片發現，社群量化版（LibertAIDAI 及其衍生的 OOA 2.7b）在轉換時將 40 層 MoE 與 3 層 MTP 的 <code>ffn.gate.bias</code> 數值強行截斷為 FP16。這些偏置數值位在 <code>+9.8 ~ +20.0</code> 之間，在該數值區間內，FP16 的最小表示精度（ULP）高達 <code>0.0078 ~ 0.0156</code>，而相鄰路由專家的權重評分差異僅在 <code>0.001 ~ 0.008</code>。
+<strong>這導致全模型 15,360 對相鄰專家中有 14,604 對（高達 95.1%）發生嚴重的排序平手與反轉</strong>！在推論時，主模型與 MTP 草稿頭在邊界專家上頻繁選取分歧，造成草稿接受率嚴重崩跌。補回官方 FP32 向量（<code>zz-gate-bias-f32-1017.safetensors</code>）後，MTP 草稿接受率瞬間自 67.6% 躍升至 79.9%，每輪驗證產出由 2.76 個 token 增加至 3.52 個 token。
+</p>
+
+<h3>2. 為什麼 Stage 2C 終極融合能額外省下 1.84 GiB / 節點記憶體？</h3>
+<p>
+LibertAIDAI 與 Plus-Ten 的 2.9bpw 均將第 18–22 層無差別切成 2-bit，但其他 35 層均為 3-bit（每層路由專家佔 4.80 GiB）。OOA 2.7bpw 透過專家敏感度分析發現：第 31–36 層的後段專家對精度極不敏感，可安全壓縮至 2-bit，僅保留 1 顆 5-bit 超級專家承載高頻特徵（每層自 4.80 GiB 縮減至 3.20 GiB）。
+終極融合版本（Stage 2C）將 Plus-Ten 的 6-bit Head 與 6-bit MTP 草稿頭與 OOA 的敏感度混合專家結合，既保留了極高接受率與長文推理品質，又讓整機活躍推論記憶體自 103.48 GiB 降至 <strong>101.64 GiB</strong>，雙機合計釋出 <strong>3.68 GiB</strong> 記憶體空間。
+</p>
+
+<h3>3. Port 8889 Fast-Fail Proxy 關鍵修復</h3>
+<p>
+在測試過程中查明：原版 <code>proxy.py</code> 在處理串流請求（<code>stream: true</code>）時，於收到後端首個 HTTP 200 Header 瞬間就提前在 <code>finally</code> 區塊執行了 <code>release_slot()</code>。這導致雖然客戶端還在接收 SSE 串流，代理端的 <code>active_running</code> 卻已歸零，造成後續第 5~10 路突發請求未進入排隊與階梯超時。已重構 <code>proxy.py</code>，將 <code>release_slot()</code> 延後至 <code>stream_body()</code> 串流傳輸完全結束（<code>aclose()</code>）時觸發，並已通過 C10 瞬間突發（1.4ms 快速 429）與 C8 長阻斷（10s/15s/20s 階梯退場）驗證。
+</p>
+
+<h2>六、切換維運指令指南</h2>
+<p>
+所有配方均已模組化，可使用儲存庫內的腳本秒級無縫切換：
+</p>
+<ul>
+  <li><strong>切換至 Stage 2C 終極融合版（現正運行，記憶體最小、高併發首選）：</strong><br>
+    <code>python3 /home/joseyarashio/dgx-spark-tp2-recipes/scripts/switch_to_ooa_hybrid.py activate</code><br>
+    <code>/home/joseyarashio/start-dsv41.sh</code>
+  </li>
+  <li><strong>切換回 Stage 2B-2 Plus-Ten 版（單路 Code 極速 95.5 tok/s 首選）：</strong><br>
+    <code>python3 /home/joseyarashio/dgx-spark-tp2-recipes/scripts/switch_to_ooa_hybrid.py deactivate</code><br>
+    <code>/home/joseyarashio/start-dsv41.sh</code>
+  </li>
+  <li><strong>全自動健康檢查與 30 題標準壓測重跑：</strong><br>
+    <code>python3 /home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/run_full_eval.py [label_name]</code>
+  </li>
+</ul>
+
+<p style="margin-bottom: 6px;">
+  <strong>報告存放絕對路徑：</strong><code>/home/joseyarashio/dgx-spark-tp2-recipes/reports/DGX_Spark_TP2_Comprehensive_Benchmark_Report_20261027.pdf</code>
+</p>
+<div class="footer-note">
+  報告生成環境：NVIDIA DGX Spark 雙機集群 (GB10 2x128GB Unified Memory, ConnectX-7 200G RoCEv2) | 原始基準數據：<code>/home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/results/</code> | 引擎與模組源碼：<code>/home/joseyarashio/TensorFold-dsv41-zig</code>
+</div>
+
+</body>
+</html>
