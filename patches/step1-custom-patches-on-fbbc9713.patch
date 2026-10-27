@@ -1,0 +1,912 @@
+diff --git a/zig/build/cuda.zig b/zig/build/cuda.zig
+index b6ffd282..41b44bff 100644
+--- a/zig/build/cuda.zig
++++ b/zig/build/cuda.zig
+@@ -178,13 +178,13 @@ fn engines(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builti
+ fn nativeServer(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, cuda: *std.Build.Module, lanes: *std.Build.Module, nemotron: *std.Build.Module, core: *std.Build.Module, tokenizer: *std.Build.Module, build_options: *std.Build.Step.Options, install_native: bool) *std.Build.Step.Compile {
+     const m = engines(b, target, optimize, cuda, lanes, nemotron, core);
+     // the HTTP side keeps its safety checks; the engine below it runs at `optimize` (the tokenizer is the family's)
+-    const template = b.createModule(.{ .root_source_file = b.path("zig/src/core/template/template.zig"), .target = target, .optimize = .ReleaseSafe, .link_libc = true });
++    const template = b.createModule(.{ .root_source_file = b.path("zig/src/core/template/template.zig"), .target = target, .optimize = optimize, .link_libc = true });
+     const exe = b.addExecutable(.{ .name = "tensorfold-native", .root_module = b.createModule(.{
+         .root_source_file = b.path("zig/src/server/main.zig"),
+         .target = target,
+-        .optimize = .ReleaseSafe,
++        .optimize = optimize,
+         .link_libc = true,
+-        .imports = &.{ .{ .name = "engine_api", .module = m.api }, .{ .name = "tokenizer", .module = tokenizer }, .{ .name = "template", .module = template }, .{ .name = "native_engines", .module = m.engines }, .{ .name = "checkpoint_cli", .module = b.createModule(.{ .root_source_file = b.path("zig/src/cli/cli.zig"), .target = target, .optimize = .ReleaseSafe, .link_libc = true, .imports = &.{.{ .name = "native_engines", .module = m.engines }} }) } },
++        .imports = &.{ .{ .name = "engine_api", .module = m.api }, .{ .name = "tokenizer", .module = tokenizer }, .{ .name = "template", .module = template }, .{ .name = "native_engines", .module = m.engines }, .{ .name = "checkpoint_cli", .module = b.createModule(.{ .root_source_file = b.path("zig/src/cli/cli.zig"), .target = target, .optimize = optimize, .link_libc = true, .imports = &.{.{ .name = "native_engines", .module = m.engines }} }) } },
+     }) });
+     exe.root_module.addOptions("build_options", build_options);
+     if (!install_native) {
+diff --git a/zig/src/core/lane_host.zig b/zig/src/core/lane_host.zig
+index 83b94b84..2c4c640f 100644
+--- a/zig/src/core/lane_host.zig
++++ b/zig/src/core/lane_host.zig
+@@ -205,6 +205,14 @@ pub const LaneHost = struct {
+         return job.host.closing or std.mem.indexOfScalar(Id, job.host.cancels.items, job.id) != null;
+     }
+ 
++    fn othersWait(ctx: *anyopaque) bool {
++        const job: *Job = @ptrCast(@alignCast(ctx));
++        const h = job.host;
++        h.lock();
++        defer h.unlock();
++        return h.queued.items.len > 0 or (h.filling != null and h.filling != job) or h.core.activeCount() > 0 or h.cancels.items.len > 0 or h.closing;
++    }
++
+     /// Hands a stream the tokens its rounds committed since the last delivery.
+     fn send(h: *LaneHost, job: *Job) void {
+         const emitted = job.stream.emitted();
+@@ -351,6 +359,7 @@ pub const LaneHost = struct {
+             .proposer = job.proposer.proposer(),
+             .stop_check = if (r.stop) |s| .{ .ptr = s.ctx, .check = s.check } else null,
+             .cancel_check = .{ .ptr = job, .check = cancelled },
++            .share_check = .{ .ptr = job, .check = othersWait },
+             .think_budget = r.think_budget,
+             .think_close = r.think_close,
+             .think_end = if (r.think_end) |t| t else -1,
+diff --git a/zig/src/core/lanes/stream.zig b/zig/src/core/lanes/stream.zig
+index 1d6ba843..ebba715f 100644
+--- a/zig/src/core/lanes/stream.zig
++++ b/zig/src/core/lanes/stream.zig
+@@ -128,6 +128,7 @@ pub const Spec = struct {
+     proposer: ?Proposer = null,
+     stop_check: ?StopCheck = null,
+     cancel_check: ?CancelCheck = null,
++    share_check: ?CancelCheck = null,
+     think_budget: u32 = 0,
+     think_close: []const u32 = &.{},
+     think_end: i64 = -1,
+@@ -148,6 +149,7 @@ pub const Stream = struct {
+     proposer: ?Proposer,
+     stop_check: ?StopCheck,
+     cancel_check: ?CancelCheck,
++    share_check: ?CancelCheck = null,
+     think_budget: u32,
+     think_close: []const u32,
+     think_end: i64,
+@@ -202,6 +204,7 @@ pub const Stream = struct {
+             .proposer = if (spec.drafts) spec.proposer else null,
+             .stop_check = spec.stop_check,
+             .cancel_check = spec.cancel_check,
++            .share_check = spec.share_check,
+             .think_budget = spec.think_budget,
+             .think_close = spec.think_close,
+             .think_end = spec.think_end,
+@@ -261,6 +264,11 @@ pub const Stream = struct {
+         return c.check(c.ptr);
+     }
+ 
++    pub fn shares(s: *const Stream) bool {
++        const c = s.share_check orelse return true;
++        return c.check(c.ptr);
++    }
++
+     fn budgetActive(s: *const Stream) bool {
+         return s.think_open and s.think_budget > 0 and s.think_close.len > 0;
+     }
+diff --git a/zig/src/core/tokenizer/model.zig b/zig/src/core/tokenizer/model.zig
+index 40716add..cf07b7cc 100644
+--- a/zig/src/core/tokenizer/model.zig
++++ b/zig/src/core/tokenizer/model.zig
+@@ -64,6 +64,10 @@ pub const Model = struct {
+     fn bpe(m: *const Model, ctx: *steps.Context, vocab: *const Vocab, word: []const u8, out: *std.ArrayList(u32)) Error!void {
+         const a = ctx.a;
+         if (m.ignore_merges) if (m.id(vocab, word)) |whole| return out.append(a, whole);
++        const w = if (ctx.word) |scratch| scratch.allocator() else a;
++        defer if (ctx.word) |scratch| {
++            _ = scratch.reset(.retain_capacity);
++        };
+         var symbols: std.ArrayList(Symbol) = .empty;
+         var pending_unk: ?u32 = null;
+         var piece: std.ArrayList(u8) = .empty;
+@@ -73,16 +77,16 @@ pub const Model = struct {
+             var s = word[i .. i + len];
+             if ((i > 0 and m.prefix != null) or (i + len == word.len and m.suffix != null)) {
+                 piece.clearRetainingCapacity();
+-                if (i > 0) try piece.appendSlice(a, m.prefix orelse "");
+-                try piece.appendSlice(a, s);
+-                if (i + len == word.len) try piece.appendSlice(a, m.suffix orelse "");
++                if (i > 0) try piece.appendSlice(w, m.prefix orelse "");
++                try piece.appendSlice(w, s);
++                if (i + len == word.len) try piece.appendSlice(w, m.suffix orelse "");
+                 s = piece.items;
+             }
+             i += len;
+             if (m.id(vocab, s)) |found| {
+-                if (pending_unk) |u| try symbols.append(a, .{ .id = u, .prev = 0, .next = 0 });
++                if (pending_unk) |u| try symbols.append(w, .{ .id = u, .prev = 0, .next = 0 });
+                 pending_unk = null;
+-                try symbols.append(a, .{ .id = found, .prev = 0, .next = 0 });
++                try symbols.append(w, .{ .id = found, .prev = 0, .next = 0 });
+                 continue;
+             }
+             if (m.byte_fallback) {
+@@ -91,17 +95,17 @@ pub const Model = struct {
+                     if (m.byte_ids[b] == null) break false;
+                 } else true;
+                 if (all) {
+-                    for (s) |b| try symbols.append(a, .{ .id = m.byte_ids[b].?, .prev = 0, .next = 0 });
++                    for (s) |b| try symbols.append(w, .{ .id = m.byte_ids[b].?, .prev = 0, .next = 0 });
+                     continue;
+                 }
+             }
+             if (m.unk_token != null) {
+                 if (pending_unk != null and m.fuse_unk) continue;
+-                if (pending_unk) |u| try symbols.append(a, .{ .id = u, .prev = 0, .next = 0 });
++                if (pending_unk) |u| try symbols.append(w, .{ .id = u, .prev = 0, .next = 0 });
+                 pending_unk = try m.unk(vocab);
+             }
+         }
+-        if (pending_unk) |u| try symbols.append(a, .{ .id = u, .prev = 0, .next = 0 });
++        if (pending_unk) |u| try symbols.append(w, .{ .id = u, .prev = 0, .next = 0 });
+         const syms = symbols.items;
+         for (syms, 0..) |*s, k| {
+             s.prev = @as(i32, @intCast(k)) - 1;
+@@ -109,7 +113,7 @@ pub const Model = struct {
+         }
+         var queue = std.PriorityQueue(Candidate, void, order).empty;
+         for (0..syms.len -| 1) |k| if (m.pair(syms[k].id, syms[k + 1].id)) |hit|
+-            try queue.push(a, .{ .rank = hit.rank, .pos = @intCast(k), .id = hit.id });
++            try queue.push(w, .{ .rank = hit.rank, .pos = @intCast(k), .id = hit.id });
+         while (queue.pop()) |top| {
+             const s = &syms[top.pos];
+             if (!s.alive or s.next < 0) continue;
+@@ -121,9 +125,9 @@ pub const Model = struct {
+             syms[right].alive = false;
+             if (s.next >= 0) syms[@intCast(s.next)].prev = @intCast(top.pos);
+             if (s.prev >= 0) if (m.pair(syms[@intCast(s.prev)].id, s.id)) |hit|
+-                try queue.push(a, .{ .rank = hit.rank, .pos = @intCast(s.prev), .id = hit.id });
++                try queue.push(w, .{ .rank = hit.rank, .pos = @intCast(s.prev), .id = hit.id });
+             if (s.next >= 0) if (m.pair(s.id, syms[@intCast(s.next)].id)) |hit|
+-                try queue.push(a, .{ .rank = hit.rank, .pos = top.pos, .id = hit.id });
++                try queue.push(w, .{ .rank = hit.rank, .pos = top.pos, .id = hit.id });
+         }
+         for (syms) |s| if (s.alive) try out.append(a, s.id);
+     }
+diff --git a/zig/src/core/tokenizer/steps.zig b/zig/src/core/tokenizer/steps.zig
+index ebd1369c..046bdc81 100644
+--- a/zig/src/core/tokenizer/steps.zig
++++ b/zig/src/core/tokenizer/steps.zig
+@@ -13,6 +13,7 @@ pub const Context = struct {
+     matcher: regex.Matcher,
+     spans: std.ArrayList(Span) = .empty,
+     hits: std.ArrayList([2]usize) = .empty,
++    word: ?*std.heap.ArenaAllocator = null,
+ };
+ 
+ pub const Span = struct { start: usize, end: usize, matched: bool };
+diff --git a/zig/src/core/tokenizer/tokenizer.zig b/zig/src/core/tokenizer/tokenizer.zig
+index 176d9958..53c68d55 100644
+--- a/zig/src/core/tokenizer/tokenizer.zig
++++ b/zig/src/core/tokenizer/tokenizer.zig
+@@ -114,9 +114,11 @@ pub const Tokenizer = struct {
+ 
+     /// Token ids for `text`, without post-processor tokens; invalid UTF-8 reads as U+FFFD. Caller frees with `a`.
+     pub fn encode(t: *const Tokenizer, a: Allocator, text: []const u8) Error![]u32 {
+-        var arena = std.heap.ArenaAllocator.init(a);
++        var arena = std.heap.ArenaAllocator.init(t.allocator);
+         defer arena.deinit();
+-        var ctx = steps.Context{ .a = arena.allocator(), .matcher = .{ .a = arena.allocator() } };
++        var word = std.heap.ArenaAllocator.init(t.allocator);
++        defer word.deinit();
++        var ctx = steps.Context{ .a = arena.allocator(), .matcher = .{ .a = arena.allocator() }, .word = &word };
+         var valid = text;
+         if (!std.unicode.utf8ValidateSlice(text)) {
+             var fixed: std.ArrayList(u8) = .empty;
+diff --git a/zig/src/families/dsv41/checkpoint.zig b/zig/src/families/dsv41/checkpoint.zig
+index 05045c80..39fde36b 100644
+--- a/zig/src/families/dsv41/checkpoint.zig
++++ b/zig/src/families/dsv41/checkpoint.zig
+@@ -4,6 +4,8 @@ const std = @import("std");
+ const core = @import("core");
+ const st = core.safetensors;
+ const DType = @import("rank_cache.zig").DType;
++const Config = @import("config.zig").Config;
++const plan = @import("plan.zig");
+ 
+ /// One planned entry's layout once read.
+ pub const Slice = struct {
+@@ -117,12 +119,28 @@ fn dtypeOf(d: st.DType) !DType {
+ 
+ const Source = struct { t: st.Tensor, name: []const u8 };
+ 
++/// The 1017 converter's name for one of the engine's MTP markov head names: markov_w1 is the engine's embed.weight,
++/// markov_w2 its head.weight. Null for every other tensor. A pack written with the engine's own names resolves
++/// before this is tried, so the September packs (and every earlier one) read exactly as they did.
++fn converterName(name: []const u8, buf: []u8) ?[]const u8 {
++    const markov = ".markov_head.";
++    const weight = ".weight";
++    const at = std.mem.lastIndexOf(u8, name, markov) orelse return null;
++    if (!std.mem.endsWith(u8, name, weight) or name.len < at + markov.len + weight.len) return null;
++    const which = name[at + markov.len .. name.len - weight.len];
++    const conv = if (std.mem.eql(u8, which, "embed")) "markov_w1" else if (std.mem.eql(u8, which, "head")) "markov_w2" else return null;
++    return std.fmt.bufPrint(buf, "{s}{s}{s}{s}", .{ name[0..at], markov, conv, weight }) catch null;
++}
++
+ fn source(sh: *const Shards, k: Key, buf: []u8) !Source {
+     const name = if (!k.exl3) k.name else blk: {
+         const tail = if (std.mem.eql(u8, k.part, "tr")) "trellis" else if (std.mem.eql(u8, k.part, "suh")) "suh" else if (std.mem.eql(u8, k.part, "svh")) "svh" else return error.BadKey;
+         break :blk try std.fmt.bufPrint(buf, "{s}.{s}", .{ k.name, tail });
+     };
+-    return .{ .t = sh.get(name) orelse return error.MissingTensor, .name = name };
++    if (sh.get(name)) |t| return .{ .t = t, .name = name };
++    var conv_buf: [256]u8 = undefined;
++    const conv = converterName(name, &conv_buf) orelse return error.MissingTensor;
++    return .{ .t = sh.get(conv) orelse return error.MissingTensor, .name = conv };
+ }
+ 
+ /// The layout `key` reads into.
+@@ -158,6 +176,9 @@ pub fn read(sh: *const Shards, key: []const u8, out: []u8) !void {
+         const from = try dtypeOf(t.dtype);
+         if (k.dtype == null or k.dtype.? == from) return @memcpy(out, t.bytes);
+         if (from == .f16 and k.dtype.? == .f32) return widenHalf(t.bytes, out);
++        // the 1017 quants hold the Engram q_weight / k_weight tables in bf16; the engine reads them as f32, and the
++        // widening is exact (bf16 is an f32's top 16 bits), as the Python loader's .to(torch.float32) is.
++        if (from == .bf16 and k.dtype.? == .f32) return widenBfloat(t.bytes, out);
+         return error.UnsupportedConversion;
+     }
+     const es = (try dtypeOf(t.dtype)).size();
+@@ -189,6 +210,27 @@ fn widenHalf(src: []const u8, out: []u8) void {
+     }
+ }
+ 
++/// bf16 -> f32, exact (the same .to(torch.float32) of a bf16 tensor: bf16 is an f32's top 16 bits).
++fn widenBfloat(src: []const u8, out: []u8) void {
++    const n = src.len / 2;
++    for (0..n) |i| {
++        const bits = std.mem.readInt(u16, src[2 * i ..][0..2], .little);
++        std.mem.writeInt(u32, out[4 * i ..][0..4], @as(u32, bits) << 16, .little);
++    }
++}
++
++/// bf16 -> f16 for a tensor the kernel reads as fp16 (the MTP markov head; the 1017 checkpoint itself holds it in
++/// bf16). Exact for every value f16 holds: bf16's 7 mantissa bits fit f16's 10, and the head's weights are far inside
++/// f16's range; a value outside it saturates, as a cast does.
++pub fn narrowBfloat(src: []const u8, out: []u8) void {
++    const n = src.len / 2;
++    for (0..n) |i| {
++        const bits = std.mem.readInt(u16, src[2 * i ..][0..2], .little);
++        const h: f16 = @floatCast(@as(f32, @bitCast(@as(u32, bits) << 16)));
++        std.mem.writeInt(u16, out[2 * i ..][0..2], @bitCast(h), .little);
++    }
++}
++
+ test "loader keys parse as Python prints them" {
+     const p = try Key.parse("layers.3.ffn.experts.17.w2|None|(1152, 2304)|tr");
+     try std.testing.expect(p.exl3 and p.cols == null and p.rows.?[0] == 1152 and p.rows.?[1] == 2304);
+@@ -198,6 +240,116 @@ test "loader keys parse as Python prints them" {
+     try std.testing.expectError(error.BadKey, Key.parse("a|(2, 1)|None|tr"));
+ }
+ 
++test "the 1017 converter's markov names map to the engine's, and nothing else does" {
++    var buf: [256]u8 = undefined;
++    try std.testing.expectEqualStrings("mtp.2.markov_head.markov_w1.weight", converterName("mtp.2.markov_head.embed.weight", &buf).?);
++    try std.testing.expectEqualStrings("mtp.2.markov_head.markov_w2.weight", converterName("mtp.2.markov_head.head.weight", &buf).?);
++    try std.testing.expect(converterName("mtp.2.markov_head.markov_w1.weight", &buf) == null);
++    try std.testing.expect(converterName("layers.1.engram.q_weight", &buf) == null);
++    try std.testing.expect(converterName("embed.weight", &buf) == null);
++    try std.testing.expect(converterName("mtp.2.markov_head.embed.scale", &buf) == null);
++}
++
++test "bf16 -> f16 keeps every value f16 holds" {
++    const vals = [_]f32{ 0.5, -2.0, 0.0234375, 65504.0, 0.0, 1.0, -0.0 };
++    var src: [vals.len * 2]u8 = undefined;
++    for (vals, 0..) |v, i| {
++        const bf: u16 = @truncate(@as(u32, @bitCast(v)) >> 16);
++        std.mem.writeInt(u16, src[2 * i ..][0..2], bf, .little);
++    }
++    var out: [vals.len * 2]u8 = undefined;
++    narrowBfloat(&src, &out);
++    for (0..vals.len) |i| {
++        // the value the bf16 actually holds (65504 is not bf16-representable: it rounds to 65280)
++        const bf = std.mem.readInt(u16, src[2 * i ..][0..2], .little);
++        const expected: f32 = @bitCast(@as(u32, bf) << 16);
++        const h: f16 = @bitCast(std.mem.readInt(u16, out[2 * i ..][0..2], .little));
++        try std.testing.expectEqual(expected, @as(f32, h));
++    }
++}
++
++test "a 1017 pack: converter markov names and bf16 Engram read as the engine's keys" {
++    const a = std.testing.allocator;
++    const io = std.testing.io;
++    var tmp = std.testing.tmpDir(.{ .iterate = true });
++    defer tmp.cleanup();
++    // the 1017 quant's header entries: markov_w1 / markov_w2 and the Engram q / k in bf16
++    var body: [32]u8 = undefined;
++    for (&body, 0..) |*x, i| x.* = @truncate(i * 7 + 3);
++    const json = "{\"mtp.2.markov_head.markov_w1.weight\":{\"dtype\":\"BF16\",\"shape\":[2,2],\"data_offsets\":[0,8]}," ++
++        "\"mtp.2.markov_head.markov_w2.weight\":{\"dtype\":\"F16\",\"shape\":[2,2],\"data_offsets\":[8,16]}," ++
++        "\"layers.1.engram.q_weight\":{\"dtype\":\"BF16\",\"shape\":[2,2],\"data_offsets\":[16,24]}," ++
++        "\"layers.1.engram.k_weight\":{\"dtype\":\"BF16\",\"shape\":[2,2],\"data_offsets\":[24,32]}}";
++    var file: std.ArrayList(u8) = .empty;
++    defer file.deinit(a);
++    var len: [8]u8 = undefined;
++    std.mem.writeInt(u64, &len, json.len, .little);
++    try file.appendSlice(a, &len);
++    try file.appendSlice(a, json);
++    try file.appendSlice(a, &body);
++    try tmp.dir.writeFile(io, .{ .sub_path = "model-00001-of-00001.safetensors", .data = file.items });
++    const dir = try std.fs.path.join(a, &.{ ".zig-cache", "tmp", &tmp.sub_path });
++    defer a.free(dir);
++    var sh = try Shards.open(a, io, dir);
++    defer sh.close(io);
++    // the engine's names find the converter's tensors, byte for byte
++    const embed = try describe(&sh, "mtp.2.markov_head.embed.weight|None");
++    try std.testing.expectEqual(DType.bf16, embed.dtype);
++    try std.testing.expectEqual(@as(usize, 8), embed.bytes);
++    var got: [8]u8 = undefined;
++    try read(&sh, "mtp.2.markov_head.embed.weight|None", &got);
++    try std.testing.expectEqualSlices(u8, body[0..8], &got);
++    try read(&sh, "mtp.2.markov_head.head.weight|None", &got);
++    try std.testing.expectEqualSlices(u8, body[8..16], &got);
++    // the Engram q / k the pack holds in bf16 read as f32, exactly
++    const q = try describe(&sh, "layers.1.engram.q_weight|torch.float32");
++    try std.testing.expectEqual(DType.f32, q.dtype);
++    try std.testing.expectEqual(@as(usize, 16), q.bytes);
++    var wide: [16]u8 = undefined;
++    try read(&sh, "layers.1.engram.q_weight|torch.float32", &wide);
++    for (0..4) |i| {
++        const bits = std.mem.readInt(u16, body[16 + 2 * i ..][0..2], .little);
++        try std.testing.expectEqual(@as(u32, bits) << 16, std.mem.readInt(u32, wide[4 * i ..][0..4], .little));
++    }
++    var wide_k: [16]u8 = undefined;
++    try read(&sh, "layers.1.engram.k_weight|torch.float32", &wide_k);
++    for (0..4) |i| {
++        const bits = std.mem.readInt(u16, body[24 + 2 * i ..][0..2], .little);
++        try std.testing.expectEqual(@as(u32, bits) << 16, std.mem.readInt(u32, wide_k[4 * i ..][0..4], .little));
++    }
++}
++
++test "a pack with the engine's own names reads them as before: the converter's name never wins" {
++    const a = std.testing.allocator;
++    const io = std.testing.io;
++    var tmp = std.testing.tmpDir(.{ .iterate = true });
++    defer tmp.cleanup();
++    var body: [24]u8 = undefined;
++    for (&body, 0..) |*x, i| x.* = @truncate(i * 11 + 5);
++    const json = "{\"mtp.2.markov_head.embed.weight\":{\"dtype\":\"BF16\",\"shape\":[2,2],\"data_offsets\":[0,8]}," ++
++        "\"mtp.2.markov_head.markov_w1.weight\":{\"dtype\":\"BF16\",\"shape\":[2,2],\"data_offsets\":[8,16]}," ++
++        "\"layers.1.engram.q_weight\":{\"dtype\":\"F32\",\"shape\":[1,2],\"data_offsets\":[16,24]}}";
++    var file: std.ArrayList(u8) = .empty;
++    defer file.deinit(a);
++    var len: [8]u8 = undefined;
++    std.mem.writeInt(u64, &len, json.len, .little);
++    try file.appendSlice(a, &len);
++    try file.appendSlice(a, json);
++    try file.appendSlice(a, &body);
++    try tmp.dir.writeFile(io, .{ .sub_path = "model-00001-of-00001.safetensors", .data = file.items });
++    const dir = try std.fs.path.join(a, &.{ ".zig-cache", "tmp", &tmp.sub_path });
++    defer a.free(dir);
++    var sh = try Shards.open(a, io, dir);
++    defer sh.close(io);
++    var got: [8]u8 = undefined;
++    try read(&sh, "mtp.2.markov_head.embed.weight|None", &got);
++    try std.testing.expectEqualSlices(u8, body[0..8], &got);
++    // an f32 table the engine reads as f32 is copied, not converted (the September packs' shape)
++    var f32_got: [8]u8 = undefined;
++    try read(&sh, "layers.1.engram.q_weight|torch.float32", &f32_got);
++    try std.testing.expectEqualSlices(u8, body[16..24], &f32_got);
++}
++
+ test "column, row and whole slices of a toy trellis and its scales" {
+     const a = std.testing.allocator;
+     const io = std.testing.io;
+@@ -249,3 +401,144 @@ test "column, row and whole slices of a toy trellis and its scales" {
+     const h0: f16 = @bitCast(std.mem.readInt(u16, body[224..226], .little));
+     try std.testing.expectEqual(@as(f32, h0), @as(f32, @bitCast(std.mem.readInt(u32, wide[0..4], .little))));
+ }
++
++const fixture_1017 = @embedFile("fixtures/1017-headers.json");
++
++/// One pack of the fixture: its shards rebuilt from the real headers (a pattern in the body), then every check read
++/// under the engine's key and compared with the pack's own tensor.
++fn fixturePack(a: std.mem.Allocator, io: std.Io, pack: std.json.Value) !void {
++    var tmp = std.testing.tmpDir(.{ .iterate = true });
++    defer tmp.cleanup();
++    for (pack.object.get("files").?.array.items) |fv| {
++        const f = fv.object;
++        const name = f.get("name").?.string;
++        const header = f.get("header").?.string;
++        const body_bytes: usize = @intCast(f.get("body_bytes").?.integer);
++        var file: std.ArrayList(u8) = .empty;
++        defer file.deinit(a);
++        var len: [8]u8 = undefined;
++        std.mem.writeInt(u64, &len, header.len, .little);
++        try file.appendSlice(a, &len);
++        try file.appendSlice(a, header);
++        const start = file.items.len;
++        try file.resize(a, start + body_bytes);
++        for (file.items[start..], 0..) |*x, i| x.* = @truncate(i * 37 + 11);
++        try tmp.dir.writeFile(io, .{ .sub_path = name, .data = file.items });
++    }
++    const dir = try std.fs.path.join(a, &.{ ".zig-cache", "tmp", &tmp.sub_path });
++    defer a.free(dir);
++    var sh = try Shards.open(a, io, dir);
++    defer sh.close(io);
++    for (pack.object.get("checks").?.array.items) |cv| {
++        const c = cv.object;
++        const key = c.get("key").?.string;
++        const src_name = c.get("source").?.string;
++        const want = c.get("want").?.string;
++        const dtype_text = c.get("dtype").?.string;
++        const want_dtype: DType = if (std.mem.eql(u8, dtype_text, "BF16")) .bf16 else if (std.mem.eql(u8, dtype_text, "F16")) .f16 else if (std.mem.eql(u8, dtype_text, "F32")) .f32 else return error.BadFixture;
++        const src = sh.get(src_name) orelse return error.MissingTensor;
++        const slice = try describe(&sh, key);
++        try std.testing.expectEqual(want_dtype, slice.dtype);
++        const got = try a.alloc(u8, slice.bytes);
++        defer a.free(got);
++        try read(&sh, key, got);
++        if (std.mem.eql(u8, want, "same")) {
++            try std.testing.expectEqualSlices(u8, src.bytes, got);
++        } else if (std.mem.eql(u8, want, "f32")) {
++            try std.testing.expectEqual(src.bytes.len * 2, got.len);
++            for (0..src.bytes.len / 2) |i| {
++                const bits = std.mem.readInt(u16, src.bytes[2 * i ..][0..2], .little);
++                try std.testing.expectEqual(@as(u32, bits) << 16, std.mem.readInt(u32, got[4 * i ..][0..4], .little));
++            }
++        } else return error.BadFixture;
++    }
++}
++
++test "1017 packs from their real headers: converter markov names and bf16 Engram read as the engine's keys" {
++    const a = std.testing.allocator;
++    const io = std.testing.io;
++    const parsed = try std.json.parseFromSlice(std.json.Value, a, fixture_1017, .{});
++    defer parsed.deinit();
++    for (parsed.value.object.get("packs").?.array.items) |pack| try fixturePack(a, io, pack);
++}
++
++test "a real pack reads under the engine's keys (TF_DSV41_PACK): 1017 markov names and Engram dtypes" {
++    const dir = std.c.getenv("TF_DSV41_PACK") orelse return error.SkipZigTest;
++    const a = std.testing.allocator;
++    const io = std.testing.io;
++    var sh = try Shards.open(a, io, std.mem.span(dir));
++    defer sh.close(io);
++    // the MTP markov head: the engine's names read the pack's own tensor or the 1017 converter's, byte for byte
++    for ([_][]const u8{ "mtp.2.markov_head.embed.weight", "mtp.2.markov_head.head.weight" }) |name| {
++        var kb: [128]u8 = undefined;
++        const key = try std.fmt.bufPrint(&kb, "{s}|None", .{name});
++        var buf: [256]u8 = undefined;
++        const src = try source(&sh, try Key.parse(key), &buf);
++        const got = try a.alloc(u8, src.t.bytes.len);
++        defer a.free(got);
++        try read(&sh, key, got);
++        try std.testing.expectEqualSlices(u8, src.t.bytes, got);
++    }
++    // the Engram q / k: the engine reads f32; a bf16 table widens exactly, an f32 one is copied
++    for ([_][]const u8{ "layers.1.engram.q_weight", "layers.1.engram.k_weight", "layers.14.engram.q_weight", "layers.14.engram.k_weight" }) |name| {
++        var kb: [128]u8 = undefined;
++        var nb: [128]u8 = undefined;
++        const key = try std.fmt.bufPrint(&kb, "{s}|torch.float32", .{name});
++        const raw_key = try std.fmt.bufPrint(&nb, "{s}|None", .{name});
++        const src = sh.get(name) orelse return error.MissingTensor;
++        const from = (try describe(&sh, raw_key)).dtype;
++        const got = try a.alloc(u8, (try describe(&sh, key)).bytes);
++        defer a.free(got);
++        try read(&sh, key, got);
++        if (from == .f32) {
++            try std.testing.expectEqualSlices(u8, src.bytes, got);
++        } else if (from == .bf16) {
++            try std.testing.expectEqual(src.bytes.len * 2, got.len);
++            for (0..src.bytes.len / 2) |i| {
++                const bits = std.mem.readInt(u16, src.bytes[2 * i ..][0..2], .little);
++                try std.testing.expectEqual(@as(u32, bits) << 16, std.mem.readInt(u32, got[4 * i ..][0..4], .little));
++            }
++        } else return error.UnsupportedConversion;
++    }
++    std.debug.print("TF_DSV41_PACK {s}: the markov head names and the Engram q/k read under the engine's keys\n", .{std.mem.span(dir)});
++}
++
++test "a pack's planned entries read to one digest (TF_DSV41_DIGEST_PACK): the loader's byte contract across builds" {
++    const dir = std.c.getenv("TF_DSV41_DIGEST_PACK") orelse return error.SkipZigTest;
++    const a = std.testing.allocator;
++    const io = std.testing.io;
++    // the plan's keys are many small allocations: one arena, freed with the test
++    var arena = std.heap.ArenaAllocator.init(a);
++    defer arena.deinit();
++    const cfg = try Config.read(arena.allocator(), io, std.mem.span(dir));
++    var sh = try Shards.open(a, io, std.mem.span(dir));
++    defer sh.close(io);
++    const wants = try plan.wants(arena.allocator(), cfg, .{ .rank = 0, .world = 2 }, true);
++    var h = std.crypto.hash.sha2.Sha256.init(.{});
++    var buf: std.ArrayList(u8) = .empty;
++    defer buf.deinit(a);
++    var n: usize = 0;
++    var bytes: usize = 0;
++    for (wants) |w| {
++        const bar = std.mem.indexOfScalar(u8, w.key, '|') orelse w.key.len;
++        const name = w.key[0..bar];
++        // a representative set: the embedding and head, the DSpark tensors, the Engram q / k and layer 0's non-expert
++        // tensors (the experts are the bulk of the pack and the same code reads them)
++        const take = std.mem.startsWith(u8, name, "embed.") or std.mem.startsWith(u8, name, "norm.") or
++            std.mem.eql(u8, name, "head") or std.mem.startsWith(u8, name, "mtp.") or
++            std.mem.indexOf(u8, name, ".engram.") != null or
++            (std.mem.startsWith(u8, name, "layers.0.") and std.mem.indexOf(u8, name, ".ffn.experts.") == null);
++        if (!take) continue;
++        h.update(w.key);
++        h.update("\x00");
++        const len = (try describe(&sh, w.key)).bytes;
++        try buf.resize(a, len);
++        try read(&sh, w.key, buf.items);
++        h.update(buf.items);
++        n += 1;
++        bytes += len;
++    }
++    var out: [32]u8 = undefined;
++    h.final(&out);
++    std.debug.print("TF_DSV41_DIGEST_PACK {s}: {d} entries, {d} bytes, sha256 {x}\n", .{ std.mem.span(dir), n, bytes, out });
++}
+diff --git a/zig/src/families/dsv41/lanes.zig b/zig/src/families/dsv41/lanes.zig
+index b9a4c0e7..cd85a4f5 100644
+--- a/zig/src/families/dsv41/lanes.zig
++++ b/zig/src/families/dsv41/lanes.zig
+@@ -464,7 +464,7 @@ pub const Lanes = struct {
+             m.fill_seq = &.{};
+         }
+         var ran: usize = 0;
+-        while (f.start < f.len and ran < chunks) : (ran += 1) {
++        while (f.start < f.len and (ran < chunks or !s.shares())) : (ran += 1) {
+             const start = f.start;
+             const len = f.len;
+             if (start > 0 and s.isCancelled()) return error.Cancelled;
+@@ -573,6 +573,7 @@ pub const Lanes = struct {
+         if (s.images.len > 0) {
+             const image_id = m.cfg.image_token orelse return error.NoVision;
+             const row_bytes = m.cfg.hidden * 2;
++            const resume_at: usize = if (kept) |sn| sn.at else 0;
+             var at_row: usize = 0;
+             for (s.images) |img| {
+                 if (img.tokens == 0 or @as(usize, img.at) + img.tokens > len) return error.BadImageSpan;
+@@ -580,6 +581,7 @@ pub const Lanes = struct {
+                     if (q.* != @as(i64, image_id)) return error.BadImageSpan;
+                     q.* = -1;
+                 }
++                if (@as(usize, img.at) + img.tokens <= resume_at) continue;
+                 if (img.rows) {
+                     if (img.bytes.len != img.tokens * row_bytes) return error.BadImageRows;
+                     try rows.appendSlice(gpa, img.bytes);
+diff --git a/zig/src/families/dsv41/model.zig b/zig/src/families/dsv41/model.zig
+index 8ffb29e7..b5782a6a 100644
+--- a/zig/src/families/dsv41/model.zig
++++ b/zig/src/families/dsv41/model.zig
+@@ -154,6 +154,7 @@ pub const Model = struct {
+         m.* = undefined;
+         m.gpa = gpa;
+         if (std.c.getenv("TF_DS_REPLAY_FLOOR")) |v| prompt.replay_floor = std.mem.eql(u8, std.mem.span(v), "1"); // every rank alike
++        prompt.aliasEnv(); // TF_DS_PROMPT_ALIAS: this rank's memory only
+         m.spans = .empty;
+         m.img_buf = null;
+         m.host = std.heap.ArenaAllocator.init(gpa);
+diff --git a/zig/src/families/dsv41/prompt.zig b/zig/src/families/dsv41/prompt.zig
+index 936818b1..aabadc5c 100644
+--- a/zig/src/families/dsv41/prompt.zig
++++ b/zig/src/families/dsv41/prompt.zig
+@@ -102,6 +102,45 @@ pub const Arena = struct {
+     }
+ };
+ 
++/// TF_DS_PROMPT_ALIAS's shared regions (Chunk.init): each member's field, its region and its bytes as its own take
++/// would take them; place() takes each region once at its largest member's bytes and points every member at its start.
++/// Off: every member's own take, in the served order (the same pieces at the same places).
++const Regions = struct {
++    on: bool,
++    size: [5]usize = @splat(0),
++    at: [32]*u64 = undefined,
++    of: [32]u8 = undefined,
++    n: usize = 0,
++    used: usize = 0, // the members' bytes
++
++    fn take(r: *Regions, a: *Arena, g: u8, p: *u64, bytes: usize) !void {
++        if (!r.on) {
++            p.* = try a.take(bytes);
++            return;
++        }
++        if (r.n == r.at.len) return error.TooManySharedBuffers;
++        r.size[g] = @max(r.size[g], bytes);
++        r.at[r.n] = p;
++        r.of[r.n] = g;
++        r.n += 1;
++        r.used += bytes;
++        p.* = 0;
++    }
++
++    fn place(r: *Regions, a: *Arena) !void {
++        if (!r.on) return;
++        var base: [5]u64 = @splat(0);
++        var total: usize = 0;
++        for (r.size, &base) |s, *b| {
++            if (s == 0) continue;
++            b.* = try a.take(s);
++            total += s;
++        }
++        for (r.at[0..r.n], r.of[0..r.n]) |p, g| p.* = base[g];
++        std.log.info("the prompt pass's scratch: {d} buffers of {d} MiB in shared regions of {d} MiB (TF_DS_PROMPT_ALIAS)", .{ r.n, r.used >> 20, total >> 20 });
++    }
++};
++
+ /// A RoPE kind's tables on the device: cos, sin fp32 [rows, rope_dim / 2] (ops.RopeTables' rows).
+ pub const Rope = struct { cos: u64, sin: u64 };
+ 
+@@ -274,6 +313,16 @@ pub const Chunk = struct {
+         const o_lora = l0.wo_a[0].n;
+         const ex = l0.experts;
+         const sl = e.slots();
++        if (alias) {
++            if (e.two != null) return notPorted(@src());
++            var last: usize = 0;
++            for (e.w.layers, 0..) |lay, li| {
++                if (lay.engram_wkv != null and li >= c.candidate_source) return error.PromptAliasLayers;
++                if (lay.idx_wq_b != null or lay.engram_wkv != null) last = li;
++            }
++            for (c.dspark_taps.slice()) |li| if (li <= last) return error.PromptAliasLayers;
++        }
++        var rg: Regions = .{ .on = alias };
+         var ch: Chunk = undefined;
+         ch.spans = &.{};
+         ch.img_rows = 0;
+@@ -296,13 +345,13 @@ pub const Chunk = struct {
+         ch.qa = try a.take(cap * l0.wq_a.n * 2);
+         ch.y = try a.take(cap * hd * 2);
+         ch.qr = try a.take(cap * l0.wq_a.n * 2);
+-        ch.q = try a.take(cap * hl * hd * 2);
++        try rg.take(a, 3, &ch.q, cap * hl * hd * 2);
+         ch.wsrc = try a.take((c.window - 1 + cap) * hd * 2);
+         ch.wlo = try a.take(8);
+-        ch.o = try a.take(cap * hl * hd * 2);
+-        ch.u = try a.take(cap * groups * o_lora * 2);
+-        ch.pa = try a.take(cap * d * 4);
+-        ch.ga = try a.take(e.world * cap * d * 4);
++        try rg.take(a, 2, &ch.o, cap * hl * hd * 2);
++        try rg.take(a, 3, &ch.u, cap * groups * o_lora * 2);
++        try rg.take(a, 2, &ch.pa, cap * d * 4);
++        try rg.take(a, 0, &ch.ga, e.world * cap * d * 4);
+         ch.neg = try a.take(cap * 8);
+         ch.ring_idx = try a.take((c.window + ring_extra) * 8);
+         ch.rslot = try a.take(ring_extra * 8);
+@@ -310,15 +359,15 @@ pub const Chunk = struct {
+         ch.pl_ = try a.take(ring_extra * hl * tri_attn.attn_splits * 4);
+         ch.po_ = try a.take(ring_extra * hl * tri_attn.attn_splits * hd * 4);
+         ch.invalid = try a.take(4);
+-        ch.xf = try a.take(cap * d * 4);
++        try rg.take(a, 0, &ch.xf, cap * d * 4);
+         ch.gate_f = try a.take(c.experts * d * 4);
+         ch.logits = try a.take(cap * c.experts * 4);
+         ch.pick = try a.take(cap * sl * 4);
+         ch.wts = try a.take(cap * sl * 4);
+         ch.pick_vl = try a.take(cap * sl * 4);
+         ch.wts_vl = try a.take(cap * sl * 4);
+-        ch.pm = try a.take(cap * d * 4);
+-        ch.gm = try a.take(e.world * cap * d * 4);
++        try rg.take(a, 2, &ch.pm, cap * d * 4);
++        try rg.take(a, 0, &ch.gm, e.world * cap * d * 4);
+         // compressed layers: the smallest ratio sets the most compressed entries a row can see
+         var min_ratio: usize = 0;
+         for (e.w.layers) |lay| {
+@@ -335,16 +384,16 @@ pub const Chunk = struct {
+             ch.groups = try a.take(cap * 8);
+             ch.gpos = try a.take(cap * 8);
+             ch.raw_idx = try a.take(raw_rows * 8);
+-            ch.iq = try a.take(cap * ih * 2);
+-            ch.iq4 = try a.take(cap * ih * 2);
++            try rg.take(a, 2, &ch.iq, cap * ih * 2);
++            try rg.take(a, 4, &ch.iq4, cap * ih * 2);
+             ch.wl = try a.take(cap * c.index_heads * 4);
+             ch.iw = try a.take(cap * c.index_heads * 2);
+             ch.vis = try a.take(cap * 8);
+             ch.vis_blk = try a.take(cap * 8);
+             // the indexer's row blocks keep rows * n_comp under 2^24 (model.py rb), so their keys under key_elems
+             const ke: usize = @min(cap * ch.max_comp, key_elems); // (typed: @min with a comptime bound narrows)
+-            ch.keys = try a.take(ke * 8);
+-            ch.score = try a.take(ke * 4);
++            try rg.take(a, 1, &ch.keys, ke * 8);
++            try rg.take(a, 0, &ch.score, ke * 4);
+             ch.tmax = try a.take((ke / tri_index.tile + cap) * 8);
+             ch.cidx = try a.take(cap * c.index_topk * 8);
+             ch.ktop = try a.take(cap * c.index_topk * 8);
+@@ -353,9 +402,9 @@ pub const Chunk = struct {
+             const cb = c.candidate_block;
+             ch.pool_ms = (ch.max_comp + cb - 1) / cb;
+             if (ch.pool_ms > c.candidate_blocks) {
+-                ch.pool = try a.take(cap * ch.pool_ms);
++                try rg.take(a, 1, &ch.pool, cap * ch.pool_ms);
+                 ch.bmax = try a.take(@max(16 * ch.pool_ms, key_elems / cb + cap) * 4);
+-                ch.pidx = try a.take(cap * c.candidate_blocks * 8);
++                try rg.take(a, 2, &ch.pidx, cap * c.candidate_blocks * 8);
+             }
+             ch.every = try a.take(cap * 8);
+             {
+@@ -366,26 +415,26 @@ pub const Chunk = struct {
+                 try e.s.synchronize(); // (the host copy is freed next)
+             }
+             if (tri_index.prunes(ch.max_comp, c.index_topk)) {
+-                ch.pbufs = .{ .tpos = try a.take(pruned_rows * c.index_topk * 8), .cand = try a.take(pruned_rows * c.index_topk * tri_index.tile * 8), .every = ch.every };
++                ch.pbufs = .{ .tpos = try a.take(pruned_rows * c.index_topk * 8), .cand = 0, .every = ch.every };
++                try rg.take(a, 0, &ch.pbufs.cand, pruned_rows * c.index_topk * tri_index.tile * 8);
+             }
+         }
+         for (e.w.layers) |lay| {
+             const ew = lay.engram_wkv orelse continue;
+             const en = if (e.two) |t| t.engramWidth() else ew.n; // the summed projection's width (2D: both pairs')
+             ch.eb = try a.take(cap * ew.k * 2);
+-            ch.ek = try a.take(cap * ew.n * 4);
+-            ch.ekg = try a.take(e.world * cap * en * 4);
+-            ch.kv = try a.take(cap * en * 2);
++            try rg.take(a, 1, &ch.ek, cap * ew.n * 4);
++            try rg.take(a, 0, &ch.ekg, e.world * cap * en * 4);
++            try rg.take(a, 2, &ch.kv, cap * en * 2);
+             break;
+         }
+         const sz = exl3_experts.Scratch.sizes(cap, sl, ex.dims, ex.width, ex.count);
+-        var xs: exl3_experts.Scratch = undefined;
+-        xs.rows = cap;
+-        xs.slots = sl;
++        ch.xs.rows = cap;
++        ch.xs.slots = sl;
++        const shared = [_]?u8{ 2, 3, 2, 0, null, null, null, null, null, null, null };
+         inline for (.{ "xg", "xu", "xd", "z", "no_y", "ids", "count", "counts", "members", "work_gu", "work_d" }, 0..) |f, j| {
+-            @field(xs, f) = try a.take(sz[j]);
++            if (shared[j]) |g| try rg.take(a, g, &@field(ch.xs, f), sz[j]) else @field(ch.xs, f) = try a.take(sz[j]);
+         }
+-        ch.xs = xs;
+         ch.xsd = try decodeScratch(e, a, ex, sl);
+         ch.gl = try a.take(16 * (d / 256) * c.experts * 4);
+         // prefill.Workspace: the largest prompt GEMM's rotated input and W_q (fp16) over every layer, and the Hadamard
+@@ -409,7 +458,10 @@ pub const Chunk = struct {
+                 max_kn = @max(max_kn, @as(usize, l.k) * l.n);
+             }
+         }
+-        ch.ws = .{ .xh = try a.take(cap * max_xk * 2), .w = try a.take(max_kn * 2), .h = try a.take(128 * 128 * 2) };
++        ch.ws = .{ .xh = 0, .w = 0, .h = 0 };
++        try rg.take(a, 4, &ch.ws.xh, cap * max_xk * 2);
++        try rg.take(a, 0, &ch.ws.w, max_kn * 2);
++        ch.ws.h = try a.take(128 * 128 * 2);
+         ch.blas_ws = try a.take(cublas.Blas.workspace_bytes);
+         // grouped linears: every layer's counters (int32 [8 N / 128], zeros, left zero by each launch), the largest
+         // group's rotated rows and partials at 128 rows
+@@ -441,10 +493,12 @@ pub const Chunk = struct {
+             max_gz = @max(max_gz, exl3_linear.zFloats(kv[0..ds.blocks.len], 128));
+             try addLinear(e, &ch, a, ds.main_proj, &max_gk, &max_gz);
+         }
+-        ch.taps = try a.take(@max(c.dspark_taps.slice().len, 1) * cap * d * 2);
++        try rg.take(a, 1, &ch.taps, @max(c.dspark_taps.slice().len, 1) * cap * d * 2);
+         ch.gxh = try a.take(128 * max_gk * 2);
+         ch.gz = try a.take(@max(max_gz, 1) * 4);
++        try rg.place(a);
+         // the scratch as experts.py makes it: zeros, the member lists -1
++        const xs = ch.xs;
+         for ([_]u64{ xs.xg, xs.xu, xs.xd, xs.z, xs.no_y, xs.ids, xs.count, xs.counts }, [_]usize{ sz[0], sz[1], sz[2], sz[3], sz[4], sz[5], sz[6], sz[7] }) |p, n| try fill(e, p, 0, n);
+         try fill32(e, xs.members, 0xffffffff, sz[8] / 4);
+         try fill(e, ch.neg, 0xff, cap * 8);
+@@ -714,6 +768,13 @@ pub fn mm(e: *const Engine, ch: *const Chunk, l: weights.Linear, x: u64, ldx: us
+ /// TF_DS_REPLAY_FLOOR=1 (model.zig sets it on every rank): a small chunk whose window reaches below the floor reads it
+ /// by the gather path (off: ring mode, as the served lane reads, the slot's previous request's keys below the floor).
+ pub var replay_floor = false;
++pub var alias = false;
++
++pub fn aliasEnv() void {
++    const v = std.c.getenv("TF_DS_PROMPT_ALIAS") orelse return;
++    alias = std.mem.eql(u8, std.mem.span(v), "1");
++    if (alias) std.log.info("the prompt pass's scratch in shared regions (TF_DS_PROMPT_ALIAS)", .{});
++}
+ 
+ /// attention_k: the partial pa [n, D] fp32 of this rank's heads; the chunk's keys go into the layer's window ring
+ /// (bf16 [window + RING_EXTRA, head_dim]). A compressed layer also attends to its kv source's latents the indexer picks
+diff --git a/zig/src/families/dsv41/weights.zig b/zig/src/families/dsv41/weights.zig
+index df613e42..7cbf8e4a 100644
+--- a/zig/src/families/dsv41/weights.zig
++++ b/zig/src/families/dsv41/weights.zig
+@@ -121,6 +121,14 @@ pub const Source = union(enum) {
+         };
+     }
+ 
++    /// The dtype `key`'s entry is stored in (a key's own dtype request does not apply: this is the bytes').
++    pub fn dtype(s: Source, key: []const u8) !rank_cache.DType {
++        return switch (s) {
++            .cache => |c| (c.index.get(key) orelse return error.MissingEntry).dtype,
++            .shards => |sh| (try checkpoint.describe(sh, key)).dtype,
++        };
++    }
++
+     pub fn read(s: Source, key: []const u8, out: []u8) !void {
+         switch (s) {
+             .cache => |c| {
+@@ -265,6 +273,19 @@ const Loader = struct {
+         return L.upload(tensor, try L.entry(try plan.plainKey(&kb, tensor, dtype)));
+     }
+ 
++    /// The MTP markov head, which the kernel reads as fp16: a pack that holds it in bf16 (the 1017 checkpoint's own
++    /// dtype; the converter casts it to f16, a community quant may not) is converted exactly at load, and an f16 head
++    /// is uploaded as it is. The cache key stays the checkpoint's own dtype, so no rank cache is invalidated.
++    fn markovHead(L: *Loader, tensor: []const u8) !u64 {
++        var kb: [256]u8 = undefined;
++        const key = try plan.plainKey(&kb, tensor, null);
++        const src = try L.entry(key);
++        if ((try L.src.dtype(key)) != .bf16) return L.upload(tensor, src);
++        try L.aux.resize(L.gpa, src.len);
++        checkpoint.narrowBfloat(src, L.aux.items);
++        return L.upload(tensor, L.aux.items);
++    }
++
+     /// linear(prefix, cols, rows): Exl3Linear.from_tensors in strips.
+     fn linear(L: *Loader, prefix: []const u8, cols: ?[2]usize, rows: ?[2]usize) !Linear {
+         var kb: [256]u8 = undefined;
+@@ -516,7 +537,7 @@ pub fn load(gpa: std.mem.Allocator, d: *const cuda.Driver, src: Source, c: Confi
+             .main_norm = try L.plain("mtp.0.main_norm.weight", null),
+             .norm = try L.plain(try std.fmt.bufPrint(&tb, "{s}.norm.weight", .{last}), null),
+             .markov_embed = try L.plain(try std.fmt.bufPrint(&tb, "{s}.markov_head.embed.weight", .{last}), null),
+-            .markov_head = try L.plain(try std.fmt.bufPrint(&tb, "{s}.markov_head.head.weight", .{last}), null),
++            .markov_head = try L.markovHead(try std.fmt.bufPrint(&tb, "{s}.markov_head.head.weight", .{last})),
+             .conf = try L.plain(try std.fmt.bufPrint(&tb, "{s}.confidence_head.proj.weight", .{last}), null),
+         };
+     }
+diff --git a/zig/src/server/server.zig b/zig/src/server/server.zig
+index 29a53829..8d93c8cf 100644
+--- a/zig/src/server/server.zig
++++ b/zig/src/server/server.zig
+@@ -22,6 +22,10 @@ const Value = json.Value;
+ const Cx = errors.Cx;
+ const Allocator = std.mem.Allocator;
+ 
++/// Requests so far that drew a random seed (TF_SEED_RANDOM), and the second of the last top_k warning.
++var seed_counter: std.atomic.Value(u64) = .init(0);
++var clamp_warned_s: std.atomic.Value(i64) = .init(-60);
++
+ /// auto compacts near the window. fraction compacts past that share of it.
+ pub const CompactAt = union(enum) { auto, fraction: f64 };
+ 
+@@ -135,6 +139,39 @@ pub const Server = struct {
+         return null;
+     }
+ 
++    /// TF_SEED_RANDOM=1: the value mixed into the salt of a request that names no seed, so identical requests sample
++    /// differently (off: the seed is keyed to the prompt alone, as before). A request that sends `seed` keeps it exactly.
++    fn seedMix(srv: *const Server) i64 {
++        const v = std.c.getenv("TF_SEED_RANDOM") orelse return 0;
++        if (!std.mem.eql(u8, std.mem.span(v), "1")) return 0;
++        const ns: u64 = @truncate(@as(u96, @bitCast(std.Io.Clock.real.now(srv.io).toNanoseconds())));
++        const n = seed_counter.fetchAdd(1, .monotonic);
++        return @bitCast((ns ^ (n *% 0x9E3779B97F4A7C15)) *% 0xBF58476D1CE4E5B9);
++    }
++
++    /// TF_TOP_K_MAX=N: the largest top_k the engine's sampler takes (DeepSeek-V4.1: 56). A request top_k of 0 or below
++    /// (vLLM's "off") means the server default, and one above N is cut to N, with a warning at most once a minute.
++    fn topKFor(srv: *const Server, asked: i64) i64 {
++        const v = std.c.getenv("TF_TOP_K_MAX") orelse return asked;
++        const max = std.fmt.parseInt(i64, std.mem.span(v), 10) catch return asked;
++        if (max <= 0) return asked;
++        var k = asked;
++        if (k <= 0) {
++            k = 20;
++            if (srv.config.default_sampling) |d| if (d.get("top_k")) |dk| if (dk.int64()) |n| if (n > 0) {
++                k = n;
++            };
++        }
++        if (k > max) {
++            const now_s: i64 = @intCast(@divFloor(clock.nowNs(srv.io), std.time.ns_per_s));
++            const last = clamp_warned_s.load(.monotonic);
++            if (now_s - last >= 60 and clamp_warned_s.cmpxchgStrong(last, now_s, .monotonic, .monotonic) == null)
++                log.line("warning: top_k {d} is above this engine's sampler limit; using {d} (at most one warning a minute)", .{ k, max });
++            k = max;
++        }
++        return k;
++    }
++
+     /// ``_resolve_sampling``: omitted or null fields keep the defaults; an omitted seed is keyed to the prompt.
+     pub fn resolveSampling(srv: *Server, cx: *Cx, f: Value, temperature: f64, prompt_ids: []const u32) errors.Refused!?api.Sampling {
+         _ = temperature; // the request's own temperature field decides, as in the Python server
+@@ -143,11 +180,11 @@ pub const Server = struct {
+         try merge(options, cx, try fields.parseNumbers(cx, f));
+         const temp = number(options.get("temperature")) orelse 0;
+         if (temp <= 0) return null;
+-        const seed: u64 = if (options.get("seed")) |s| seedBits(s) else api.seedFor(prompt_ids, srv.config.seed_salt);
++        const seed: u64 = if (options.get("seed")) |s| seedBits(s) else api.seedFor(prompt_ids, srv.config.seed_salt +% srv.seedMix());
+         return .{
+             .seed = seed,
+             .temperature = @floatCast(temp),
+-            .top_k = @intCast(@min(@max(0, (if (options.get("top_k")) |k| k.int64() else null) orelse 0), std.math.maxInt(u32))),
++            .top_k = @intCast(@min(@max(0, srv.topKFor((if (options.get("top_k")) |k| k.int64() else null) orelse 0)), std.math.maxInt(u32))),
+             .top_p = @floatCast(number(options.get("top_p")) orelse 1.0),
+             .min_p = @floatCast(number(options.get("min_p")) orelse 0.0),
+         };

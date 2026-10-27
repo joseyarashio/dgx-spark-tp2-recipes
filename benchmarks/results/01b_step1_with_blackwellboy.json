@@ -1,0 +1,834 @@
+{
+  "label": "step1_with_blackwellboy",
+  "timestamp": "2026-10-27 17:48:29",
+  "system_before": {
+    "health": {
+      "status": "ok",
+      "model": "DeepSeek-V4.1-Flash-1017-TF",
+      "model_ids": [
+        "DeepSeek-V4.1-Flash-1017-TF",
+        "DeepSeek-V4.1-Flash-TF",
+        "current"
+      ],
+      "max_batch_size": 4,
+      "warming": false,
+      "memory": {
+        "active": 111110465828,
+        "cache": 0,
+        "peak": 111110465828
+      },
+      "live": {
+        "connections": 0,
+        "waiting": 0,
+        "decode_tokens_per_second": 0.0,
+        "prefill_tokens_per_second": 0.0
+      }
+    },
+    "proxy": {
+      "status": "ok",
+      "upstream_healthy": true,
+      "upstream_url": "http://127.0.0.1:8888",
+      "current_model": "DeepSeek-V4.1-Flash-1017-TF",
+      "concurrency_limit": 4,
+      "queue_buffer": 4,
+      "tiered_timeouts": [
+        20.0,
+        15.0,
+        10.0,
+        5.0
+      ],
+      "extension_seconds": 5.0,
+      "active_running": 0,
+      "waiting_in_queue": 0,
+      "queue_positions": [],
+      "queue_extended": [],
+      "model_limits_config": {
+        "dsv41": 2,
+        "DeepSeek-V4.1-Flash-EXL3": 2,
+        "DeepSeek-V4.1-Flash-TF": 4,
+        "DeepSeek-V4.1-Flash-1017-TF": 4,
+        "GLM-5.3-Flash": 4,
+        "GLM-5.3-Flash-EXL3": 4
+      },
+      "default_limit": 4
+    },
+    "node1": {
+      "mem_available_mib": 8206,
+      "swap_used_mib": 812,
+      "buddy_normal_orders_9_to_13": [
+        23,
+        78,
+        8,
+        3,
+        26
+      ],
+      "buddy_2mib_plus_blocks_total": 138
+    },
+    "node2": {
+      "mem_available_mib": 11076,
+      "swap_used_mib": 0,
+      "buddy_normal_orders_9_to_13": [
+        224,
+        143,
+        45,
+        2,
+        148
+      ],
+      "buddy_2mib_plus_blocks_total": 562
+    }
+  },
+  "single_decode": {
+    "temp_0.30": {
+      "code": {
+        "id": "chatcmpl-6246525e88b3beca222eeb073d9db069",
+        "wall_seconds": 5.6382,
+        "client_ttft_seconds": 0.4215,
+        "tensorfold": {
+          "enable_thinking": false,
+          "reasoning_effort": "none",
+          "engine": "lanes",
+          "tokens_per_second": 73.41244591384769,
+          "seconds": 5.623332882,
+          "prefill_seconds": 0.406118353,
+          "prefill_widths": [],
+          "prefill_raised": [],
+          "time_to_first_token": 0.406625264,
+          "sampling": "exact",
+          "drafts": true,
+          "token_sha": "4d95c4c630b7",
+          "min_rows": 2
+        },
+        "speculative": {
+          "rounds": 138,
+          "drafted": 375,
+          "accepted": 245,
+          "acceptance_rate": 0.6533333333333333,
+          "tokens_per_round": 2.782608695652174
+        },
+        "usage": {
+          "prompt_tokens": 43,
+          "completion_tokens": 384,
+          "total_tokens": 427,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "log_line": "[tensorfold] done chatcmpl-6246525e88b3beca222eeb073d9db069 prompt=43 cached=0 thinking=False effort=none tokens=384 sha=4d95c4c630b7 finish=length rounds=138 accepted=245/375",
+        "reply_preview": "# LRU Cache Implementation\n\nBelow is a complete, production-quality implementation of an **LRU (Least Recently Used) Cac",
+        "reply_len_chars": 1462
+      },
+      "prose": {
+        "id": "chatcmpl-08742fb7a79456baf099694277d49c11",
+        "wall_seconds": 6.1517,
+        "client_ttft_seconds": 0.2105,
+        "tensorfold": {
+          "enable_thinking": false,
+          "reasoning_effort": "none",
+          "engine": "lanes",
+          "tokens_per_second": 64.46551812207626,
+          "seconds": 6.150321882,
+          "prefill_seconds": 0.209122393,
+          "prefill_widths": [],
+          "prefill_raised": [],
+          "time_to_first_token": 0.209833158,
+          "sampling": "exact",
+          "drafts": true,
+          "token_sha": "bc5a204f87c7",
+          "min_rows": 2
+        },
+        "speculative": {
+          "rounds": 178,
+          "drafted": 334,
+          "accepted": 205,
+          "acceptance_rate": 0.6137724550898204,
+          "tokens_per_round": 2.157303370786517
+        },
+        "usage": {
+          "prompt_tokens": 64,
+          "completion_tokens": 384,
+          "total_tokens": 448,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "log_line": "[tensorfold] done chatcmpl-08742fb7a79456baf099694277d49c11 prompt=64 cached=0 thinking=False effort=none tokens=384 sha=bc5a204f87c7 finish=length rounds=178 accepted=205/334",
+        "reply_preview": "你提出的問題涉及多個高度專業且相互交織的技術概念，但其中若干術語與架構名稱存在明顯的拼寫偏差或非標準表述，需要先做術語澄清與合理重建，否則無法進行有意義的技術分析。以下先逐項辨析，再給出在合理重建假設下的分析框架。\n\n---\n\n## 一、術",
+        "reply_len_chars": 600
+      },
+      "structured": {
+        "id": "chatcmpl-20baca3a15d43ebeff8eaeb1556f6092",
+        "wall_seconds": 3.6076,
+        "client_ttft_seconds": 0.2626,
+        "tensorfold": {
+          "enable_thinking": false,
+          "reasoning_effort": "none",
+          "engine": "lanes",
+          "tokens_per_second": 114.48314872137472,
+          "seconds": 3.606591658,
+          "prefill_seconds": 0.261097098,
+          "prefill_widths": [],
+          "prefill_raised": [],
+          "time_to_first_token": 0.261610952,
+          "sampling": "exact",
+          "drafts": true,
+          "token_sha": "4d8084d85e05",
+          "min_rows": 2
+        },
+        "speculative": {
+          "rounds": 74,
+          "drafted": 331,
+          "accepted": 309,
+          "acceptance_rate": 0.9335347432024169,
+          "tokens_per_round": 5.1891891891891895
+        },
+        "usage": {
+          "prompt_tokens": 82,
+          "completion_tokens": 384,
+          "total_tokens": 466,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "log_line": "[tensorfold] done chatcmpl-20baca3a15d43ebeff8eaeb1556f6092 prompt=82 cached=0 thinking=False effort=none tokens=384 sha=4d8084d85e05 finish=length rounds=74 accepted=309/331",
+        "reply_preview": "[\n  {\n    \"node_id\": \"gpu-node-001\",\n    \"rack\": \"rack-a1\",\n    \"ip_address\": \"10.42.1.11\",\n    \"gpu_model\": \"Nimbus X90",
+        "reply_len_chars": 968
+      }
+    },
+    "temp_0.0": {
+      "code": {
+        "id": "chatcmpl-4f47853d0aa57be1c2aeb33cac9d5b40",
+        "wall_seconds": 4.4981,
+        "client_ttft_seconds": 0.1616,
+        "tensorfold": {
+          "enable_thinking": false,
+          "reasoning_effort": "none",
+          "engine": "lanes",
+          "tokens_per_second": 88.3176200430075,
+          "seconds": 4.497075642,
+          "prefill_seconds": 0.160423816,
+          "prefill_widths": [],
+          "prefill_raised": [],
+          "time_to_first_token": 0.160895174,
+          "sampling": "greedy",
+          "drafts": true,
+          "token_sha": "e20607b3cc8e",
+          "min_rows": 2
+        },
+        "speculative": {
+          "rounds": 110,
+          "drafted": 375,
+          "accepted": 273,
+          "acceptance_rate": 0.728,
+          "tokens_per_round": 3.4909090909090907
+        },
+        "usage": {
+          "prompt_tokens": 43,
+          "completion_tokens": 384,
+          "total_tokens": 427,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "log_line": "[tensorfold] done chatcmpl-4f47853d0aa57be1c2aeb33cac9d5b40 prompt=43 cached=0 thinking=False effort=none tokens=384 sha=e20607b3cc8e finish=length rounds=110 accepted=273/375",
+        "reply_preview": "# LRU Cache Implementation\n\nBelow is a complete implementation of an **LRU (Least Recently Used) Cache** — a cache with ",
+        "reply_len_chars": 1399
+      },
+      "prose": {
+        "id": "chatcmpl-53c6639bc5d71c48e289c87dbc6c3478",
+        "wall_seconds": 6.0779,
+        "client_ttft_seconds": 0.2002,
+        "tensorfold": {
+          "enable_thinking": false,
+          "reasoning_effort": "none",
+          "engine": "lanes",
+          "tokens_per_second": 65.15853235349076,
+          "seconds": 6.07650117,
+          "prefill_seconds": 0.198496827,
+          "prefill_widths": [],
+          "prefill_raised": [],
+          "time_to_first_token": 0.199395945,
+          "sampling": "greedy",
+          "drafts": true,
+          "token_sha": "6adb44324f82",
+          "min_rows": 1
+        },
+        "speculative": {
+          "rounds": 176,
+          "drafted": 340,
+          "accepted": 207,
+          "acceptance_rate": 0.6088235294117647,
+          "tokens_per_round": 2.1818181818181817
+        },
+        "usage": {
+          "prompt_tokens": 64,
+          "completion_tokens": 384,
+          "total_tokens": 448,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "log_line": "[tensorfold] done chatcmpl-53c6639bc5d71c48e289c87dbc6c3478 prompt=64 cached=0 thinking=False effort=none tokens=384 sha=6adb44324f82 finish=length rounds=176 accepted=207/340",
+        "reply_preview": "你提出的問題涉及多個高度專業且相互交織的技術概念，但其中若干術語與架構名稱存在明顯的拼寫偏差或非標準表述，需要先做術語澄清與合理重建，否則無法進行有意義的技術分析。以下先逐項辨析，再給出在合理重建假設下的分析框架。\n\n---\n\n## 一、術",
+        "reply_len_chars": 658
+      },
+      "structured": {
+        "id": "chatcmpl-394ba61197b8686b3d50f08b29a5e9c2",
+        "wall_seconds": 3.6675,
+        "client_ttft_seconds": 0.2638,
+        "tensorfold": {
+          "enable_thinking": false,
+          "reasoning_effort": "none",
+          "engine": "lanes",
+          "tokens_per_second": 112.51130420608611,
+          "seconds": 3.6662535,
+          "prefill_seconds": 0.26211877,
+          "prefill_widths": [],
+          "prefill_raised": [],
+          "time_to_first_token": 0.26308419,
+          "sampling": "greedy",
+          "drafts": true,
+          "token_sha": "b0b304e1905c",
+          "min_rows": 2
+        },
+        "speculative": {
+          "rounds": 75,
+          "drafted": 341,
+          "accepted": 309,
+          "acceptance_rate": 0.906158357771261,
+          "tokens_per_round": 5.12
+        },
+        "usage": {
+          "prompt_tokens": 82,
+          "completion_tokens": 384,
+          "total_tokens": 466,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "log_line": "[tensorfold] done chatcmpl-394ba61197b8686b3d50f08b29a5e9c2 prompt=82 cached=0 thinking=False effort=none tokens=384 sha=b0b304e1905c finish=length rounds=75 accepted=309/341",
+        "reply_preview": "[\n  {\n    \"node_id\": \"gpu-node-001\",\n    \"rack\": \"rack-a1\",\n    \"ip_address\": \"10.42.1.11\",\n    \"gpu_model\": \"Nimbus X90",
+        "reply_len_chars": 967
+      }
+    }
+  },
+  "concurrent_4stream": {
+    "wall_seconds": 13.3766,
+    "total_completion_tokens": 1536,
+    "aggregate_wall_tok_s": 114.83,
+    "sum_stream_tok_s": 156.94,
+    "streams": {
+      "structured": {
+        "id": "chatcmpl-d7a173d9bb045439029bbf773ac8e740",
+        "wall_seconds": 7.612,
+        "client_ttft_seconds": 0.6248,
+        "tensorfold": {
+          "enable_thinking": false,
+          "reasoning_effort": "none",
+          "engine": "lanes",
+          "tokens_per_second": 54.81208425391875,
+          "seconds": 7.610079736,
+          "prefill_seconds": 0.262376831,
+          "prefill_widths": [],
+          "prefill_raised": [],
+          "time_to_first_token": 0.624006899,
+          "sampling": "exact",
+          "drafts": true,
+          "token_sha": "8e45bcbfefab",
+          "min_rows": 1
+        },
+        "speculative": {
+          "rounds": 79,
+          "drafted": 334,
+          "accepted": 305,
+          "acceptance_rate": 0.9131736526946108,
+          "tokens_per_round": 4.860759493670886
+        },
+        "usage": {
+          "prompt_tokens": 82,
+          "completion_tokens": 384,
+          "total_tokens": 466,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "log_line": "[tensorfold] done chatcmpl-d7a173d9bb045439029bbf773ac8e740 prompt=82 cached=0 thinking=False effort=none tokens=384 sha=8e45bcbfefab finish=length rounds=79 accepted=305/334",
+        "reply_preview": "[\n  {\n    \"node_id\": \"gpu-node-001\",\n    \"rack\": \"rack-a1\",\n    \"ip_address\": \"10.12.1.11\",\n    \"gpu_model\": \"Aurora-X90",
+        "reply_len_chars": 967
+      },
+      "algo": {
+        "id": "chatcmpl-de035fd63c9d9a9a029806a35fbcecad",
+        "wall_seconds": 10.9465,
+        "client_ttft_seconds": 0.7785,
+        "tensorfold": {
+          "enable_thinking": false,
+          "reasoning_effort": "none",
+          "engine": "lanes",
+          "tokens_per_second": 37.66862544095955,
+          "seconds": 10.944728978,
+          "prefill_seconds": 0.154547674,
+          "prefill_widths": [],
+          "prefill_raised": [],
+          "time_to_first_token": 0.777773825,
+          "sampling": "exact",
+          "drafts": true,
+          "token_sha": "df983111c8b7",
+          "min_rows": 1
+        },
+        "speculative": {
+          "rounds": 127,
+          "drafted": 335,
+          "accepted": 257,
+          "acceptance_rate": 0.7671641791044777,
+          "tokens_per_round": 3.0236220472440944
+        },
+        "usage": {
+          "prompt_tokens": 38,
+          "completion_tokens": 384,
+          "total_tokens": 422,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "log_line": "[tensorfold] done chatcmpl-de035fd63c9d9a9a029806a35fbcecad prompt=38 cached=0 thinking=False effort=none tokens=384 sha=df983111c8b7 finish=length rounds=127 accepted=257/335",
+        "reply_preview": "# Red-Black Tree Implementation in Python\n\nHere's a complete implementation of a **Red-Black Tree** (note: the standard ",
+        "reply_len_chars": 1636
+      },
+      "code": {
+        "id": "chatcmpl-3a9516ffdcd770cfe9e0578685995d63",
+        "wall_seconds": 11.1042,
+        "client_ttft_seconds": 0.1609,
+        "tensorfold": {
+          "enable_thinking": false,
+          "reasoning_effort": "none",
+          "engine": "lanes",
+          "tokens_per_second": 34.99683589631825,
+          "seconds": 11.102566254,
+          "prefill_seconds": 0.158686811,
+          "prefill_widths": [],
+          "prefill_raised": [],
+          "time_to_first_token": 0.160080262,
+          "sampling": "exact",
+          "drafts": true,
+          "token_sha": "8a5562aa406e",
+          "min_rows": 2
+        },
+        "speculative": {
+          "rounds": 130,
+          "drafted": 323,
+          "accepted": 253,
+          "acceptance_rate": 0.7832817337461301,
+          "tokens_per_round": 2.953846153846154
+        },
+        "usage": {
+          "prompt_tokens": 43,
+          "completion_tokens": 384,
+          "total_tokens": 427,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "log_line": "[tensorfold] done chatcmpl-3a9516ffdcd770cfe9e0578685995d63 prompt=43 cached=0 thinking=False effort=none tokens=384 sha=8a5562aa406e finish=length rounds=130 accepted=253/323",
+        "reply_preview": "# LRU Cache Implementation\n\nBelow is a complete implementation of an **LRU (Least Recently Used) Cache** — a cache with ",
+        "reply_len_chars": 1400
+      },
+      "prose": {
+        "id": "chatcmpl-2534eb812158aee2f10da29c71cae943",
+        "wall_seconds": 13.3637,
+        "client_ttft_seconds": 0.362,
+        "tensorfold": {
+          "enable_thinking": false,
+          "reasoning_effort": "none",
+          "engine": "lanes",
+          "tokens_per_second": 29.45797626935408,
+          "seconds": 13.362366234,
+          "prefill_seconds": 0.20206022,
+          "prefill_widths": [],
+          "prefill_raised": [],
+          "time_to_first_token": 0.361340981,
+          "sampling": "exact",
+          "drafts": true,
+          "token_sha": "a4aef3186cdc",
+          "min_rows": 1
+        },
+        "speculative": {
+          "rounds": 201,
+          "drafted": 263,
+          "accepted": 182,
+          "acceptance_rate": 0.6920152091254753,
+          "tokens_per_round": 1.9104477611940298
+        },
+        "usage": {
+          "prompt_tokens": 64,
+          "completion_tokens": 384,
+          "total_tokens": 448,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "log_line": "[tensorfold] done chatcmpl-2534eb812158aee2f10da29c71cae943 prompt=64 cached=0 thinking=False effort=none tokens=384 sha=a4aef3186cdc finish=length rounds=201 accepted=182/263",
+        "reply_preview": "# 分散式大語言模型推論在雙節點 RoCEv2 架構下的系統分析\n\n以下針對您提出的四個面向進行詳細分析。需先說明：**「RoCEv2」並非學界或業界廣泛認可的標準架構名稱**（截至我的知識範圍），因此以下分析將以「雙節點（two-node",
+        "reply_len_chars": 627
+      }
+    }
+  },
+  "cold_prefill": {
+    "8k": {
+      "id": "chatcmpl-6ae46463457adaf6b39292c719e78084",
+      "wall_seconds": 6.5747,
+      "client_ttft_seconds": 6.2078,
+      "tensorfold": {
+        "enable_thinking": false,
+        "reasoning_effort": "none",
+        "engine": "lanes",
+        "tokens_per_second": 40.825604107486896,
+        "seconds": 6.548435681,
+        "prefill_seconds": 6.18093758,
+        "prefill_widths": [],
+        "prefill_raised": [],
+        "time_to_first_token": 6.206793516,
+        "sampling": "greedy",
+        "drafts": true,
+        "token_sha": "8d9cf69f56c8",
+        "min_rows": 2
+      },
+      "speculative": {
+        "rounds": 11,
+        "drafted": 13,
+        "accepted": 4,
+        "acceptance_rate": 0.3076923076923077,
+        "tokens_per_round": 1.4545454545454546
+      },
+      "usage": {
+        "prompt_tokens": 14016,
+        "completion_tokens": 16,
+        "total_tokens": 14032,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      },
+      "log_line": "[tensorfold] done chatcmpl-6ae46463457adaf6b39292c719e78084 prompt=14016 cached=0 thinking=False effort=none tokens=16 sha=8d9cf69f56c8 finish=length rounds=11 accepted=4/13",
+      "reply_preview": "這些詞彙屬於高效能運算與分散式深度學習系統架構",
+      "reply_len_chars": 23,
+      "computed_prefill_tok_s": 2267.6
+    },
+    "32k": {
+      "id": "chatcmpl-bc89bb3342ee49e02f4ab89bf19f2612",
+      "wall_seconds": 25.1325,
+      "client_ttft_seconds": 24.7864,
+      "tensorfold": {
+        "enable_thinking": false,
+        "reasoning_effort": "none",
+        "engine": "lanes",
+        "tokens_per_second": 43.285191351133975,
+        "seconds": 25.064981938,
+        "prefill_seconds": 24.718225546,
+        "prefill_widths": [],
+        "prefill_raised": [],
+        "time_to_first_token": 24.784897269,
+        "sampling": "greedy",
+        "drafts": true,
+        "token_sha": "6dbe0a299157",
+        "min_rows": 2
+      },
+      "speculative": {
+        "rounds": 11,
+        "drafted": 13,
+        "accepted": 5,
+        "acceptance_rate": 0.38461538461538464,
+        "tokens_per_round": 1.4545454545454546
+      },
+      "usage": {
+        "prompt_tokens": 56728,
+        "completion_tokens": 16,
+        "total_tokens": 56744,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      },
+      "log_line": "[tensorfold] done chatcmpl-bc89bb3342ee49e02f4ab89bf19f2612 prompt=56728 cached=0 thinking=False effort=none tokens=16 sha=6dbe0a299157 finish=length rounds=11 accepted=5/13",
+      "reply_preview": "這是一組關於 GPU 與分散式深度學習加速架構的技術",
+      "reply_len_chars": 26,
+      "computed_prefill_tok_s": 2295.0
+    }
+  },
+  "vision_cache_resume_2k": {
+    "turn1": {
+      "id": "chatcmpl-58cb2f6c0038271c1b54cbec2e13ca6c",
+      "wall_seconds": 3.9999,
+      "client_ttft_seconds": 2.9634,
+      "tensorfold": {
+        "enable_thinking": false,
+        "reasoning_effort": "none",
+        "engine": "lanes",
+        "tokens_per_second": 60.75677915028241,
+        "seconds": 3.986847156,
+        "prefill_seconds": 2.949763767,
+        "prefill_widths": [],
+        "prefill_raised": [],
+        "time_to_first_token": 2.96180073,
+        "sampling": "greedy",
+        "drafts": true,
+        "token_sha": "6313d222253d",
+        "min_rows": 2
+      },
+      "speculative": {
+        "rounds": 32,
+        "drafted": 53,
+        "accepted": 32,
+        "acceptance_rate": 0.6037735849056604,
+        "tokens_per_round": 2.0
+      },
+      "usage": {
+        "prompt_tokens": 5364,
+        "completion_tokens": 64,
+        "total_tokens": 5428,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      },
+      "log_line": "[tensorfold] done chatcmpl-58cb2f6c0038271c1b54cbec2e13ca6c prompt=5364 cached=0 thinking=False effort=none tokens=64 sha=6313d222253d finish=length rounds=32 accepted=32/53",
+      "reply_preview": "上述技術詞彙屬於高性能計算機（特別是 GPU）架構與深度學習系統優化的領域。\n\n圖片呈現一個由左上至右下對角線過渡的 16×16 像素網格，左上方為深藍至紫的冷色調，右下方則為亮黃至綠",
+      "reply_len_chars": 92
+    },
+    "turn2": {
+      "id": "chatcmpl-af8c79d7409b083a6db18b6ec8e58c32",
+      "wall_seconds": 1.2547,
+      "client_ttft_seconds": 0.861,
+      "tensorfold": {
+        "enable_thinking": false,
+        "reasoning_effort": "none",
+        "engine": "lanes",
+        "tokens_per_second": 55.8538163452893,
+        "seconds": 1.240906501,
+        "prefill_seconds": 0.84683352,
+        "prefill_widths": [],
+        "prefill_raised": [],
+        "time_to_first_token": 0.859263122,
+        "sampling": "greedy",
+        "drafts": true,
+        "token_sha": "0b8b88c568a7",
+        "min_rows": 2
+      },
+      "speculative": {
+        "rounds": 11,
+        "drafted": 24,
+        "accepted": 12,
+        "acceptance_rate": 0.5,
+        "tokens_per_round": 2.090909090909091
+      },
+      "usage": {
+        "prompt_tokens": 5452,
+        "completion_tokens": 23,
+        "total_tokens": 5475,
+        "prompt_tokens_details": {
+          "cached_tokens": 4096
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      },
+      "log_line": "[tensorfold] done chatcmpl-af8c79d7409b083a6db18b6ec8e58c32 prompt=5452 cached=4096 thinking=False effort=none tokens=23 sha=0b8b88c568a7 finish=stop rounds=11 accepted=12/24",
+      "reply_preview": "中央格紋呈灰褐/橄欖過渡色，左上角則為深藍紫色。",
+      "reply_len_chars": 24
+    }
+  },
+  "cut_in_test": {
+    "long_32k": {
+      "id": "chatcmpl-8be823c4587b5dee1336b3d42f3f61ea",
+      "wall_seconds": 26.7731,
+      "client_ttft_seconds": 26.4442,
+      "tensorfold": {
+        "enable_thinking": false,
+        "reasoning_effort": "none",
+        "engine": "lanes",
+        "tokens_per_second": 45.49920278420177,
+        "seconds": 26.704831884,
+        "prefill_seconds": 26.374686036,
+        "prefill_widths": [],
+        "prefill_raised": [],
+        "time_to_first_token": 26.44247164,
+        "sampling": "greedy",
+        "drafts": true,
+        "token_sha": "488188ab9a96",
+        "min_rows": 2
+      },
+      "speculative": {
+        "rounds": 10,
+        "drafted": 13,
+        "accepted": 5,
+        "acceptance_rate": 0.38461538461538464,
+        "tokens_per_round": 1.6
+      },
+      "usage": {
+        "prompt_tokens": 56728,
+        "completion_tokens": 16,
+        "total_tokens": 56744,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      },
+      "log_line": "[tensorfold] done chatcmpl-8be823c4587b5dee1336b3d42f3f61ea prompt=56728 cached=0 thinking=False effort=none tokens=16 sha=488188ab9a96 finish=length rounds=10 accepted=5/13",
+      "reply_preview": "這些詞彙屬於高效能運算架構（尤其是 GPU／加速器",
+      "reply_len_chars": 25
+    },
+    "short_behind_1s": {
+      "id": "chatcmpl-0e01efd6f346ccb712b328b719485687",
+      "wall_seconds": 1.0525,
+      "client_ttft_seconds": 0.9764,
+      "tensorfold": {
+        "enable_thinking": false,
+        "reasoning_effort": "none",
+        "engine": "lanes",
+        "tokens_per_second": 91.09982554903976,
+        "seconds": 1.051002517,
+        "prefill_seconds": 0.222947409,
+        "prefill_widths": [],
+        "prefill_raised": [],
+        "time_to_first_token": 0.9751084,
+        "sampling": "greedy",
+        "drafts": true,
+        "token_sha": "6480e8976641",
+        "min_rows": 4
+      },
+      "speculative": {
+        "rounds": 2,
+        "drafted": 7,
+        "accepted": 6,
+        "acceptance_rate": 0.8571428571428571,
+        "tokens_per_round": 4.0
+      },
+      "usage": {
+        "prompt_tokens": 26,
+        "completion_tokens": 8,
+        "total_tokens": 34,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      },
+      "log_line": "[tensorfold] done chatcmpl-0e01efd6f346ccb712b328b719485687 prompt=26 cached=0 thinking=False effort=none tokens=8 sha=6480e8976641 finish=stop rounds=2 accepted=6/7",
+      "reply_preview": "123 + 456 = 579",
+      "reply_len_chars": 15
+    }
+  },
+  "system_after": {
+    "health": {
+      "status": "ok",
+      "model": "DeepSeek-V4.1-Flash-1017-TF",
+      "model_ids": [
+        "DeepSeek-V4.1-Flash-1017-TF",
+        "DeepSeek-V4.1-Flash-TF",
+        "current"
+      ],
+      "max_batch_size": 4,
+      "warming": false,
+      "memory": {
+        "active": 111139088676,
+        "cache": 0,
+        "peak": 111139088676
+      },
+      "live": {
+        "connections": 0,
+        "waiting": 0,
+        "decode_tokens_per_second": 8.0,
+        "prefill_tokens_per_second": 2150.9
+      }
+    },
+    "proxy": {
+      "status": "ok",
+      "upstream_healthy": true,
+      "upstream_url": "http://127.0.0.1:8888",
+      "current_model": "DeepSeek-V4.1-Flash-1017-TF",
+      "concurrency_limit": 4,
+      "queue_buffer": 4,
+      "tiered_timeouts": [
+        20.0,
+        15.0,
+        10.0,
+        5.0
+      ],
+      "extension_seconds": 5.0,
+      "active_running": 0,
+      "waiting_in_queue": 0,
+      "queue_positions": [],
+      "queue_extended": [],
+      "model_limits_config": {
+        "dsv41": 2,
+        "DeepSeek-V4.1-Flash-EXL3": 2,
+        "DeepSeek-V4.1-Flash-TF": 4,
+        "DeepSeek-V4.1-Flash-1017-TF": 4,
+        "GLM-5.3-Flash": 4,
+        "GLM-5.3-Flash-EXL3": 4
+      },
+      "default_limit": 4
+    },
+    "node1": {
+      "mem_available_mib": 7971,
+      "swap_used_mib": 812,
+      "buddy_normal_orders_9_to_13": [
+        17,
+        4,
+        8,
+        2,
+        22
+      ],
+      "buddy_2mib_plus_blocks_total": 53
+    },
+    "node2": {
+      "mem_available_mib": 10518,
+      "swap_used_mib": 0,
+      "buddy_normal_orders_9_to_13": [
+        10,
+        111,
+        44,
+        3,
+        143
+      ],
+      "buddy_2mib_plus_blocks_total": 311
+    }
+  }
+}
