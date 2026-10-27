@@ -370,14 +370,15 @@ async def proxy_all(request: Request, path: str):
             )
 
         try:
-            return await handle_forward(request, path)
-        finally:
+            return await handle_forward(request, path, release_on_close=True)
+        except Exception:
             await release_slot()
+            raise
     else:
-        return await handle_forward(request, path)
+        return await handle_forward(request, path, release_on_close=False)
 
 
-async def handle_forward(request: Request, path: str):
+async def handle_forward(request: Request, path: str, release_on_close: bool = False):
     upstream_url = f"{state['upstream_url']}/{path}"
     query = request.url.query
     if query:
@@ -395,6 +396,8 @@ async def handle_forward(request: Request, path: str):
         )
         upstream_resp = await http_client.send(upstream_req, stream=True)
     except Exception as e:
+        if release_on_close:
+            await release_slot()
         logger.error(f"Failed to connect to upstream {upstream_url}: {e}")
         return JSONResponse(
             status_code=502,
@@ -411,6 +414,8 @@ async def handle_forward(request: Request, path: str):
                 yield chunk
         finally:
             await upstream_resp.aclose()
+            if release_on_close:
+                await release_slot()
 
     media_type = upstream_resp.headers.get("content-type")
     return StreamingResponse(

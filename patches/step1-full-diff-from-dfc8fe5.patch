@@ -1,8 +1,671 @@
+diff --git a/tools/dsv41-zig/serving/README.md b/tools/dsv41-zig/serving/README.md
+new file mode 100644
+index 00000000..79e590b4
+--- /dev/null
++++ b/tools/dsv41-zig/serving/README.md
+@@ -0,0 +1,36 @@
++# Serving a DeepSeek-V4.1-Flash-1017 EXL3 pack on the TP2 engine
++
++The September packs (`Mia-AiLab/DeepSeek-V4.1-Flash-EXL3-2.9bpw`, our banked 2.9 bpw) already carry the engine's
++names and dtypes. The 1017 packs differ in two ways the loader handles, and one way this folder prepares:
++
++1. **MTP markov head names.** The 1017 converter writes `mtp.N.markov_head.markov_w1.weight` /
++   `markov_w2.weight`; the engine reads `mtp.N.markov_head.embed.weight` / `head.weight`. `checkpoint.zig` falls
++   back to the converter's names when the engine's own are absent, so a raw 1017 pack loads as it is. The Python
++   line's rank-cache writer (`deepseek-v41-tp2`, `weights.py`) only looks up the engine's names, so a pack served
++   through that writer needs the rename shim below.
++2. **Engram q / k in bf16.** The 1017 packs hold `layers.N.engram.q_weight` / `k_weight` in bf16; the engine reads
++   them as f32. `checkpoint.zig` widens bf16 -> f32 exactly (bf16 is an f32's top 16 bits), and the Python line's
++   `.to(torch.float32)` does the same. No shim needed.
++3. **The MTP markov head's dtype.** The 1017 checkpoint holds `mtp.2.markov_head.head.weight` in bf16; some community
++   packs keep it, our converter casts it to f16. The kernel reads fp16, so `weights.zig` converts a bf16 head to f16
++   at load (exact: bf16's 7 mantissa bits fit f16's 10). No shim needed.
++
++`serving_1017.py` writes what the Python cache writer needs and what the server needs besides the weights:
++
++```sh
++python3 tools/dsv41-zig/serving_1017.py MODEL_DIR            # the rename shim + chat_template.jinja
++python3 tools/dsv41-zig/serving_1017.py MODEL_DIR --check    # exit 0 when both are there and right
++```
++
++- `serving-1017.safetensors` (only when the pack has the converter's markov names): byte copies of
++  `markov_w1` / `markov_w2` under `embed.weight` / `head.weight`. The loaders map every `*.safetensors` file in the
++  folder in name order, a later file winning, and this file sorts after `model-*`, `layer-*` and `native.safetensors`.
++- `chat_template.jinja`: `serving/chat_template.jinja`, sha256 `b581d19d...` (ours; checked against DeepSeek's
++  reference renderings in the TP4 line, 71/71). The 1017 checkpoint ships no chat template and the server needs one.
++
++Images: the 1017 image routing bias is `kit/vision/gate_bias_vl.safetensors`, sha256 `4745da4b...`, made from the
++original 1017 checkpoint (not the EXL3 quant) with `kit/make_bias_vl.py`; point the kit at it (`TF_DS_KIT`) or pass
++`--vision-bias`.
++
++The Engram tables are not in the EXL3 packs: pass the original 1017 checkpoint's shards 47 and 48 as `--engram`
++(the same as the September packs).
+diff --git a/tools/dsv41-zig/serving/chat_template.jinja b/tools/dsv41-zig/serving/chat_template.jinja
+new file mode 100644
+index 00000000..7200afe2
+--- /dev/null
++++ b/tools/dsv41-zig/serving/chat_template.jinja
+@@ -0,0 +1,420 @@
++{#- DeepSeek-V4.1-Flash-1017 chat template.
++    It renders what DeepSeek's encoding/encoding.py for this checkpoint (MIT) renders with
++    encode_messages(messages, thinking_mode, reasoning_effort=reasoning_effort), drop_thinking on.
++    It reads:
++      messages               roles system (developer as system), user, assistant, tool and latest_reminder, with the
++                             fields the reference reads: content (text, or a list of text, image_url and tool_result
++                             parts), reasoning_content, tool_calls, tool_call_id, task, wo_eos, and tools and
++                             response_format on a system message.
++      tools                  the request's tools, put on the first message when it is a system message, else on an
++                             empty system message before it (the reference shows tools only on a system message).
++      thinking_mode          "thinking" or "chat"; else enable_thinking, else thinking; default "chat".
++      reasoning_effort       an integer 1-100, or "low" 50, "high" 75, "max" 100 (the reference's names), or "minimal"
++                             25, "medium" 62, "xhigh" 88 (the served lane's numbers); default "high". Shown only in
++                             thinking mode, before the first turn.
++      add_generation_prompt  the closing "<｜Assistant｜>" header (or task token) after the last message only when true.
++      drop_thinking          default true: turns before the last user turn lose their reasoning; any tools turn it off.
++    A request cannot set: tool-call arguments as a JSON string (servers pass an object; a string, or a server's
++    {"_invalid_arguments": raw}, renders as one "arguments" parameter); an image (it is the "<｜deepseek_image｜>"
++    placeholder in the text, put there by the server).
++    Two passes over the messages, each in linear time: the last user turn first, then the prompt. -#}
++{%- set bos = '<｜begin▁of▁sentence｜>' -%}
++{%- set eos = '<｜end▁of▁sentence｜>' -%}
++{%- set sys_tok = '<｜System｜>' -%}
++{%- set user_tok = '<｜User｜>' -%}
++{%- set assistant_tok = '<｜Assistant｜>' -%}
++{%- set reminder_tok = '<｜latest_reminder｜>' -%}
++{%- set image_tok = '<｜deepseek_image｜>' -%}
++{%- set think_open = '<think>' -%}
++{%- set think_close = '</think>' -%}
++{%- set task_tokens = {'action': '<｜action｜>', 'query': '<｜query｜>', 'authority': '<｜authority｜>', 'domain': '<｜domain｜>', 'title': '<｜title｜>', 'read_url': '<｜read_url｜>'} -%}
++{%- set effort_numbers = {'minimal': 25, 'low': 50, 'medium': 62, 'high': 75, 'xhigh': 88, 'max': 100} -%}
++{%- set kept_roles = ['system', 'user', 'assistant', 'tool', 'latest_reminder', 'direct_search_results'] -%}
++{%- set tools_head = '## Tools\n\nYou have access to a set of tools to help answer the user' ~ "'" ~ 's question. You can invoke tools by writing a "<｜DSML｜ calls>" block like the following:\n\n<｜DSML｜ calls>\n<｜DSML｜ invoke name="$TOOL_NAME">\n<｜DSML｜ parameter name="$PARAMETER_NAME" string="true|false">$PARAMETER_VALUE</｜DSML｜ parameter>\n...\n</｜DSML｜ invoke>\n<｜DSML｜ invoke name="$TOOL_NAME2">\n...\n</｜DSML｜ invoke>\n</｜DSML｜ calls>\n\nString parameters should be specified as is and set `string="true"`. For all other types (numbers, booleans, arrays, objects), pass the value in JSON format and set `string="false"`.\n\nIf thinking_mode is enabled (triggered by <think>), you MUST output your complete reasoning inside <think>...</think> BEFORE any tool calls or final response.\n\nOtherwise, output directly after </think> with tool calls or final response.\n\n### Available Tool Schemas\n\n' -%}
++{%- set tools_tail = '\n\nYou MUST strictly follow the above defined tool name and parameter schemas to invoke tool calls.\n' -%}
++{#- thinking mode and reasoning effort -#}
++{%- if thinking_mode is defined and thinking_mode is not none -%}
++  {%- set mode = thinking_mode -%}
++{%- elif enable_thinking is defined and enable_thinking is not none -%}
++  {%- set mode = 'thinking' if enable_thinking else 'chat' -%}
++{%- elif thinking is defined and thinking is not none -%}
++  {%- set mode = 'thinking' if thinking else 'chat' -%}
++{%- else -%}
++  {%- set mode = 'chat' -%}
++{%- endif -%}
++{%- if mode != 'chat' and mode != 'thinking' -%}
++  {{- raise_exception('thinking_mode must be "chat" or "thinking"') -}}
++{%- endif -%}
++{%- set effort = reasoning_effort if reasoning_effort is defined and reasoning_effort is not none else 'high' -%}
++{%- if effort is string and effort in effort_numbers -%}
++  {%- set budget = effort_numbers[effort] -%}
++{%- elif effort is integer and effort >= 1 and effort <= 100 -%}
++  {%- set budget = effort -%}
++{%- else -%}
++  {{- raise_exception('reasoning_effort must be an integer 1-100 or one of minimal, low, medium, high, xhigh, max') -}}
++{%- endif -%}
++{%- set top_tools = tools if tools is defined and tools else none -%}
++{%- if top_tools and (messages | length == 0 or messages[0].role not in ['system', 'developer']) -%}
++  {%- set msgs = [{'role': 'system', 'content': ''}] + messages -%}
++{%- else -%}
++  {%- set msgs = messages -%}
++{%- endif -%}
++{%- set total = msgs | length -%}
++{#- 1. the last user turn (find_last_user_index), with tool results and the user messages after them as one user turn
++    (merge_tool_messages), and whether any message has tools (which turns drop_thinking off) -#}
++{%- set p = namespace(last=-1, tools=top_tools is not none, open=false, task=none, real=false, blocks=0, start=-1) -%}
++{%- for m in msgs -%}
++  {%- set k = loop.index0 -%}
++  {%- set role = 'system' if m.role == 'developer' else m.role -%}
++  {%- set content = m.content if m.content is defined and m.content is not none else '' -%}
++  {%- if role == 'user' or role == 'tool' -%}
++    {%- if not (p.open and (role == 'tool' or p.task is none)) -%}
++      {%- if p.open and (p.real or p.blocks == 0) -%}
++        {%- set p.last = p.start -%}
++      {%- endif -%}
++      {%- set p.open = true -%}
++      {%- set p.start = k -%}
++      {%- set p.real = false -%}
++      {%- set p.blocks = 0 -%}
++      {%- set p.task = m.task if role == 'user' and m.task is defined and m.task is not none else none -%}
++      {%- if role == 'user' and m.tools is defined and m.tools -%}
++        {%- set p.tools = true -%}
++      {%- endif -%}
++    {%- endif -%}
++    {%- if role == 'tool' or content is string -%}
++      {%- set p.blocks = p.blocks + 1 -%}
++      {%- if role == 'user' -%}
++        {%- set p.real = true -%}
++      {%- endif -%}
++    {%- else -%}
++      {%- for b in content if b is mapping -%}
++        {%- set p.blocks = p.blocks + 1 -%}
++        {%- if b.type in ['text', 'image', 'image_url'] -%}
++          {%- set p.real = true -%}
++        {%- endif -%}
++      {%- endfor -%}
++    {%- endif -%}
++  {%- else -%}
++    {%- if p.open and (p.real or p.blocks == 0) -%}
++      {%- set p.last = p.start -%}
++    {%- endif -%}
++    {%- set p.open = false -%}
++    {%- if role == 'system' and k > 0 -%}
++      {%- set sr = namespace(real=true) -%}
++      {%- if content is not string and content | length > 0 -%}
++        {%- set sr.real = false -%}
++        {%- for b in content if b is mapping and b.type in ['text', 'image', 'image_url'] -%}
++          {%- set sr.real = true -%}
++        {%- endfor -%}
++      {%- endif -%}
++      {%- if sr.real -%}
++        {%- set p.last = k -%}
++      {%- endif -%}
++    {%- endif -%}
++    {%- if m.tools is defined and m.tools -%}
++      {%- set p.tools = true -%}
++    {%- endif -%}
++  {%- endif -%}
++{%- endfor -%}
++{%- if p.open and (p.real or p.blocks == 0) -%}
++  {%- set p.last = p.start -%}
++{%- endif -%}
++{%- set last = p.last -%}
++{%- set drop = (drop_thinking if drop_thinking is defined and drop_thinking is not none else true) and not p.tools -%}
++{#- 2. the prompt (render_message for each turn; in thinking mode with drop_thinking, a message of another role before
++    the last user turn is left out, as _drop_thinking_messages does) -#}
++{{- bos -}}
++{%- set r = namespace(count=0, open=false, blocks=[], task=none, start=-1, ids=[], prev_task=none) -%}
++{%- for m in msgs -%}
++  {%- set k = loop.index0 -%}
++  {%- set role = 'system' if m.role == 'developer' else m.role -%}
++  {%- set content = m.content if m.content is defined and m.content is not none else '' -%}
++  {%- set task = m.task if m.task is defined and m.task is not none else none -%}
++  {%- if not (role not in kept_roles and mode == 'thinking' and drop and k < last) -%}
++    {#- the role of the turn after this message, none after the last -#}
++    {%- set nx = namespace(raw=none, role=none) -%}
++    {%- if k + 1 < total -%}
++      {%- set nx.raw = 'system' if msgs[k + 1].role == 'developer' else msgs[k + 1].role -%}
++      {%- if nx.raw not in kept_roles and mode == 'thinking' and drop and k + 1 < last -%}
++        {%- for j in range(k + 2, total) -%}
++          {%- set rj = 'system' if msgs[j].role == 'developer' else msgs[j].role -%}
++          {%- if nx.role is none and not (rj not in kept_roles and j < last) -%}
++            {%- set nx.role = 'user' if rj == 'tool' else rj -%}
++          {%- endif -%}
++        {%- endfor -%}
++      {%- else -%}
++        {%- set nx.role = 'user' if nx.raw == 'tool' else nx.raw -%}
++      {%- endif -%}
++    {%- endif -%}
++    {%- set closing = nx.role in ['assistant', 'latest_reminder'] or (nx.role is none and add_generation_prompt is defined and add_generation_prompt) -%}
++    {%- if role == 'user' or role == 'tool' -%}
++      {#- a user turn: this message's parts join the open turn, which ends where the next message does not join it -#}
++      {%- if not r.open -%}
++        {%- set r.open = true -%}
++        {%- set r.blocks = [] -%}
++        {%- set r.start = k -%}
++        {%- set r.task = task if role == 'user' else none -%}
++      {%- endif -%}
++      {%- if role == 'tool' -%}
++        {%- if content is string -%}
++          {%- set text = content -%}
++        {%- else -%}
++          {%- set tp = namespace(parts=[]) -%}
++          {%- for b in content if b is mapping -%}
++            {%- if b.type == 'text' -%}
++              {%- set tp.parts = tp.parts + [b.text if b.text is defined and b.text is not none else ''] -%}
++            {%- elif b.type == 'image' or b.type == 'image_url' -%}
++              {%- set tp.parts = tp.parts + [image_tok] -%}
++            {%- else -%}
++              {%- set tp.parts = tp.parts + ['[Unsupported ' ~ (b.type if b.type is defined and b.type is not none else 'None') ~ ']'] -%}
++            {%- endif -%}
++          {%- endfor -%}
++          {%- set text = tp.parts | join('\n\n') -%}
++        {%- endif -%}
++        {%- set r.blocks = r.blocks + [{'kind': 'tool', 'id': m.tool_call_id if m.tool_call_id is defined and m.tool_call_id is not none else '', 'text': text}] -%}
++      {%- elif content is string -%}
++        {%- set r.blocks = r.blocks + [{'kind': 'text', 'id': '', 'text': content}] -%}
++      {%- else -%}
++        {%- for b in content if b is mapping -%}
++          {%- if b.type == 'text' -%}
++            {%- set r.blocks = r.blocks + [{'kind': 'text', 'id': '', 'text': b.text if b.text is defined and b.text is not none else ''}] -%}
++          {%- elif b.type == 'image' or b.type == 'image_url' -%}
++            {%- set r.blocks = r.blocks + [{'kind': 'text', 'id': '', 'text': image_tok}] -%}
++          {%- elif b.type == 'tool_result' -%}
++            {%- set inner = b.content if b.content is defined and b.content is not none else '' -%}
++            {%- if inner is string -%}
++              {%- set text = inner -%}
++            {%- else -%}
++              {%- set tp = namespace(parts=[]) -%}
++              {%- for c in inner if c is mapping -%}
++                {%- if c.type == 'text' -%}
++                  {%- set tp.parts = tp.parts + [c.text if c.text is defined and c.text is not none else ''] -%}
++                {%- elif c.type == 'image' or c.type == 'image_url' -%}
++                  {%- set tp.parts = tp.parts + [image_tok] -%}
++                {%- else -%}
++                  {%- set tp.parts = tp.parts + ['[Unsupported ' ~ (c.type if c.type is defined and c.type is not none else 'None') ~ ']'] -%}
++                {%- endif -%}
++              {%- endfor -%}
++              {%- set text = tp.parts | join('\n\n') -%}
++            {%- endif -%}
++            {%- set r.blocks = r.blocks + [{'kind': 'tool', 'id': b.tool_use_id if b.tool_use_id is defined and b.tool_use_id is not none else '', 'text': text}] -%}
++          {%- else -%}
++            {%- set r.blocks = r.blocks + [{'kind': 'other', 'id': '', 'text': '[Unsupported ' ~ (b.type if b.type is defined and b.type is not none else 'None') ~ ']'}] -%}
++          {%- endif -%}
++        {%- endfor -%}
++      {%- endif -%}
++      {%- if not (nx.raw == 'tool' or (nx.raw == 'user' and r.task is none)) -%}
++        {#- the turn ends here: its tool results in the order of the calls before them (sort_tool_results_by_call_order) -#}
++        {%- set results = r.blocks | selectattr('kind', 'equalto', 'tool') | list -%}
++        {%- set so = namespace(keys=[], sorted=results, at=0) -%}
++        {%- if results | length > 1 and r.ids | select | list | length > 0 -%}
++          {%- for b in results -%}
++            {%- set key = namespace(k=0) -%}
++            {%- for cid in r.ids -%}
++              {%- if cid and cid == b.id -%}
++                {%- set key.k = loop.index0 -%}
++              {%- endif -%}
++            {%- endfor -%}
++            {%- set so.keys = so.keys + [key.k] -%}
++          {%- endfor -%}
++          {%- set so.sorted = [] -%}
++          {%- for n in range(r.ids | length) -%}
++            {%- for b in results -%}
++              {%- if so.keys[loop.index0] == n -%}
++                {%- set so.sorted = so.sorted + [b] -%}
++              {%- endif -%}
++            {%- endfor -%}
++          {%- endfor -%}
++        {%- endif -%}
++        {%- if r.count == 0 and mode == 'thinking' -%}
++          {{- sys_tok ~ 'Reasoning Effort: ' ~ budget ~ ' (range 1-100, the higher the value, the more thorough the reasoning)\n\n' -}}
++        {%- endif -%}
++        {{- user_tok -}}
++        {%- for b in r.blocks -%}
++          {%- if not loop.first -%}
++            {{- '\n\n' -}}
++          {%- endif -%}
++          {%- if b.kind == 'tool' -%}
++            {{- '<tool_result>' ~ so.sorted[so.at].text ~ '</tool_result>' -}}
++            {%- set so.at = so.at + 1 -%}
++          {%- else -%}
++            {{- b.text -}}
++          {%- endif -%}
++        {%- endfor -%}
++        {%- if closing -%}
++          {%- if r.task is not none -%}
++            {%- if r.task not in task_tokens -%}
++              {{- raise_exception('Invalid task: ' ~ r.task) -}}
++            {%- elif r.task != 'action' -%}
++              {{- task_tokens[r.task] -}}
++            {%- else -%}
++              {{- assistant_tok ~ (think_open if mode == 'thinking' else think_close) ~ task_tokens['action'] -}}
++            {%- endif -%}
++          {%- else -%}
++            {{- assistant_tok ~ (think_open if mode == 'thinking' and (not drop or r.start >= last) else think_close) -}}
++          {%- endif -%}
++        {%- endif -%}
++        {%- set r.prev_task = r.task -%}
++        {%- set r.count = r.count + 1 -%}
++        {%- set r.open = false -%}
++      {%- endif -%}
++    {%- else -%}
++      {#- a system, assistant or latest_reminder turn -#}
++      {%- if content is string -%}
++        {%- set text = content -%}
++      {%- else -%}
++        {%- set tp = namespace(parts=[]) -%}
++        {%- for b in content if b is mapping -%}
++          {%- if b.type == 'text' -%}
++            {%- set tp.parts = tp.parts + [b.text if b.text is defined and b.text is not none else ''] -%}
++          {%- elif b.type == 'image' or b.type == 'image_url' -%}
++            {%- set tp.parts = tp.parts + [image_tok] -%}
++          {%- endif -%}
++        {%- endfor -%}
++        {%- set text = tp.parts | join('\n\n') -%}
++      {%- endif -%}
++      {%- if r.count == 0 and mode == 'thinking' -%}
++        {{- sys_tok ~ 'Reasoning Effort: ' ~ budget ~ ' (range 1-100, the higher the value, the more thorough the reasoning)\n\n' -}}
++      {%- elif r.count == 0 and role == 'system' -%}
++        {{- sys_tok -}}
++      {%- endif -%}
++      {%- if role == 'system' -%}
++        {%- if r.count > 0 -%}
++          {{- sys_tok -}}
++        {%- endif -%}
++        {{- text -}}
++        {%- set own = top_tools if k == 0 and top_tools else (m.tools if m.tools is defined and m.tools else none) -%}
++        {%- if own -%}
++          {{- '\n\n' ~ tools_head -}}
++          {%- for t in own -%}
++            {%- set flat = not (t.function is defined and t.function is mapping) -%}
++            {%- set f = t if flat else t.function -%}
++            {%- set space = t.namespace if t.namespace is defined and t.namespace is not none else (f.namespace if f.namespace is defined else none) -%}
++            {%- set q = namespace(space=space.name if space is mapping else space, name=f.name) -%}
++            {%- if '::' in q.name -%}
++              {%- set parts = q.name.split('::') -%}
++              {%- if q.space is not none and q.space != parts[0] -%}
++                {{- raise_exception('Conflicting tool namespaces: ' ~ q.space ~ ' != ' ~ parts[0]) -}}
++              {%- endif -%}
++              {%- if parts | length > 2 -%}
++                {{- raise_exception('Tool name must not contain ' ~ "'::'" ~ ': ' ~ q.name) -}}
++              {%- endif -%}
++              {%- set q.space = parts[0] -%}
++              {%- set q.name = parts[1] -%}
++            {%- endif -%}
++            {%- if q.space is not none and '::' in q.space -%}
++              {{- raise_exception('Tool namespace must not contain ' ~ "'::'" ~ ': ' ~ q.space) -}}
++            {%- endif -%}
++            {%- set qname = q.name if q.space is none else q.space ~ '::' ~ q.name -%}
++            {%- set described = space is mapping and space.description is defined and space.description -%}
++            {%- set description = (space.description ~ '\n' ~ (f.description if f.description is defined and f.description else '')) if described else none -%}
++            {%- if not loop.first -%}
++              {{- '\n' -}}
++            {%- endif -%}
++            {{- '{' -}}
++            {%- set js = namespace(first=true, described=false) -%}
++            {%- for key, v in f.items() if not (key == 'namespace' or (flat and key == 'type')) -%}
++              {%- if not js.first -%}
++                {{- ', ' -}}
++              {%- endif -%}
++              {%- set js.first = false -%}
++              {%- if key == 'name' -%}
++                {{- (key | tojson) ~ ': ' ~ (qname | tojson) -}}
++              {%- elif key == 'description' and described -%}
++                {{- (key | tojson) ~ ': ' ~ (description | tojson) -}}
++                {%- set js.described = true -%}
++              {%- else -%}
++                {{- (key | tojson) ~ ': ' ~ (v | tojson) -}}
++              {%- endif -%}
++            {%- endfor -%}
++            {%- if described and not js.described -%}
++              {{- (', ' if not js.first else '') ~ '"description": ' ~ (description | tojson) -}}
++            {%- endif -%}
++            {{- '}' -}}
++          {%- endfor -%}
++          {{- tools_tail -}}
++        {%- endif -%}
++        {%- if m.response_format is defined and m.response_format -%}
++          {{- '\n\n## Response Format:\n\nYou MUST strictly adhere to the following schema to reply:\n' ~ (m.response_format | tojson) -}}
++        {%- endif -%}
++      {%- elif role == 'latest_reminder' -%}
++        {{- reminder_tok ~ text -}}
++      {%- elif role == 'assistant' -%}
++        {%- if mode == 'thinking' and not (r.count > 0 and r.prev_task is not none) and (not drop or k > last) -%}
++          {{- (m.reasoning_content if m.reasoning_content is string else '') ~ think_close -}}
++        {%- endif -%}
++        {{- text -}}
++        {%- set calls = m.tool_calls if m.tool_calls is defined and m.tool_calls else [] -%}
++        {%- if calls -%}
++          {%- set ids = namespace(list=[]) -%}
++          {{- '\n\n<｜DSML｜ calls>\n' -}}
++          {%- for c in calls -%}
++            {%- if c.id is defined and c.id -%}
++              {%- set ids.list = ids.list + [c.id] -%}
++            {%- elif c.function is defined and c.function is mapping and c.function.id is defined and c.function.id -%}
++              {%- set ids.list = ids.list + [c.function.id] -%}
++            {%- else -%}
++              {%- set ids.list = ids.list + [''] -%}
++            {%- endif -%}
++            {%- set f = c.function if c.function is defined and c.function is mapping else {} -%}
++            {%- set space = c.namespace if c.namespace is defined and c.namespace else (f.namespace if f.namespace is defined else none) -%}
++            {%- set q = namespace(space=space.name if space is mapping else space, name=f.name if f.name is defined else '') -%}
++            {%- if '::' in q.name -%}
++              {%- set parts = q.name.split('::') -%}
++              {%- if q.space is not none and q.space != parts[0] -%}
++                {{- raise_exception('Conflicting tool namespaces: ' ~ q.space ~ ' != ' ~ parts[0]) -}}
++              {%- endif -%}
++              {%- if parts | length > 2 -%}
++                {{- raise_exception('Tool name must not contain ' ~ "'::'" ~ ': ' ~ q.name) -}}
++              {%- endif -%}
++              {%- set q.space = parts[0] -%}
++              {%- set q.name = parts[1] -%}
++            {%- endif -%}
++            {%- if q.space is not none and '::' in q.space -%}
++              {{- raise_exception('Tool namespace must not contain ' ~ "'::'" ~ ': ' ~ q.space) -}}
++            {%- endif -%}
++            {%- set args = f.arguments if f.arguments is defined else {} -%}
++            {%- if args is mapping and args | length == 1 and '_invalid_arguments' in args -%}
++              {%- set args = {'arguments': args['_invalid_arguments']} -%}
++            {%- elif args is not mapping -%}
++              {%- set args = {'arguments': args} -%}
++            {%- endif -%}
++            {%- if not loop.first -%}
++              {{- '\n' -}}
++            {%- endif -%}
++            {{- '<｜DSML｜ invoke name="' ~ (q.name if q.space is none else q.space ~ '::' ~ q.name) ~ '">\n' -}}
++            {%- for key, v in args.items() -%}
++              {%- if not loop.first -%}
++                {{- '\n' -}}
++              {%- endif -%}
++              {{- '<｜DSML｜ parameter name="' ~ key ~ '" string="' ~ ('true' if v is string else 'false') ~ '">' ~ (v if v is string else v | tojson) ~ '</｜DSML｜ parameter>' -}}
++            {%- endfor -%}
++            {{- '\n</｜DSML｜ invoke>' -}}
++          {%- endfor -%}
++          {{- '\n</｜DSML｜ calls>' -}}
++          {%- set r.ids = ids.list -%}
++        {%- endif -%}
++        {%- if not (m.wo_eos is defined and m.wo_eos) -%}
++          {{- eos -}}
++        {%- endif -%}
++      {%- else -%}
++        {{- raise_exception('Unknown role: ' ~ role) -}}
++      {%- endif -%}
++      {%- if closing -%}
++        {%- if task is not none -%}
++          {%- if task not in task_tokens -%}
++            {{- raise_exception('Invalid task: ' ~ task) -}}
++          {%- elif task != 'action' -%}
++            {{- task_tokens[task] -}}
++          {%- else -%}
++            {{- assistant_tok ~ (think_open if mode == 'thinking' else think_close) ~ task_tokens['action'] -}}
++          {%- endif -%}
++        {%- elif role == 'system' and r.count > 0 -%}
++          {{- assistant_tok ~ (think_open if mode == 'thinking' and (not drop or k >= last) else think_close) -}}
++        {%- endif -%}
++      {%- endif -%}
++      {%- set r.prev_task = task -%}
++      {%- set r.count = r.count + 1 -%}
++    {%- endif -%}
++  {%- endif -%}
++{%- endfor -%}
+diff --git a/tools/dsv41-zig/serving_1017.py b/tools/dsv41-zig/serving_1017.py
+new file mode 100755
+index 00000000..29cbe433
+--- /dev/null
++++ b/tools/dsv41-zig/serving_1017.py
+@@ -0,0 +1,179 @@
++#!/usr/bin/env python3
++"""serving_1017.py MODEL_DIR [--template FILE] [--check]: make a DeepSeek-V4.1-Flash-1017 EXL3 pack servable by the
++engine at this branch. Standard library only, no GPU; it reads the pack's headers and about 130 MB of its tensors and
++changes no downloaded file.
++
++MODEL_DIR is a download of a 1017 EXL3 pack (ours 4.0 bpw, LibertAI/Mia 2.9 bpw, a community 2.8 bpw). The script
++adds up to two files to it:
++
++- serving-1017.safetensors: the MTP markov head under the names the engine reads, where the pack's converter wrote
++  them differently. The 1017 converter writes mtp.N.markov_head.markov_w1.weight / markov_w2.weight; the engine reads
++  mtp.N.markov_head.embed.weight / head.weight. The two are byte copies, so the file costs 132 MB and nothing is
++  recomputed. A pack that already has the engine's names (a pack this script readied, or a community pack that kept
++  the checkpoint's own names) gets no shim. The engine (and the Python line's rank-cache writer) maps every
++  *.safetensors file in the folder in name order, a later file winning; serving-1017.safetensors sorts after model-*,
++  layer-* and native.safetensors, so its names replace the converter's.
++  The Engram q / k tables need no shim: the 1017 packs hold them in bf16, and both the engine (checkpoint.zig widens
++  bf16 -> f32 exactly) and the Python line (.to(torch.float32)) read them as f32. The markov head's bf16 (the 1017
++  checkpoint's own dtype; some packs keep it) needs none either: the engine converts it to the fp16 its kernel reads
++  at load (weights.zig), exactly.
++- chat_template.jinja: this repository's tools/dsv41-zig/serving/chat_template.jinja (sha256
++  b581d19d13f5c678d72ae197781c016c8331174cf69118017f20dadbb7e2e6a4, checked against DeepSeek's reference renderings).
++  The 1017 checkpoint ships no chat template and the server needs one for chat requests.
++
++--check changes nothing. It exits 0 when the files in MODEL_DIR equal what the script would write, and 1 otherwise.
++Either way it prints the sha256 of the files it would write (and of the ones present).
++"""
++import argparse
++import hashlib
++import json
++import os
++import re
++import shutil
++import struct
++import sys
++
++OUT = "serving-1017.safetensors"
++TEMPLATE = "chat_template.jinja"
++MARKOV = re.compile(r"^(mtp\.\d+)\.markov_head\.(?:markov_w([12])|(embed|head))\.weight$")
++ENGRAM_QK = re.compile(r"^layers\.\d+\.engram\.[qk]_weight$")
++
++
++def header(path):
++    with open(path, "rb") as f:
++        n = struct.unpack("<Q", f.read(8))[0]
++        h = json.loads(f.read(n))
++    h.pop("__metadata__", None)
++    return 8 + n, h
++
++
++def entries(model_dir):
++    """Every tensor of the folder by name, the way the engine maps it: files in name order, a later file winning."""
++    out = {}
++    for name in sorted(os.listdir(model_dir)):
++        if not name.endswith(".safetensors"):
++            continue
++        path = os.path.join(model_dir, name)
++        base, h = header(path)
++        for k, v in h.items():
++            out[k] = (path, base, v)
++    return out
++
++
++def read_tensor(entry):
++    path, base, info = entry
++    a, b = info["data_offsets"]
++    with open(path, "rb") as f:
++        f.seek(base + a)
++        data = f.read(b - a)
++    if len(data) != b - a:
++        sys.exit(f"{path}: short read (an incomplete download?)")
++    return data
++
++
++def encode(tensors):
++    """the file's bytes: tensors is a list of (name, dtype, shape, bytes) in file order"""
++    hdr, off = {}, 0
++    for name, dt, shape, data in tensors:
++        hdr[name] = {"dtype": dt, "shape": shape, "data_offsets": [off, off + len(data)]}
++        off += len(data)
++    hdr["__metadata__"] = {"format": "pt"}
++    hb = json.dumps(hdr, separators=(",", ":")).encode()
++    hb += b" " * (-len(hb) % 8)
++    return [struct.pack("<Q", len(hb)), hb] + [t[3] for t in tensors]
++
++
++def sha256_of(parts):
++    s = hashlib.sha256()
++    for p in parts:
++        s.update(p)
++    return s.hexdigest()
++
++
++def sha256_file(path):
++    s = hashlib.sha256()
++    with open(path, "rb") as f:
++        for block in iter(lambda: f.read(1 << 22), b""):
++            s.update(block)
++    return s.hexdigest()
++
++
++def plan_shim(model_dir):
++    """The markov tensors the pack needs under the engine's names, in name order; ([], []) when it needs none.
++
++    Returns (parts, names, notes): the safetensors bytes to write, the tensor names they hold, and what the pack's
++    dtypes mean for the engine (printed as notes)."""
++    have = entries(model_dir)
++    if not have:
++        sys.exit(f"no *.safetensors in {model_dir}: is MODEL_DIR a 1017 EXL3 pack?")
++    shim, notes, markov, engram = {}, [], False, False
++    for name in sorted(have):
++        m = MARKOV.match(name)
++        if m:
++            markov = True
++            stem, conv, plain = m.group(1), m.group(2), m.group(3)
++            engine = f"{stem}.markov_head.{'embed' if (conv == '1' or plain == 'embed') else 'head'}.weight"
++            path, base, info = have[name]
++            if engine.endswith("head.weight") and info["dtype"] == "BF16":
++                notes.append(f"{name} is bf16: the engine converts it to fp16 at load (weights.zig)")
++            if name != engine:
++                if engine in shim:
++                    sys.exit(f"two tensors would write {engine}")
++                shim[engine] = (info["dtype"], info["shape"], read_tensor((path, base, info)))
++            continue
++        if ENGRAM_QK.match(name):
++            engram = True
++            info = have[name][2]
++            if info["dtype"] != "F32":
++                notes.append(f"{name} is {info['dtype']}: the engine widens it to f32 at load (checkpoint.zig)")
++    if not markov or not engram:
++        sys.exit(f"{model_dir}: expected the MTP markov head and the Engram q / k of a 1017 pack")
++    names = sorted(shim)
++    if not names:
++        return [], [], notes
++    return encode([(n, *shim[n]) for n in names]), names, notes
++
++
++def main():
++    here = os.path.dirname(os.path.abspath(__file__))
++    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
++    ap.add_argument("model_dir")
++    ap.add_argument("--template", default=os.path.join(here, "serving", TEMPLATE))
++    ap.add_argument("--check", action="store_true")
++    a = ap.parse_args()
++    d = a.model_dir
++    parts, names, notes = plan_shim(d)
++    tpl = open(a.template, "rb").read()
++    tpl_sha = hashlib.sha256(tpl).hexdigest()
++    shim_p = os.path.join(d, OUT)
++    tpl_p = os.path.join(d, TEMPLATE)
++    shim_sha = sha256_of(parts) if parts else None
++    if a.check:
++        ok = True
++        got = sha256_file(shim_p) if os.path.isfile(shim_p) else "absent"
++        want = shim_sha if shim_sha else "absent"
++        print(f"{OUT}: {got} ({'ok' if got == want else 'expected ' + want})")
++        ok = ok and got == want
++        got = sha256_file(tpl_p) if os.path.isfile(tpl_p) else "absent"
++        print(f"{TEMPLATE}: {got} ({'ok' if got == tpl_sha else 'expected ' + tpl_sha})")
++        ok = ok and got == tpl_sha
++        sys.exit(0 if ok else 1)
++    if parts:
++        tmp = shim_p + ".partial"
++        with open(tmp, "wb") as f:
++            for p in parts:
++                f.write(p)
++        os.replace(tmp, shim_p)
++        print(f"{OUT}: {', '.join(names)}")
++        print(f"{OUT}: {shim_sha}")
++    else:
++        print(f"{OUT}: not needed (the pack already has the engine's markov names)")
++    for note in notes:
++        print(f"note: {note}")
++    if os.path.abspath(a.template) != os.path.abspath(tpl_p):
++        shutil.copyfile(a.template, tpl_p)
++    print(f"{TEMPLATE}: {tpl_sha}")
++
++
++if __name__ == "__main__":
++    main()
 diff --git a/zig/build/cuda.zig b/zig/build/cuda.zig
-index 2ba004c8..41b44bff 100644
+index 2ba004c8..bf7612d7 100644
 --- a/zig/build/cuda.zig
 +++ b/zig/build/cuda.zig
-@@ -178,13 +178,13 @@ fn engines(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builti
+@@ -110,6 +110,9 @@ pub fn targets(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bu
+     const ds_check = b.createModule(.{ .root_source_file = b.path("zig/src/families/dsv41/check_main.zig"), .target = target, .optimize = optimize, .link_libc = true });
+     ds_check.addImport("dsv41", engines(b, target, optimize, cuda, mods.lanes, mods.nemotron, mods.core).dsv41);
+     b.installArtifact(b.addExecutable(.{ .name = "tf-dsv41-check", .root_module = ds_check }));
++    const ds_rank_cache = b.createModule(.{ .root_source_file = b.path("zig/src/families/dsv41/rank_cache_main.zig"), .target = target, .optimize = optimize, .link_libc = true });
++    ds_rank_cache.addImport("dsv41", ds_check.import_table.get("dsv41").?);
++    b.installArtifact(b.addExecutable(.{ .name = "tf-dsv41-rank-cache", .root_module = ds_rank_cache }));
+     const ds_load = b.createModule(.{ .root_source_file = b.path("zig/src/families/dsv41/load_main.zig"), .target = target, .optimize = optimize, .link_libc = true });
+     ds_load.addImport("dsv41", ds_check.import_table.get("dsv41").?);
+     ds_load.addImport("cuda", cuda);
+@@ -178,13 +181,13 @@ fn engines(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builti
  fn nativeServer(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, cuda: *std.Build.Module, lanes: *std.Build.Module, nemotron: *std.Build.Module, core: *std.Build.Module, tokenizer: *std.Build.Module, build_options: *std.Build.Step.Options, install_native: bool) *std.Build.Step.Compile {
      const m = engines(b, target, optimize, cuda, lanes, nemotron, core);
      // the HTTP side keeps its safety checks; the engine below it runs at `optimize` (the tokenizer is the family's)
@@ -19,7 +682,7 @@ index 2ba004c8..41b44bff 100644
      }) });
      exe.root_module.addOptions("build_options", build_options);
      if (!install_native) {
-@@ -196,13 +196,14 @@ fn nativeServer(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
+@@ -196,13 +199,14 @@ fn nativeServer(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
      return exe;
  }
  
@@ -1446,7 +2109,7 @@ index 176d9958..53c68d55 100644
          if (!std.unicode.utf8ValidateSlice(text)) {
              var fixed: std.ArrayList(u8) = .empty;
 diff --git a/zig/src/families/dsv41/checkpoint.zig b/zig/src/families/dsv41/checkpoint.zig
-index 05045c80..39fde36b 100644
+index 05045c80..64573f3d 100644
 --- a/zig/src/families/dsv41/checkpoint.zig
 +++ b/zig/src/families/dsv41/checkpoint.zig
 @@ -4,6 +4,8 @@ const std = @import("std");
@@ -1488,7 +2151,41 @@ index 05045c80..39fde36b 100644
  }
  
  /// The layout `key` reads into.
-@@ -158,6 +176,9 @@ pub fn read(sh: *const Shards, key: []const u8, out: []u8) !void {
+@@ -146,18 +164,42 @@ pub fn describe(sh: *const Shards, key: []const u8) !Slice {
+     return out;
+ }
+ 
++/// Where `key`'s source tensor lies in its shard (a reader that takes the whole tensor in one read, then readFrom).
++pub const Span = struct { file: *const st.File, offset: usize, len: usize };
++
++pub fn span(sh: *const Shards, key: []const u8) !Span {
++    const k = try Key.parse(key);
++    var buf: [256]u8 = undefined;
++    const s = try source(sh, k, &buf);
++    const f = &sh.files[sh.names.get(s.name).?];
++    return .{ .file = f, .offset = @intFromPtr(s.t.bytes.ptr) - @intFromPtr(f.map.memory.ptr), .len = s.t.bytes.len };
++}
++
+ /// `key`'s bytes into `out` (describe(key).bytes long).
+ pub fn read(sh: *const Shards, key: []const u8, out: []u8) !void {
++    return readFrom(sh, key, null, out);
++}
++
++/// read, the source tensor's bytes taken from `bytes` (its span, read by the caller) instead of the mapped shard: a
++/// column slice touches every row of its tensor, which through the map is a disk read a row.
++pub fn readFrom(sh: *const Shards, key: []const u8, bytes: ?[]const u8, out: []u8) !void {
+     const k = try Key.parse(key);
+     var buf: [256]u8 = undefined;
+     const s = try source(sh, k, &buf);
+-    const t = s.t;
++    var t = s.t;
++    if (bytes) |b| {
++        if (b.len != t.bytes.len) return error.BadSize;
++        t.bytes = b;
++    }
+     const want = try describe(sh, key);
+     if (out.len != want.bytes) return error.BadSize;
+     if (!k.exl3) {
          const from = try dtypeOf(t.dtype);
          if (k.dtype == null or k.dtype.? == from) return @memcpy(out, t.bytes);
          if (from == .f16 and k.dtype.? == .f32) return widenHalf(t.bytes, out);
@@ -1498,7 +2195,7 @@ index 05045c80..39fde36b 100644
          return error.UnsupportedConversion;
      }
      const es = (try dtypeOf(t.dtype)).size();
-@@ -189,6 +210,27 @@ fn widenHalf(src: []const u8, out: []u8) void {
+@@ -189,6 +231,27 @@ fn widenHalf(src: []const u8, out: []u8) void {
      }
  }
  
@@ -1526,7 +2223,7 @@ index 05045c80..39fde36b 100644
  test "loader keys parse as Python prints them" {
      const p = try Key.parse("layers.3.ffn.experts.17.w2|None|(1152, 2304)|tr");
      try std.testing.expect(p.exl3 and p.cols == null and p.rows.?[0] == 1152 and p.rows.?[1] == 2304);
-@@ -198,6 +240,116 @@ test "loader keys parse as Python prints them" {
+@@ -198,6 +261,116 @@ test "loader keys parse as Python prints them" {
      try std.testing.expectError(error.BadKey, Key.parse("a|(2, 1)|None|tr"));
  }
  
@@ -1643,7 +2340,7 @@ index 05045c80..39fde36b 100644
  test "column, row and whole slices of a toy trellis and its scales" {
      const a = std.testing.allocator;
      const io = std.testing.io;
-@@ -249,3 +401,144 @@ test "column, row and whole slices of a toy trellis and its scales" {
+@@ -249,3 +422,144 @@ test "column, row and whole slices of a toy trellis and its scales" {
      const h0: f16 = @bitCast(std.mem.readInt(u16, body[224..226], .little));
      try std.testing.expectEqual(@as(f32, h0), @as(f32, @bitCast(std.mem.readInt(u32, wide[0..4], .little))));
  }
@@ -2146,6 +2843,358 @@ index 00000000..c8cf0009
 +    try std.testing.expectEqual(@as(usize, 6), try Pass.run(a, &ld, &eh, &c, tabs, &p2, 2, 5, null));
 +    try std.testing.expectEqual(@as(u64, 8), eh.lead_late);
 +}
+diff --git a/zig/src/families/dsv41/fixtures/1017-headers.json b/zig/src/families/dsv41/fixtures/1017-headers.json
+new file mode 100644
+index 00000000..134fa1e9
+--- /dev/null
++++ b/zig/src/families/dsv41/fixtures/1017-headers.json
+@@ -0,0 +1,345 @@
++{
++ "note": "The tensor names, dtypes and shapes are the real packs' headers (read only, over ssh where the pack lives on another host); data_offsets are rebased into a compact fixture body.",
++ "packs": [
++  {
++   "name": "ours-4.0bpw",
++   "title": "ours 4.0 bpw (bertholomus/DeepSeek-V4.1-Flash-1017-EXL3-4.0bpw, tank publish)",
++   "source": "/tank/models/llm/publish/DeepSeek-V4.1-Flash-1017-EXL3-4.0bpw",
++   "files": [
++    {
++     "name": "model-00001-of-00041.safetensors",
++     "header": "{\"layers.1.engram.q_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[0,40960]},\"layers.1.engram.k_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[40960,81920]}}",
++     "body_bytes": 81920
++    },
++    {
++     "name": "model-00002-of-00041.safetensors",
++     "header": "{\"layers.1.engram.q_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[0,40960]},\"layers.1.engram.k_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[40960,81920]}}",
++     "body_bytes": 81920
++    },
++    {
++     "name": "model-00014-of-00041.safetensors",
++     "header": "{\"layers.14.engram.q_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[0,40960]},\"layers.14.engram.k_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[40960,81920]}}",
++     "body_bytes": 81920
++    },
++    {
++     "name": "model-00015-of-00041.safetensors",
++     "header": "{\"layers.14.engram.q_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[0,40960]},\"layers.14.engram.k_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[40960,81920]}}",
++     "body_bytes": 81920
++    },
++    {
++     "name": "model-00041-of-00041.safetensors",
++     "header": "{\"mtp.2.markov_head.markov_w1.weight\":{\"dtype\":\"BF16\",\"shape\":[129280,256],\"data_offsets\":[0,66191360]},\"mtp.2.markov_head.markov_w2.weight\":{\"dtype\":\"F16\",\"shape\":[129280,256],\"data_offsets\":[66191360,132382720]}}",
++     "body_bytes": 132382720
++    }
++   ],
++   "checks": [
++    {
++     "key": "mtp.2.markov_head.embed.weight|None",
++     "source": "mtp.2.markov_head.markov_w1.weight",
++     "source_dtype": "BF16",
++     "want": "same",
++     "dtype": "BF16"
++    },
++    {
++     "key": "mtp.2.markov_head.head.weight|None",
++     "source": "mtp.2.markov_head.markov_w2.weight",
++     "source_dtype": "F16",
++     "want": "same",
++     "dtype": "F16"
++    },
++    {
++     "key": "layers.1.engram.q_weight|torch.float32",
++     "source": "layers.1.engram.q_weight",
++     "source_dtype": "BF16",
++     "want": "f32",
++     "dtype": "F32"
++    },
++    {
++     "key": "layers.1.engram.k_weight|torch.float32",
++     "source": "layers.1.engram.k_weight",
++     "source_dtype": "BF16",
++     "want": "f32",
++     "dtype": "F32"
++    },
++    {
++     "key": "layers.14.engram.q_weight|torch.float32",
++     "source": "layers.14.engram.q_weight",
++     "source_dtype": "BF16",
++     "want": "f32",
++     "dtype": "F32"
++    },
++    {
++     "key": "layers.14.engram.k_weight|torch.float32",
++     "source": "layers.14.engram.k_weight",
++     "source_dtype": "BF16",
++     "want": "f32",
++     "dtype": "F32"
++    }
++   ]
++  },
++  {
++   "name": "work-2.9bpw",
++   "title": "work 2.9 bpw download (tank work/dsv41-1017-exl3-2.9bpw)",
++   "source": "/tank/models/llm/work/dsv41-1017-exl3-2.9bpw",
++   "files": [
++    {
++     "name": "model-00001-of-00041.safetensors",
++     "header": "{\"layers.1.engram.q_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[0,40960]},\"layers.1.engram.k_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[40960,81920]}}",
++     "body_bytes": 81920
++    },
++    {
++     "name": "model-00002-of-00041.safetensors",
++     "header": "{\"layers.1.engram.q_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[0,40960]},\"layers.1.engram.k_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[40960,81920]}}",
++     "body_bytes": 81920
++    },
++    {
++     "name": "model-00014-of-00041.safetensors",
++     "header": "{\"layers.14.engram.q_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[0,40960]},\"layers.14.engram.k_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[40960,81920]}}",
++     "body_bytes": 81920
++    },
++    {
++     "name": "model-00015-of-00041.safetensors",
++     "header": "{\"layers.14.engram.q_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[0,40960]},\"layers.14.engram.k_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[40960,81920]}}",
++     "body_bytes": 81920
++    },
++    {
++     "name": "model-00041-of-00041.safetensors",
++     "header": "{\"mtp.2.markov_head.markov_w1.weight\":{\"dtype\":\"BF16\",\"shape\":[129280,256],\"data_offsets\":[0,66191360]},\"mtp.2.markov_head.markov_w2.weight\":{\"dtype\":\"F16\",\"shape\":[129280,256],\"data_offsets\":[66191360,132382720]}}",
++     "body_bytes": 132382720
++    }
++   ],
++   "checks": [
++    {
++     "key": "mtp.2.markov_head.embed.weight|None",
++     "source": "mtp.2.markov_head.markov_w1.weight",
++     "source_dtype": "BF16",
++     "want": "same",
++     "dtype": "BF16"
++    },
++    {
++     "key": "mtp.2.markov_head.head.weight|None",
++     "source": "mtp.2.markov_head.markov_w2.weight",
++     "source_dtype": "F16",
++     "want": "same",
++     "dtype": "F16"
++    },
++    {
++     "key": "layers.1.engram.q_weight|torch.float32",
++     "source": "layers.1.engram.q_weight",
++     "source_dtype": "BF16",
++     "want": "f32",
++     "dtype": "F32"
++    },
++    {
++     "key": "layers.1.engram.k_weight|torch.float32",
++     "source": "layers.1.engram.k_weight",
++     "source_dtype": "BF16",
++     "want": "f32",
++     "dtype": "F32"
++    },
++    {
++     "key": "layers.14.engram.q_weight|torch.float32",
++     "source": "layers.14.engram.q_weight",
++     "source_dtype": "BF16",
++     "want": "f32",
++     "dtype": "F32"
++    },
++    {
++     "key": "layers.14.engram.k_weight|torch.float32",
++     "source": "layers.14.engram.k_weight",
++     "source_dtype": "BF16",
++     "want": "f32",
++     "dtype": "F32"
++    }
++   ]
++  },
++  {
++   "name": "a5-2.9bpw-prepared",
++   "title": "A5 2.9 bpw prepared pack (ascent-05 ~/models/deepseek-v41-1017-exl3-2.9bpw/model)",
++   "source": "/home/bertholomus/models/deepseek-v41-1017-exl3-2.9bpw",
++   "files": [
++    {
++     "name": "model-00002-of-00043.safetensors",
++     "header": "{\"layers.1.engram.q_weight\":{\"dtype\":\"F32\",\"shape\":[4,5120],\"data_offsets\":[0,81920]},\"layers.1.engram.k_weight\":{\"dtype\":\"F32\",\"shape\":[4,5120],\"data_offsets\":[81920,163840]}}",
++     "body_bytes": 163840
++    },
++    {
++     "name": "model-00015-of-00043.safetensors",
++     "header": "{\"layers.14.engram.q_weight\":{\"dtype\":\"F32\",\"shape\":[4,5120],\"data_offsets\":[0,81920]},\"layers.14.engram.k_weight\":{\"dtype\":\"F32\",\"shape\":[4,5120],\"data_offsets\":[81920,163840]}}",
++     "body_bytes": 163840
++    },
++    {
++     "name": "model-00043-of-00043.safetensors",
++     "header": "{\"mtp.2.markov_head.embed.weight\":{\"dtype\":\"BF16\",\"shape\":[129280,256],\"data_offsets\":[0,66191360]},\"mtp.2.markov_head.head.weight\":{\"dtype\":\"F16\",\"shape\":[129280,256],\"data_offsets\":[66191360,132382720]}}",
++     "body_bytes": 132382720
++    }
++   ],
++   "checks": [
++    {
++     "key": "mtp.2.markov_head.embed.weight|None",
++     "source": "mtp.2.markov_head.embed.weight",
++     "source_dtype": "BF16",
++     "want": "same",
++     "dtype": "BF16"
++    },
++    {
++     "key": "mtp.2.markov_head.head.weight|None",
++     "source": "mtp.2.markov_head.head.weight",
++     "source_dtype": "F16",
++     "want": "same",
++     "dtype": "F16"
++    },
++    {
++     "key": "layers.1.engram.q_weight|torch.float32",
++     "source": "layers.1.engram.q_weight",
++     "source_dtype": "F32",
++     "want": "same",
++     "dtype": "F32"
++    },
++    {
++     "key": "layers.1.engram.k_weight|torch.float32",
++     "source": "layers.1.engram.k_weight",
++     "source_dtype": "F32",
++     "want": "same",
++     "dtype": "F32"
++    },
++    {
++     "key": "layers.14.engram.q_weight|torch.float32",
++     "source": "layers.14.engram.q_weight",
++     "source_dtype": "F32",
++     "want": "same",
++     "dtype": "F32"
++    },
++    {
++     "key": "layers.14.engram.k_weight|torch.float32",
++     "source": "layers.14.engram.k_weight",
++     "source_dtype": "F32",
++     "want": "same",
++     "dtype": "F32"
++    }
++   ]
++  },
++  {
++   "name": "a6-jayleaton-2.8bpw",
++   "title": "A6 jayleaton 2.8 bpw (ascent-06 ~/ai/models/jayleaton-...-2.8bpw)",
++   "source": "/home/bertholomus/ai/models/jayleaton-DeepSeek-V4.1-Flash-1017-EXL3-2.8bpw--859396591c34",
++   "files": [
++    {
++     "name": "native.safetensors",
++     "header": "{\"layers.1.engram.q_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[0,40960]},\"layers.1.engram.k_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[40960,81920]},\"layers.14.engram.q_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[81920,122880]},\"layers.14.engram.k_weight\":{\"dtype\":\"BF16\",\"shape\":[4,5120],\"data_offsets\":[122880,163840]},\"mtp.2.markov_head.embed.weight\":{\"dtype\":\"BF16\",\"shape\":[129280,256],\"data_offsets\":[163840,66355200]},\"mtp.2.markov_head.head.weight\":{\"dtype\":\"BF16\",\"shape\":[129280,256],\"data_offsets\":[66355200,132546560]}}",
++     "body_bytes": 132546560
++    }
++   ],
++   "checks": [
++    {
++     "key": "mtp.2.markov_head.embed.weight|None",
++     "source": "mtp.2.markov_head.embed.weight",
++     "source_dtype": "BF16",
++     "want": "same",
++     "dtype": "BF16"
++    },
++    {
++     "key": "mtp.2.markov_head.head.weight|None",
++     "source": "mtp.2.markov_head.head.weight",
++     "source_dtype": "BF16",
++     "want": "same",
++     "dtype": "BF16"
++    },
++    {
++     "key": "layers.1.engram.q_weight|torch.float32",
++     "source": "layers.1.engram.q_weight",
++     "source_dtype": "BF16",
++     "want": "f32",
++     "dtype": "F32"
++    },
++    {
++     "key": "layers.1.engram.k_weight|torch.float32",
++     "source": "layers.1.engram.k_weight",
++     "source_dtype": "BF16",
++     "want": "f32",
++     "dtype": "F32"
++    },
++    {
++     "key": "layers.14.engram.q_weight|torch.float32",
++     "source": "layers.14.engram.q_weight",
++     "source_dtype": "BF16",
++     "want": "f32",
++     "dtype": "F32"
++    },
++    {
++     "key": "layers.14.engram.k_weight|torch.float32",
++     "source": "layers.14.engram.k_weight",
++     "source_dtype": "BF16",
++     "want": "f32",
++     "dtype": "F32"
++    }
++   ]
++  },
++  {
++   "name": "september-2.9bpw",
++   "title": "September 2.9 bpw served pack (tank banked/DeepSeek-V4.1-Flash-EXL3-2.9bpw--64ba41b6)",
++   "source": "/tank/models/llm/banked/DeepSeek-V4.1-Flash-EXL3-2.9bpw--64ba41b6",
++   "files": [
++    {
++     "name": "model-00002-of-00039.safetensors",
++     "header": "{\"layers.1.engram.q_weight\":{\"dtype\":\"F32\",\"shape\":[4,5120],\"data_offsets\":[0,81920]},\"layers.1.engram.k_weight\":{\"dtype\":\"F32\",\"shape\":[4,5120],\"data_offsets\":[81920,163840]}}",
++     "body_bytes": 163840
++    },
++    {
++     "name": "model-00015-of-00039.safetensors",
++     "header": "{\"layers.14.engram.q_weight\":{\"dtype\":\"F32\",\"shape\":[4,5120],\"data_offsets\":[0,81920]},\"layers.14.engram.k_weight\":{\"dtype\":\"F32\",\"shape\":[4,5120],\"data_offsets\":[81920,163840]}}",
++     "body_bytes": 163840
++    },
++    {
++     "name": "model-00039-of-00039.safetensors",
++     "header": "{\"mtp.2.markov_head.embed.weight\":{\"dtype\":\"BF16\",\"shape\":[129280,256],\"data_offsets\":[0,66191360]},\"mtp.2.markov_head.head.weight\":{\"dtype\":\"F16\",\"shape\":[129280,256],\"data_offsets\":[66191360,132382720]}}",
++     "body_bytes": 132382720
++    }
++   ],
++   "checks": [
++    {
++     "key": "mtp.2.markov_head.embed.weight|None",
++     "source": "mtp.2.markov_head.embed.weight",
++     "source_dtype": "BF16",
++     "want": "same",
++     "dtype": "BF16"
++    },
++    {
++     "key": "mtp.2.markov_head.head.weight|None",
++     "source": "mtp.2.markov_head.head.weight",
++     "source_dtype": "F16",
++     "want": "same",
++     "dtype": "F16"
++    },
++    {
++     "key": "layers.1.engram.q_weight|torch.float32",
++     "source": "layers.1.engram.q_weight",
++     "source_dtype": "F32",
++     "want": "same",
++     "dtype": "F32"
++    },
++    {
++     "key": "layers.1.engram.k_weight|torch.float32",
++     "source": "layers.1.engram.k_weight",
++     "source_dtype": "F32",
++     "want": "same",
++     "dtype": "F32"
++    },
++    {
++     "key": "layers.14.engram.q_weight|torch.float32",
++     "source": "layers.14.engram.q_weight",
++     "source_dtype": "F32",
++     "want": "same",
++     "dtype": "F32"
++    },
++    {
++     "key": "layers.14.engram.k_weight|torch.float32",
++     "source": "layers.14.engram.k_weight",
++     "source_dtype": "F32",
++     "want": "same",
++     "dtype": "F32"
++    }
++   ]
++  }
++ ]
++}
+\ No newline at end of file
 diff --git a/zig/src/families/dsv41/lanes.zig b/zig/src/families/dsv41/lanes.zig
 index c55995d2..cd85a4f5 100644
 --- a/zig/src/families/dsv41/lanes.zig
@@ -3162,18 +4211,221 @@ index c10e7c9c..aabadc5c 100644
      var batch: [64]u64 = undefined;
      var nb: usize = 0;
 diff --git a/zig/src/families/dsv41/rank_cache.zig b/zig/src/families/dsv41/rank_cache.zig
-index 50c66d82..4936dfe9 100644
+index 50c66d82..cffd357e 100644
 --- a/zig/src/families/dsv41/rank_cache.zig
 +++ b/zig/src/families/dsv41/rank_cache.zig
-@@ -143,7 +143,7 @@ pub fn find(gpa: std.mem.Allocator, io: Io, dir: Io.Dir, rank: u32, world: u32)
+@@ -32,6 +32,19 @@ pub const DType = enum {
+         inline for (names) |n| if (std.mem.eql(u8, text, n[0])) return n[1];
+         return null;
+     }
++
++    pub fn name(self: DType) []const u8 {
++        return switch (self) {
++            .bf16 => "bfloat16",
++            .f16 => "float16",
++            .f32 => "float32",
++            .i16 => "int16",
++            .i32 => "int32",
++            .i64 => "int64",
++            .u8 => "uint8",
++            .f8e4m3 => "float8_e4m3fn",
++        };
++    }
+ };
+ 
+ /// One tensor in the file: its bytes are [offset, offset + bytes).
+@@ -142,8 +155,35 @@ pub fn find(gpa: std.mem.Allocator, io: Io, dir: Io.Dir, rank: u32, world: u32)
+     return found orelse error.NoRankCache;
  }
  
++pub fn writeRow(w: *Io.Writer, key: []const u8, dtype: DType, shape: []const usize, offset: u64, bytes: u64) !void {
++    try w.writeByte('[');
++    try jsonString(w, key);
++    try w.print(", \"{s}\", [", .{dtype.name()});
++    for (shape, 0..) |d, i| try w.print("{s}{d}", .{ if (i > 0) ", " else "", d });
++    try w.print("], {d}, {d}]", .{ offset, bytes });
++}
++
++fn jsonString(w: *Io.Writer, s: []const u8) !void {
++    try w.writeByte('"');
++    for (s) |ch| switch (ch) {
++        '"', '\\' => {
++            try w.writeByte('\\');
++            try w.writeByte(ch);
++        },
++        '\n' => try w.writeAll("\\n"),
++        '\r' => try w.writeAll("\\r"),
++        '\t' => try w.writeAll("\\t"),
++        0x08 => try w.writeAll("\\b"),
++        0x0c => try w.writeAll("\\f"),
++        0x00...0x07, 0x0b, 0x0e...0x1f, 0x7f => try w.print("\\u{x:0>4}", .{ch}),
++        0x80...0xff => return error.NonAsciiKey,
++        else => try w.writeByte(ch),
++    };
++    try w.writeByte('"');
++}
++
  /// A cache file as weights.py writes one, for the tests: each tensor's bytes, then the index, offset and magic.
 -fn writeFake(a: std.mem.Allocator, io: Io, dir: Io.Dir, name: []const u8, rows: []const struct { key: []const u8, dtype: []const u8, shape: []const usize, fill: u8 }) !void {
 +pub fn writeFake(a: std.mem.Allocator, io: Io, dir: Io.Dir, name: []const u8, rows: []const struct { key: []const u8, dtype: []const u8, shape: []const usize, fill: u8 }) !void {
      var body: std.ArrayList(u8) = .empty;
      var index: std.ArrayList(u8) = .empty;
      try index.append(a, '[');
+diff --git a/zig/src/families/dsv41/rank_cache_main.zig b/zig/src/families/dsv41/rank_cache_main.zig
+new file mode 100644
+index 00000000..1e48fd68
+--- /dev/null
++++ b/zig/src/families/dsv41/rank_cache_main.zig
+@@ -0,0 +1,149 @@
++//! tf-dsv41-rank-cache MODEL_DIR OUT_DIR RANK WORLD [--parity] [--no-dspark] [--index-only]: one rank's weight file
++//! (the lane's rank cache, TF_DS_RANK_CACHE) from the checkpoint alone, no GPU and no Python. The entries are
++//! plan.wants' (the Python loader's keys and order for the split: TP over 1 or 2 nodes, the exact 2D split over 4;
++//! --parity: the balanced experts split, TF_DS_2D_GU=parity), each sliced by the checkpoint reader from its source
++//! tensor read whole (checkpoint.readFrom: the bytes the loader keeps); then the index as weights.py RankCache writes it
++//! (rank_cache.writeRow), its offset (u64 little-endian) and the magic. The file is OUT_DIR/rank{RANK}of{WORLD}-<the
++//! index's sha256, 20 hex digits>.bin, written as a dot file and renamed when whole; OUT_DIR must not hold another file
++//! of this rank and world (the lane refuses a folder with two). --index-only: print the index the file would hold to
++//! stdout and write nothing.
++const std = @import("std");
++const dsv41 = @import("dsv41");
++
++const usage = "usage: tf-dsv41-rank-cache MODEL_DIR OUT_DIR RANK WORLD [--parity] [--no-dspark] [--index-only]\n";
++
++fn dim(s: dsv41.checkpoint.Slice, i: usize) usize {
++    return if (i < s.rank) s.shape[i] else 1;
++}
++
++pub fn main(init: std.process.Init) !u8 {
++    const a = init.arena.allocator();
++    const gpa = init.gpa;
++    const io = init.io;
++    const args = try init.minimal.args.toSlice(a);
++    if (args.len < 5) {
++        std.debug.print("{s}", .{usage});
++        return 2;
++    }
++    const rank = try std.fmt.parseInt(u32, args[3], 10);
++    const world = try std.fmt.parseInt(u32, args[4], 10);
++    var dspark = true;
++    var parity = false;
++    var index_only = false;
++    for (args[5..]) |x| {
++        if (std.mem.eql(u8, x, "--no-dspark")) {
++            dspark = false;
++        } else if (std.mem.eql(u8, x, "--parity")) {
++            parity = true;
++        } else if (std.mem.eql(u8, x, "--index-only")) {
++            index_only = true;
++        } else {
++            std.debug.print("{s}", .{usage});
++            return 2;
++        }
++    }
++    if (!(world == 1 or world == 2 or world == 4) or rank >= world or (parity and world != 4)) {
++        std.debug.print("WORLD is 1, 2 or 4, RANK below it; --parity needs WORLD 4\n{s}", .{usage});
++        return 2;
++    }
++    // four ranks: the exact 2D split (node g = TP2 rank g % 2 of pair g / 2); the file is still rank g of 4
++    const split: dsv41.plan.Split = if (world == 4) .{ .rank = rank % 2, .world = 2, .pair = rank / 2 } else .{ .rank = rank, .world = world };
++    const cfg = try dsv41.Config.read(a, io, args[1]);
++    const want = try dsv41.plan.wants(a, cfg, split, dspark);
++    var sh = try dsv41.checkpoint.Shards.open(gpa, io, args[1]);
++    defer sh.close(io);
++
++    // every entry's layout first, and from the layouts the index: a missing tensor or a layout the split does not
++    // expect stops before a byte is written
++    const slices = try a.alloc(dsv41.checkpoint.Slice, want.len);
++    var index: std.Io.Writer.Allocating = .init(gpa);
++    defer index.deinit();
++    const iw = &index.writer;
++    try iw.writeByte('[');
++    var total: u64 = 0;
++    for (want, slices, 0..) |x, *s, i| {
++        s.* = dsv41.checkpoint.describe(&sh, x.key) catch |err| {
++            std.debug.print("{s}: {t}\n", .{ x.key, err });
++            return 1;
++        };
++        var bad = false;
++        if (x.dtype) |d| bad = bad or d != s.dtype;
++        if (x.k16) |k| bad = bad or dim(s.*, 0) != k;
++        if (x.n16) |n| bad = bad or dim(s.*, 1) != n;
++        if (bad) {
++            std.debug.print("{s}: the checkpoint's {t} {any} is not the split's\n", .{ x.key, s.dtype, s.shape[0..s.rank] });
++            return 1;
++        }
++        if (i > 0) try iw.writeAll(", ");
++        try dsv41.rank_cache.writeRow(iw, x.key, s.dtype, s.shape[0..s.rank], total, s.bytes);
++        total += s.bytes;
++    }
++    try iw.writeByte(']');
++    const body = index.written();
++    var out_buf: [1 << 16]u8 = undefined;
++    var out = std.Io.File.stdout().writer(io, &out_buf);
++    if (index_only) {
++        try out.interface.writeAll(body);
++        try out.interface.flush();
++        return 0;
++    }
++
++    var dir = try std.Io.Dir.cwd().createDirPathOpen(io, args[2], .{ .open_options = .{ .iterate = true } });
++    defer dir.close(io);
++    if (dsv41.rank_cache.find(a, io, dir, rank, world)) |old| {
++        std.debug.print("{s} already holds {s}: remove it or name an empty OUT_DIR\n", .{ args[2], old });
++        return 1;
++    } else |err| if (err != error.NoRankCache) return err;
++    const partial = try std.fmt.allocPrint(a, ".rank{d}of{d}.partial", .{ rank, world });
++    var file = try dir.createFile(io, partial, .{});
++    var file_open = true;
++    defer if (file_open) file.close(io);
++    errdefer dir.deleteFile(io, partial) catch {};
++    var wbuf: [1 << 20]u8 = undefined;
++    var fw = file.writer(io, &wbuf);
++    const w = &fw.interface;
++
++    var buf: std.ArrayList(u8) = .empty;
++    defer buf.deinit(gpa);
++    var whole: std.ArrayList(u8) = .empty;
++    defer whole.deinit(gpa);
++    var last: ?dsv41.checkpoint.Span = null;
++    var at: u64 = 0;
++    var report: u64 = 8 << 30;
++    for (want, slices) |x, s| {
++        // each source tensor in one read (its parts' keys follow one another): slicing it through the map would read
++        // the disk a row at a time
++        const sp = try dsv41.checkpoint.span(&sh, x.key);
++        if (last == null or last.?.file != sp.file or last.?.offset != sp.offset) {
++            try whole.resize(gpa, sp.len);
++            if (try sp.file.file.readPositionalAll(io, whole.items, sp.offset) != sp.len) return error.ShortRead;
++            last = sp;
++        }
++        try buf.resize(gpa, s.bytes);
++        try dsv41.checkpoint.readFrom(&sh, x.key, whole.items, buf.items);
++        try w.writeAll(buf.items);
++        at += s.bytes;
++        if (at >= report) {
++            std.debug.print("rank {d} of {d}: {d} of {d} MiB\n", .{ rank, world, at >> 20, total >> 20 });
++            report += 8 << 30;
++        }
++    }
++    try w.writeAll(body);
++    var tail: [16]u8 = undefined;
++    std.mem.writeInt(u64, tail[0..8], at, .little);
++    @memcpy(tail[8..], dsv41.rank_cache.magic);
++    try w.writeAll(&tail);
++    try w.flush();
++    try file.sync(io);
++    file.close(io);
++    file_open = false;
++
++    var digest: [32]u8 = undefined;
++    std.crypto.hash.sha2.Sha256.hash(body, &digest, .{});
++    const hex = std.fmt.bytesToHex(digest, .lower);
++    const name = try std.fmt.allocPrint(a, "rank{d}of{d}-{s}.bin", .{ rank, world, hex[0..20] });
++    try dir.rename(partial, dir, name, io);
++    try out.interface.print("{{\"file\": \"{s}\", \"entries\": {d}, \"data_bytes\": {d}, \"index_bytes\": {d}, \"rank\": {d}, \"world\": {d}, \"parity\": {}, \"dspark\": {}}}\n", .{ name, want.len, at, body.len, rank, world, parity, dspark });
++    try out.interface.flush();
++    return 0;
++}
 diff --git a/zig/src/families/dsv41/rdma.zig b/zig/src/families/dsv41/rdma.zig
 index 008baed4..c84c5b64 100644
 --- a/zig/src/families/dsv41/rdma.zig
@@ -4286,4 +5538,40 @@ index 5516e485..292c0d07 100644
 +    // the call streamer reads only the text before the first block
 +    try std.testing.expectEqualStrings("Hi. ", tool_parse.beforeDsml("Hi. " ++ block ++ " more"));
 +    try std.testing.expectEqualStrings("no block", tool_parse.beforeDsml("no block"));
++}
+diff --git a/zig/tests/dsv41/template_check.zig b/zig/tests/dsv41/template_check.zig
+new file mode 100644
+index 00000000..5e3d92b0
+--- /dev/null
++++ b/zig/tests/dsv41/template_check.zig
+@@ -0,0 +1,30 @@
++//! The 1017 chat template on this engine's template module: it compiles and renders. The template is
++//! tools/dsv41-zig/serving/chat_template.jinja (the 1017 checkpoint ships none; this is ours, checked against DeepSeek's
++//! reference renderings). Not part of `zig build test` (the template module is not a test root there); run it with:
++//!
++//!   TPL=tools/dsv41-zig/serving/chat_template.jinja \
++//!     zig test -lc --dep template -Mroot=zig/tests/dsv41/template_check.zig \
++//!       -Mtemplate=zig/src/core/template/template.zig
++const std = @import("std");
++const template = @import("template");
++
++test "the 1017 chat template compiles and renders (TPL)" {
++    const path = std.c.getenv("TPL") orelse return error.SkipZigTest;
++    const a = std.testing.allocator;
++    const src = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, std.mem.span(path), a, .limited(1 << 20));
++    defer a.free(src);
++    var diag = template.Diag{};
++    defer if (diag.msg.len > 0) a.free(diag.msg);
++    const parsed = try std.json.parseFromSlice(std.json.Value, a, "{\"messages\":[{\"role\":\"system\",\"content\":\"You are helpful.\"},{\"role\":\"user\",\"content\":\"Hi\"},{\"role\":\"assistant\",\"content\":\"Hello\"},{\"role\":\"user\",\"content\":\"Bye\"}]}", .{});
++    defer parsed.deinit();
++    const out = template.renderChat(a, src, parsed.value.object.get("messages").?, .null, parsed.value, true, &diag) catch |err| {
++        std.debug.print("TPL FAIL {t}: {s}\n", .{ err, diag.msg });
++        return err;
++    };
++    defer a.free(out);
++    // the header's system span and the two user turns are there, and the generation prompt opens the assistant turn
++    try std.testing.expect(std.mem.indexOf(u8, out, "You are helpful.") != null);
++    try std.testing.expect(std.mem.indexOf(u8, out, "Hi") != null);
++    try std.testing.expect(std.mem.indexOf(u8, out, "Bye") != null);
++    std.debug.print("TPL {s}: compiled and rendered {d} bytes\n", .{ std.mem.span(path), out.len });
 +}
