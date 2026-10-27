@@ -1,0 +1,430 @@
+import asyncio
+import json
+import logging
+import os
+import sys
+from collections import deque
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Dict, Any, Optional, Tuple, List
+
+import httpx
+from fastapi import FastAPI, Request, Response
+from fastapi.responses import JSONResponse, StreamingResponse
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("spark-fastfail-proxy")
+
+CONFIG_PATH = Path(__file__).parent / "config.json"
+
+# State
+state: Dict[str, Any] = {
+    "upstream_url": "http://127.0.0.1:8888",
+    "listen_host": "0.0.0.0",
+    "listen_port": 8889,
+    "model_limits": {
+        "dsv41": 2,
+        "DeepSeek-V4.1-Flash-EXL3": 2,
+        "DeepSeek-V4.1-Flash-TF": 4,
+        "DeepSeek-V4.1-Flash-1017-TF": 4,
+        "GLM-5.3-Flash": 4,
+        "GLM-5.3-Flash-EXL3": 4,
+    },
+    "default_limit": 4,
+    "queue_buffer": 4,
+    "tiered_timeouts": [20.0, 15.0, 10.0, 5.0],
+    "extension_seconds": 5.0,
+    "poll_interval_seconds": 3,
+    "current_model": "unknown",
+    "current_limit": 4,
+    "active_running": 0,
+    "waiting_in_queue": 0,
+    "upstream_healthy": False,
+}
+
+
+class Waiter:
+    def __init__(self, pos: int):
+        self.pos = pos
+        self.promoted = False
+        self.extended = False
+        self.deadline = 0.0
+        self.event = asyncio.Event()
+
+
+waiting_queue: deque[Waiter] = deque()
+queue_lock = asyncio.Lock()
+http_client: Optional[httpx.AsyncClient] = None
+
+# Hop-by-hop headers to exclude when forwarding
+EXCLUDE_HEADERS = {
+    "host",
+    "content-length",
+    "transfer-encoding",
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailers",
+    "upgrade",
+}
+
+
+def load_config() -> None:
+    if not CONFIG_PATH.exists():
+        return
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+            state["upstream_url"] = cfg.get("upstream_url", state["upstream_url"]).rstrip("/")
+            state["model_limits"] = cfg.get("model_limits", state["model_limits"])
+            state["default_limit"] = cfg.get("default_limit", state["default_limit"])
+            state["queue_buffer"] = cfg.get("queue_buffer", state["queue_buffer"])
+            state["tiered_timeouts"] = [float(t) for t in cfg.get("tiered_timeouts", state["tiered_timeouts"])]
+            state["extension_seconds"] = float(cfg.get("extension_seconds", state["extension_seconds"]))
+            state["poll_interval_seconds"] = cfg.get("poll_interval_seconds", state["poll_interval_seconds"])
+    except Exception as e:
+        logger.warning(f"Failed to reload config: {e}")
+
+
+def get_timeout(pos: int) -> float:
+    timeouts = state["tiered_timeouts"]
+    if pos < len(timeouts):
+        return timeouts[pos]
+    return timeouts[-1] if timeouts else 5.0
+
+
+def resolve_limit(model_ids: list[str]) -> tuple[str, int]:
+    limits = state["model_limits"]
+    default_lim = state["default_limit"]
+
+    candidates = [m for m in model_ids if m != "current"]
+    if not candidates:
+        candidates = model_ids
+
+    for mid in candidates:
+        if mid in limits:
+            return mid, limits[mid]
+        mid_lower = mid.lower()
+        for k, v in limits.items():
+            if k.lower() == mid_lower or k.lower() in mid_lower:
+                return mid, v
+
+    first_model = candidates[0] if candidates else "unknown"
+    return first_model, default_lim
+
+
+async def monitor_upstream_model():
+    """Background task to poll upstream /v1/models and detect active model & limits."""
+    while True:
+        try:
+            load_config()
+            url = f"{state['upstream_url']}/v1/models"
+            async with httpx.AsyncClient(timeout=4.0) as client:
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    model_list = [item["id"] for item in data.get("data", []) if "id" in item]
+                    matched_model, limit = resolve_limit(model_list)
+                    old_model = state["current_model"]
+                    old_limit = state["current_limit"]
+
+                    state["current_model"] = matched_model
+                    state["current_limit"] = limit
+                    state["upstream_healthy"] = True
+
+                    if old_model != matched_model or old_limit != limit:
+                        logger.info(
+                            f"Detected upstream model: '{matched_model}' -> Concurrency limit set to {limit} "
+                            f"(was: {old_model} with limit {old_limit})"
+                        )
+                        async with queue_lock:
+                            _wake_next_locked()
+                else:
+                    state["upstream_healthy"] = False
+        except Exception:
+            state["upstream_healthy"] = False
+
+        await asyncio.sleep(state["poll_interval_seconds"])
+
+
+def _wake_next_locked():
+    """Promote waiting requests if active_running < current_limit."""
+    limit = state["current_limit"]
+    while state["active_running"] < limit and len(waiting_queue) > 0:
+        promoted_waiter = waiting_queue.popleft()
+        promoted_waiter.promoted = True
+        promoted_waiter.event.set()
+        state["active_running"] += 1
+        # Advance everyone else in queue
+        for i, w in enumerate(waiting_queue):
+            w.pos = i
+            w.extended = False  # fresh tier gets fresh extension rights
+            w.event.set()
+    state["waiting_in_queue"] = len(waiting_queue)
+
+
+async def acquire_slot() -> Tuple[bool, str]:
+    """
+    Acquire an execution slot with Tiered Dynamic Queue Management and Anti-Herd Extension.
+    """
+    async with queue_lock:
+        limit = state["current_limit"]
+        queue_max = state["queue_buffer"]
+
+        # 1. Direct GPU execution if slot free and nobody waiting ahead
+        if state["active_running"] < limit and len(waiting_queue) == 0:
+            state["active_running"] += 1
+            logger.info(
+                f"Direct GPU execution [running: {state['active_running']}/{limit}] (model: {state['current_model']})"
+            )
+            return True, "direct"
+
+        # 2. Check if queue is already full -> immediate fast-fail
+        if len(waiting_queue) >= queue_max:
+            return False, "queue_full"
+
+        # 3. Enter tiered queue
+        pos = len(waiting_queue)
+        waiter = Waiter(pos)
+        waiting_queue.append(waiter)
+        state["waiting_in_queue"] = len(waiting_queue)
+        initial_timeout = get_timeout(pos)
+        waiter.deadline = asyncio.get_event_loop().time() + initial_timeout
+        logger.info(
+            f"Entered standby queue at position {pos+1}/{queue_max} (initial timeout={initial_timeout}s)"
+        )
+
+    # Wait outside lock
+    try:
+        cur_timeout = initial_timeout
+        while True:
+            cur_pos = waiter.pos
+            waiter.deadline = asyncio.get_event_loop().time() + cur_timeout
+            try:
+                await asyncio.wait_for(waiter.event.wait(), timeout=cur_timeout)
+            except asyncio.TimeoutError:
+                # Timed out at current position without promotion or advance signal
+                async with queue_lock:
+                    if waiter.promoted:
+                        return True, "promoted"
+
+                    # Anti-Herd Extension Check:
+                    # If not already extended at this tier, check if ANY waiter ahead has remaining time <= 5s
+                    can_extend = False
+                    if not waiter.extended:
+                        now = asyncio.get_event_loop().time()
+                        ext_threshold = state.get("extension_seconds", 5.0)
+                        for w in waiting_queue:
+                            if w.pos < waiter.pos:
+                                rem = w.deadline - now
+                                if rem <= ext_threshold:
+                                    can_extend = True
+                                    break
+
+                    if can_extend:
+                        waiter.extended = True
+                        cur_timeout = state.get("extension_seconds", 5.0)
+                        waiter.deadline = asyncio.get_event_loop().time() + cur_timeout
+                        logger.info(
+                            f"Anti-herd extension: Waiter at pos {waiter.pos+1} EXTENDED by {cur_timeout}s "
+                            "(waiter ahead is about to exit/promote)"
+                        )
+                        continue
+
+                    # Cannot extend or already extended once -> Dropout to 429
+                    if waiter in waiting_queue:
+                        idx = waiting_queue.index(waiter)
+                        del waiting_queue[idx]
+                        # Advance waiters behind this one
+                        for i in range(idx, len(waiting_queue)):
+                            w = waiting_queue[i]
+                            w.pos = i
+                            w.extended = False
+                            w.event.set()
+                        state["waiting_in_queue"] = len(waiting_queue)
+                logger.warning(
+                    f"Tiered queue timeout at position {cur_pos+1} (extended={waiter.extended}) -> fast-fail 429"
+                )
+                return False, f"tiered_timeout_pos_{cur_pos+1}"
+
+            # Waiter was signaled
+            if waiter.promoted:
+                logger.info(
+                    f"Promoted to GPU execution [running: {state['active_running']}/{state['current_limit']}]"
+                )
+                return True, "promoted"
+
+            # Position advanced! Reset event, clear extension flag for new tier, and loop
+            waiter.event.clear()
+            waiter.extended = False
+            cur_timeout = get_timeout(waiter.pos)
+            logger.info(
+                f"Queue position advanced to {waiter.pos+1}/{state['queue_buffer']}! Timeout reset to {cur_timeout}s"
+            )
+
+    except asyncio.CancelledError:
+        async with queue_lock:
+            if waiter.promoted:
+                state["active_running"] = max(0, state["active_running"] - 1)
+                _wake_next_locked()
+            elif waiter in waiting_queue:
+                idx = waiting_queue.index(waiter)
+                del waiting_queue[idx]
+                for i in range(idx, len(waiting_queue)):
+                    w = waiting_queue[i]
+                    w.pos = i
+                    w.extended = False
+                    w.event.set()
+                state["waiting_in_queue"] = len(waiting_queue)
+        raise
+
+
+async def release_slot():
+    async with queue_lock:
+        state["active_running"] = max(0, state["active_running"] - 1)
+        _wake_next_locked()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global http_client
+    limits = httpx.Limits(max_keepalive_connections=100, max_connections=200)
+    http_client = httpx.AsyncClient(limits=limits, timeout=httpx.Timeout(600.0, connect=10.0))
+    monitor_task = asyncio.create_task(monitor_upstream_model())
+    logger.info(
+        f"Starting proxy with upstream: {state['upstream_url']} "
+        f"(queue_buffer={state['queue_buffer']}, tiered_timeouts={state['tiered_timeouts']}, "
+        f"anti_herd_extension={state['extension_seconds']}s)"
+    )
+    yield
+    monitor_task.cancel()
+    if http_client:
+        await http_client.aclose()
+
+
+app = FastAPI(title="Spark Fast-Fail Concurrency Proxy with Anti-Herd Dynamic Queue", lifespan=lifespan)
+
+
+@app.get("/proxy/status")
+async def get_proxy_status():
+    async with queue_lock:
+        running = state["active_running"]
+        waiting = len(waiting_queue)
+        positions = [w.pos + 1 for w in waiting_queue]
+        extended_flags = [w.extended for w in waiting_queue]
+    return {
+        "status": "ok",
+        "upstream_healthy": state["upstream_healthy"],
+        "upstream_url": state["upstream_url"],
+        "current_model": state["current_model"],
+        "concurrency_limit": state["current_limit"],
+        "queue_buffer": state["queue_buffer"],
+        "tiered_timeouts": state["tiered_timeouts"],
+        "extension_seconds": state["extension_seconds"],
+        "active_running": running,
+        "waiting_in_queue": waiting,
+        "queue_positions": positions,
+        "queue_extended": extended_flags,
+        "model_limits_config": state["model_limits"],
+        "default_limit": state["default_limit"],
+    }
+
+
+@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
+async def proxy_all(request: Request, path: str):
+    is_completion = path.strip("/").endswith("chat/completions") or path.strip("/").endswith("completions")
+
+    if is_completion and request.method == "POST":
+        acquired, reason = await acquire_slot()
+        if not acquired:
+            curr_model = state["current_model"]
+            limit = state["current_limit"]
+            async with queue_lock:
+                running = state["active_running"]
+                waiting = len(waiting_queue)
+            logger.warning(
+                f"Fast-Fail 429 triggered: model '{curr_model}' (reason: {reason}, running: {running}/{limit}, queue: {waiting}/{state['queue_buffer']})"
+            )
+            return JSONResponse(
+                status_code=429,
+                headers={"Retry-After": "1"},
+                content={
+                    "error": {
+                        "message": (
+                            f"DGX Spark concurrency limit reached for '{curr_model}' "
+                            f"(running: {running}/{limit}, tiered queue: {waiting}/{state['queue_buffer']}, reason: {reason}). "
+                            "Fast-failing for client fallback."
+                        ),
+                        "type": "server_busy",
+                        "code": 429,
+                        "param": None,
+                    }
+                },
+            )
+
+        try:
+            return await handle_forward(request, path)
+        finally:
+            await release_slot()
+    else:
+        return await handle_forward(request, path)
+
+
+async def handle_forward(request: Request, path: str):
+    upstream_url = f"{state['upstream_url']}/{path}"
+    query = request.url.query
+    if query:
+        upstream_url = f"{upstream_url}?{query}"
+
+    req_headers = {k: v for k, v in request.headers.items() if k.lower() not in EXCLUDE_HEADERS}
+    body = await request.body()
+
+    try:
+        upstream_req = http_client.build_request(
+            method=request.method,
+            url=upstream_url,
+            headers=req_headers,
+            content=body,
+        )
+        upstream_resp = await http_client.send(upstream_req, stream=True)
+    except Exception as e:
+        logger.error(f"Failed to connect to upstream {upstream_url}: {e}")
+        return JSONResponse(
+            status_code=502,
+            content={"error": {"message": f"Bad Gateway to Spark backend: {e}", "type": "bad_gateway", "code": 502}},
+        )
+
+    resp_headers = {
+        k: v for k, v in upstream_resp.headers.items() if k.lower() not in EXCLUDE_HEADERS
+    }
+
+    async def stream_body():
+        try:
+            async for chunk in upstream_resp.aiter_raw():
+                yield chunk
+        finally:
+            await upstream_resp.aclose()
+
+    media_type = upstream_resp.headers.get("content-type")
+    return StreamingResponse(
+        stream_body(),
+        status_code=upstream_resp.status_code,
+        headers=resp_headers,
+        media_type=media_type,
+    )
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    load_config()
+    host = state.get("listen_host", "0.0.0.0")
+    port = state.get("listen_port", 8889)
+    uvicorn.run("proxy:app", host=host, port=port, log_level="info")

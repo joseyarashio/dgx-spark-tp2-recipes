@@ -1,0 +1,14 @@
+[Unit]
+Description=DGX Spark Fast-Fail Concurrency Proxy (Port 8889 -> 8888)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/joseyarashio/spark-fastfail-proxy
+ExecStart=/home/joseyarashio/spark-fastfail-proxy/.venv/bin/uvicorn proxy:app --host 0.0.0.0 --port 8889
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target
