@@ -49,8 +49,9 @@ state: Dict[str, Any] = {
 
 
 class Waiter:
-    def __init__(self, pos: int):
+    def __init__(self, pos: int, priority: int = 1):
         self.pos = pos
+        self.priority = priority  # 0: interactive/foreground, 1: normal, 2: background/batch
         self.promoted = False
         self.extended = False
         self.deadline = 0.0
@@ -155,10 +156,20 @@ async def monitor_upstream_model():
 
 
 def _wake_next_locked():
-    """Promote waiting requests if active_running < current_limit."""
+    """Promote waiting requests if active_running < current_limit, respecting priority order."""
     limit = state["current_limit"]
     while state["active_running"] < limit and len(waiting_queue) > 0:
-        promoted_waiter = waiting_queue.popleft()
+        # Find highest priority waiter (lowest priority integer: 0 > 1 > 2)
+        best_idx = 0
+        best_prio = waiting_queue[0].priority
+        for i, w in enumerate(waiting_queue):
+            if w.priority < best_prio:
+                best_prio = w.priority
+                best_idx = i
+
+        promoted_waiter = waiting_queue[best_idx]
+        del waiting_queue[best_idx]
+
         promoted_waiter.promoted = True
         promoted_waiter.event.set()
         state["active_running"] += 1
@@ -170,35 +181,47 @@ def _wake_next_locked():
     state["waiting_in_queue"] = len(waiting_queue)
 
 
-async def acquire_slot() -> Tuple[bool, str]:
+async def acquire_slot(priority: int = 1) -> Tuple[bool, str]:
     """
-    Acquire an execution slot with Tiered Dynamic Queue Management and Anti-Herd Extension.
+    Acquire an execution slot with Tiered Dynamic Queue Management, Priority Scheduling, and Anti-Herd Extension.
+    priority: 0 = high/foreground, 1 = normal, 2 = background/batch.
+    Background requests (priority >= 2) cannot consume more than background_max_slots (default 3 of 4).
     """
     async with queue_lock:
         limit = state["current_limit"]
         queue_max = state["queue_buffer"]
+        bg_max = state.get("background_max_slots", 3)
 
-        # 1. Direct GPU execution if slot free and nobody waiting ahead
-        if state["active_running"] < limit and len(waiting_queue) == 0:
-            state["active_running"] += 1
-            logger.info(
-                f"Direct GPU execution [running: {state['active_running']}/{limit}] (model: {state['current_model']})"
-            )
-            return True, "direct"
+        # Background ceiling check: reserve at least 1 slot for interactive
+        if priority >= 2 and state["active_running"] >= bg_max:
+            # Check if queue has room
+            if len(waiting_queue) >= queue_max:
+                return False, "bg_limit_queue_full"
+
+        # 1. Direct GPU execution if slot free and nobody waiting ahead with higher priority
+        if state["active_running"] < limit:
+            has_higher_waiting = any(w.priority < priority for w in waiting_queue)
+            if not has_higher_waiting:
+                if not (priority >= 2 and state["active_running"] >= bg_max):
+                    state["active_running"] += 1
+                    logger.info(
+                        f"Direct GPU execution [running: {state['active_running']}/{limit}, prio: {priority}] (model: {state['current_model']})"
+                    )
+                    return True, "direct"
 
         # 2. Check if queue is already full -> immediate fast-fail
         if len(waiting_queue) >= queue_max:
             return False, "queue_full"
 
-        # 3. Enter tiered queue
+        # 3. Enter tiered queue with priority
         pos = len(waiting_queue)
-        waiter = Waiter(pos)
+        waiter = Waiter(pos, priority=priority)
         waiting_queue.append(waiter)
         state["waiting_in_queue"] = len(waiting_queue)
         initial_timeout = get_timeout(pos)
         waiter.deadline = asyncio.get_event_loop().time() + initial_timeout
         logger.info(
-            f"Entered standby queue at position {pos+1}/{queue_max} (initial timeout={initial_timeout}s)"
+            f"Entered standby queue at position {pos+1}/{queue_max} (prio={priority}, initial timeout={initial_timeout}s)"
         )
 
     # Wait outside lock
@@ -342,7 +365,17 @@ async def proxy_all(request: Request, path: str):
     is_completion = path.strip("/").endswith("chat/completions") or path.strip("/").endswith("completions")
 
     if is_completion and request.method == "POST":
-        acquired, reason = await acquire_slot()
+        # Extract Priority Header: 0 = high/foreground, 1 = normal, 2 = background/batch
+        prio_hdr = request.headers.get("x-priority") or request.headers.get("priority")
+        priority = 1
+        if prio_hdr:
+            prio_lower = prio_hdr.lower()
+            if prio_lower in ["high", "foreground", "interactive", "0"]:
+                priority = 0
+            elif prio_lower in ["low", "background", "batch", "2"]:
+                priority = 2
+
+        acquired, reason = await acquire_slot(priority=priority)
         if not acquired:
             curr_model = state["current_model"]
             limit = state["current_limit"]
@@ -350,7 +383,7 @@ async def proxy_all(request: Request, path: str):
                 running = state["active_running"]
                 waiting = len(waiting_queue)
             logger.warning(
-                f"Fast-Fail 429 triggered: model '{curr_model}' (reason: {reason}, running: {running}/{limit}, queue: {waiting}/{state['queue_buffer']})"
+                f"Fast-Fail 429 triggered: model '{curr_model}' (reason: {reason}, prio: {priority}, running: {running}/{limit}, queue: {waiting}/{state['queue_buffer']})"
             )
             return JSONResponse(
                 status_code=429,
@@ -359,7 +392,7 @@ async def proxy_all(request: Request, path: str):
                     "error": {
                         "message": (
                             f"DGX Spark concurrency limit reached for '{curr_model}' "
-                            f"(running: {running}/{limit}, tiered queue: {waiting}/{state['queue_buffer']}, reason: {reason}). "
+                            f"(running: {running}/{limit}, tiered queue: {waiting}/{state['queue_buffer']}, reason: {reason}, prio: {priority}). "
                             "Fast-failing for client fallback."
                         ),
                         "type": "server_busy",
