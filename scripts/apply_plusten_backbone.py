@@ -203,18 +203,22 @@ def revert_rank_cache(rc_path, backup_file):
 
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "apply"
-    rc_path = glob.glob("/home/joseyarashio/.cache/dsv41-1017-rank-cache/tf-ds-rank/rank*of2-*.bin")[0]
-    bak_file = rc_path + ".libertai_backbone.bak"
+    target_pattern = sys.argv[2] if len(sys.argv) > 2 else "/home/joseyarashio/.cache/dsv41-plusten-rank-cache/tf-ds-rank/rank*of2-*.bin"
+    rc_paths = sorted(glob.glob(target_pattern))
+    if not rc_paths:
+        raise ValueError(f"No rank cache files found for pattern: {target_pattern}")
 
-    if mode == "revert":
-        revert_rank_cache(rc_path, bak_file)
-        return
+    for rc_path in rc_paths:
+        bak_file = rc_path + ".libertai_backbone.bak"
+        if mode == "revert":
+            revert_rank_cache(rc_path, bak_file)
+            continue
 
-    if "rank0of2" in rc_path:
-        self_test_against_libertai(rc_path)
+        if "rank0of2" in rc_path:
+            self_test_against_libertai(rc_path)
 
-    manifest = json.load(open(os.path.join(BACKBONE_DIR, "manifest.json")))
-    patch_rank_cache(rc_path, manifest, bak_file)
+        manifest = json.load(open(os.path.join(BACKBONE_DIR, "manifest.json")))
+        patch_rank_cache(rc_path, manifest, bak_file)
 
 if __name__ == "__main__":
     main()
