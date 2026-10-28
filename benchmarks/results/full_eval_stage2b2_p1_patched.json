@@ -1,0 +1,2991 @@
+{
+  "label": "stage2b2_p1_patched",
+  "timestamp": "2026-10-28 16:49:00",
+  "system_before": {
+    "health": {
+      "status": "ok",
+      "model": "DeepSeek-V4.1-Flash-1017-TF",
+      "model_ids": [
+        "DeepSeek-V4.1-Flash-1017-TF",
+        "DeepSeek-V4.1-Flash-TF",
+        "current"
+      ],
+      "max_batch_size": 4,
+      "warming": false,
+      "memory": {
+        "active": 111163943204,
+        "cache": 0,
+        "peak": 111163943204
+      },
+      "live": {
+        "connections": 1,
+        "waiting": 0,
+        "decode_tokens_per_second": 31.0,
+        "prefill_tokens_per_second": 1854.0
+      }
+    },
+    "proxy": {
+      "status": "ok",
+      "upstream_healthy": true,
+      "upstream_url": "http://127.0.0.1:8888",
+      "current_model": "DeepSeek-V4.1-Flash-1017-TF",
+      "concurrency_limit": 4,
+      "queue_buffer": 4,
+      "tiered_timeouts": [
+        20.0,
+        15.0,
+        10.0,
+        5.0
+      ],
+      "extension_seconds": 5.0,
+      "active_running": 1,
+      "waiting_in_queue": 0,
+      "queue_positions": [],
+      "queue_extended": [],
+      "model_limits_config": {
+        "dsv41": 2,
+        "DeepSeek-V4.1-Flash-EXL3": 2,
+        "DeepSeek-V4.1-Flash-TF": 4,
+        "DeepSeek-V4.1-Flash-1017-TF": 4,
+        "GLM-5.3-Flash": 4,
+        "GLM-5.3-Flash-EXL3": 4
+      },
+      "default_limit": 4
+    },
+    "node1": {
+      "mem_available_mib": 7913,
+      "swap_used_mib": 720,
+      "buddy_normal_orders_9_to_13": [
+        9,
+        3,
+        14,
+        77,
+        0
+      ],
+      "buddy_2mib_plus_blocks_total": 103,
+      "gpu_telemetry": "2476 MHz, 64, 59.55 W"
+    },
+    "node2": {
+      "mem_available_mib": 12235,
+      "swap_used_mib": 0,
+      "buddy_normal_orders_9_to_13": [
+        34,
+        150,
+        39,
+        14,
+        185
+      ],
+      "buddy_2mib_plus_blocks_total": 422,
+      "gpu_telemetry": "2470 MHz, 63, 56.96 W"
+    }
+  },
+  "question_bank": {
+    "domains": {
+      "math": [
+        {
+          "id": "math_1_mod",
+          "passed": false,
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-fcf8373605607f637b2506b920fac0a9",
+            "wall_seconds": 10.6703,
+            "client_ttft_seconds": 0.156,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 46.792995391488944,
+              "seconds": 10.663799609,
+              "prefill_seconds": 0.143134289,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.150229231,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "a88a5f463e79",
+              "min_rows": 2
+            },
+            "speculative": {
+              "rounds": 120,
+              "drafted": 455,
+              "accepted": 372,
+              "acceptance_rate": 0.8175824175824176,
+              "tokens_per_round": 4.108333333333333
+            },
+            "usage": {
+              "prompt_tokens": 38,
+              "completion_tokens": 493,
+              "total_tokens": 531,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-fcf8373605607f637b2506b920fac0a9 prompt=38 cached=0 thinking=False effort=none tokens=493 sha=a88a5f463e79 finish=stop rounds=120 accepted=372/455",
+            "content": "We want \\(7^{2026} + 13^{2026} \\mod 100\\).\n\n---\n\n**Step 1 – Mod 4 and mod 25 (CRT approach)**\n\nSince \\(100 = 4 \\times 25\\):\n\n- Mod 4:  \n\\(7 \\equiv 3 \\pmod{4}\\), \\(3^2 \\equiv 1\\), exponent even → \\(7^{2026} \\equiv 1 \\pmod{4}\\).  \n\\(13 \\equiv 1 \\pmod{4}\\) → \\(13^{2026} \\equiv 1 \\pmod{4}\\).  \nSum ≡ \\(1+1=2 \\pmod{4}\\).\n\n- Mod 25:  \nEuler’s theorem: \\(\\varphi(25)=20\\).  \n\\(2026 \\bmod{20} = 2026 - 20\\times101 = 2026 - 2020 = 6\\).\n\nSo \\(7^{2026} \\equiv 7^6 \\pmod{25}\\).  \n\\(7^2=49\\equiv -1 \\pmod{25}\\).  \n\\(7^6 = (7^2)^3 \\equiv (-1)^3 = -1 \\equiv 24 \\pmod{25}\\).\n\n\\(13^{2026} \\equiv 13^6 \\pmod{25}\\).  \n\\(13^2=169 \\equiv 19 \\pmod{25}\\).  \n\\(13^4 \\equiv 19^2=361 \\equiv 11 \\pmod{25}\\).  \n\\(13^6 = 13^4 \\cdot 13^2 \\equiv 11\\cdot 19 = 209 \\equiv 9 \\pmod{25}\\).\n\nSum mod 25: \\(24+9=33 \\equiv 8 \\pmod{25}\\).\n\n---\n\n**Step 2 – Solve CRT**\n\nWe need \\(x \\equiv 2 \\pmod{4}\\), \\(x \\equiv 8 \\pmod{25}\\).\n\nNumbers ≡ 8 mod 25: 8, 33, 58, 83, ...  \nCheck mod 4:  \n8 ≡ 0, 33 ≡ 1, 58 ≡ 2 → works.\n\nSo \\(x \\equiv 58 \\pmod{100}\\).\n\n---\n\n**Step 3 – Conclusion**\n\nRemainder is \\(58\\).\n\n\\[\n\\boxed{58}\n\\]",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "math_2_comb",
+          "passed": true,
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-e2aa1c42bb9229d4ba21f46c65af6768",
+            "wall_seconds": 11.2313,
+            "client_ttft_seconds": 0.1995,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 37.7100242611892,
+              "seconds": 11.229390314,
+              "prefill_seconds": 0.1800192,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.198517623,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "ce62e894080b",
+              "min_rows": 2
+            },
+            "speculative": {
+              "rounds": 117,
+              "drafted": 388,
+              "accepted": 300,
+              "acceptance_rate": 0.7731958762886598,
+              "tokens_per_round": 3.5641025641025643
+            },
+            "usage": {
+              "prompt_tokens": 49,
+              "completion_tokens": 417,
+              "total_tokens": 466,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-e2aa1c42bb9229d4ba21f46c65af6768 prompt=49 cached=0 thinking=False effort=none tokens=417 sha=ce62e894080b finish=stop rounds=117 accepted=300/388",
+            "content": "Alright, let's go step-by-step.\n\nWe want **5-digit positive integers** whose digits are **strictly increasing from left to right**.\n\n---\n\n### Step 1 – Understanding the problem\nA 5-digit number has digits \\(d_1 d_2 d_3 d_4 d_5\\) where:\n\n- \\(d_1 \\neq 0\\) (since it's a 5-digit number).\n- \\(d_1 < d_2 < d_3 < d_4 < d_5\\) (strictly increasing).\n- Each digit is from 0 to 9.\n\n---\n\n### Step 2 – Choosing digits\nIf the digits are strictly increasing, then all 5 digits must be distinct.\n\nWe choose 5 distinct digits from the set \\(\\{0,1,2,\\dots,9\\}\\).\n\nOnce chosen, there is exactly **one** way to arrange them in increasing order.\n\n---\n\n### Step 3 – Handling the leading zero restriction\nIf the smallest chosen digit is 0, then the number would start with 0, which would make it a 4-digit number, not 5-digit.\n\nSo we must **exclude** combinations where 0 is among the chosen digits.\n\n---\n\n### Step 4 – Counting valid combinations\nWe must choose 5 digits from \\(\\{1, 2, \\dots, 9\\}\\) (i.e., from 1–9, no zero allowed).\n\nNumber of ways: \\(\\binom{9}{5}\\).\n\n---\n\n### Step 5 – Compute \\(\\binom{9}{5}\\)\n\\[\n\\binom{9}{5} = \\binom{9}{4} = \\frac{9 \\cdot 8 \\cdot 7 \\cdot 6}{4 \\cdot 3 \\cdot 2 \\cdot 1} = \\frac{3024}{24} = 126.\n\\]\n\n---\n\n### Step 6 – Conclusion\nEach combination corresponds to exactly one valid 5-digit number.\n\nSo the total is \\(126\\).\n\n\\[\n\\boxed{126}\n\\]",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "math_3_prob",
+          "passed": true,
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-a00cef9c6769a2bdc700a1f0e29d3a4a",
+            "wall_seconds": 9.3436,
+            "client_ttft_seconds": 0.1877,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 54.93360847107443,
+              "seconds": 9.342167494,
+              "prefill_seconds": 0.16869935,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.186566241,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "2cb3914e911a",
+              "min_rows": 2
+            },
+            "speculative": {
+              "rounds": 130,
+              "drafted": 477,
+              "accepted": 374,
+              "acceptance_rate": 0.7840670859538784,
+              "tokens_per_round": 3.876923076923077
+            },
+            "usage": {
+              "prompt_tokens": 48,
+              "completion_tokens": 504,
+              "total_tokens": 552,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-a00cef9c6769a2bdc700a1f0e29d3a4a prompt=48 cached=0 thinking=False effort=none tokens=504 sha=2cb3914e911a finish=stop rounds=130 accepted=374/477",
+            "content": "Let's go step-by-step.\n\nWe have 3 fair 6-sided dice. Each die can show 1 through 6.  \nWe want the number of outcomes where the sum is exactly 11.\n\n---\n\n### Step 1: Total outcomes\nEach die has 6 possibilities, so total outcomes = \\(6^3 = 216\\).\n\n---\n\n### Step 2: Count the number of outcomes summing to 11\nWe need the number of integer solutions to:\n\n\\[\nx_1 + x_2 + x_3 = 11\n\\]\nwith \\(1 \\le x_i \\le 6\\).\n\n---\n\n### Step 3: Transform variables\nLet \\(y_i = x_i - 1\\), so \\(y_i \\ge 0\\) and \\(y_i \\le 5\\).\n\nThen:\n\n\\[\ny_1 + y_2 + y_3 = 11 - 3 = 8\n\\]\nwith \\(0 \\le y_i \\le 5\\).\n\n---\n\n### Step 4: Count without upper bound\nNumber of nonnegative integer solutions to \\(y_1 + y_2 + y_3 = 8\\) is:\n\n\\[\n\\binom{8+3-1}{3-1} = \\binom{10}{2} = 45\n\\]\n\n---\n\n### Step 5: Subtract cases where some \\(y_i \\ge 6\\)\nSince sum is 8, at most one \\(y_i\\) can be ≥ 6 (because two would require at least 12).\n\nCase: \\(y_1 \\ge 6\\). Let \\(y_1' = y_1 - 6 \\ge 0\\). Then:\n\n\\[\ny_1' + y_2 + y_3 = 8 - 6 = 2\n\\]\nNumber of nonnegative solutions: \\(\\binom{2+3-1}{3-1} = \\binom{4}{2} = 6\\).\n\nBy symmetry, same count for \\(y_2 \\ge 6\\) and \\(y_3 \\ge 6\\).\n\nSo subtract \\(3 \\times 6 = 18\\).\n\n---\n\n### Step 6: Inclusion-exclusion check\nNo overlap (can't have two ≥ 6 as noted). So total valid:\n\n\\[\n45 - 18 = 27\n\\]\n\n---\n\n### Step 7: Conclusion\nThe number of outcomes is \\(27\\).\n\n\\[\n\\boxed{27}\n\\]",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "math_4_alg",
+          "passed": true,
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-df2a6573609462aa858c15e8140d27fa",
+            "wall_seconds": 3.5132,
+            "client_ttft_seconds": 0.1764,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 71.02762679033394,
+              "seconds": 3.511873599,
+              "prefill_seconds": 0.15188172,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.175637749,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "50ef138d6140",
+              "min_rows": 3
+            },
+            "speculative": {
+              "rounds": 51,
+              "drafted": 238,
+              "accepted": 187,
+              "acceptance_rate": 0.7857142857142857,
+              "tokens_per_round": 4.666666666666667
+            },
+            "usage": {
+              "prompt_tokens": 40,
+              "completion_tokens": 238,
+              "total_tokens": 278,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-df2a6573609462aa858c15e8140d27fa prompt=40 cached=0 thinking=False effort=none tokens=238 sha=50ef138d6140 finish=stop rounds=51 accepted=187/238",
+            "content": "Alright, let's go step-by-step.\n\nWe are given:\n\n\\[\nx + \\frac{1}{x} = 5\n\\]\n\nWe want \\( x^4 + \\frac{1}{x^4} \\).\n\n---\n\n**Step 1: Square the given equation.**\n\n\\[\n\\left( x + \\frac{1}{x} \\right)^2 = 5^2\n\\]\n\\[\nx^2 + 2 + \\frac{1}{x^2} = 25\n\\]\nSo:\n\\[\nx^2 + \\frac{1}{x^2} = 23\n\\]\n\n---\n\n**Step 2: Square again to get the fourth power sum.**\n\n\\[\n\\left( x^2 + \\frac{1}{x^2} \\right)^2 = 23^2\n\\]\n\\[\nx^4 + 2 + \\frac{1}{x^4} = 529\n\\]\nThus:\n\\[\nx^4 + \\frac{1}{x^4} = 527\n\\]\n\n---\n\n**Step 3: Final answer.**\n\n\\[\n\\boxed{527}\n\\]",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "math_5_seq",
+          "passed": true,
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-15cdc04d33f8390a5935b26c9d5f70c2",
+            "wall_seconds": 4.9369,
+            "client_ttft_seconds": 0.1871,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 53.89424364737202,
+              "seconds": 4.935316628,
+              "prefill_seconds": 0.160510158,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.186054099,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "f036d14291ee",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 48,
+              "drafted": 234,
+              "accepted": 209,
+              "acceptance_rate": 0.8931623931623932,
+              "tokens_per_round": 5.354166666666667
+            },
+            "usage": {
+              "prompt_tokens": 53,
+              "completion_tokens": 257,
+              "total_tokens": 310,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-15cdc04d33f8390a5935b26c9d5f70c2 prompt=53 cached=0 thinking=False effort=none tokens=257 sha=f036d14291ee finish=stop rounds=48 accepted=209/234",
+            "content": "Let's go step-by-step.\n\nWe have:\n\n- \\( a_1 = 2 \\)\n- Recurrence: \\( a_{n+1} = 3a_n - 1 \\)\n\n---\n\n**Step 1: Find \\(a_2\\)**\n\n\\[\na_2 = 3a_1 - 1 = 3(2) - 1 = 6 - 1 = 5\n\\]\n\n---\n\n**Step 2: Find \\(a_3\\)**\n\n\\[\na_3 = 3(5) - 1 = 15 - 1 = 14\n\\]\n\n---\n\n**Step 3: Find \\(a_4\\)**\n\n\\[\na_4 = 3(14) - 1 = 42 - 1 = 41\n\\]\n\n---\n\n**Step 4: Find \\(a_5\\)**\n\n\\[\na_5 = 3(41) - 1 = 123 - 1 = 122\n\\]\n\n---\n\n**Step 5: Find \\(a_6\\)**\n\n\\[\na_6 = 3(122) - 1 = 366 - 1 = 365\n\\]\n\n---\n\nThe exact value is:\n\n\\[\n\\boxed{365}\n\\]",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        }
+      ],
+      "mmlu_pro": [
+        {
+          "id": "mmlu_1_arch",
+          "passed": true,
+          "picked": "B",
+          "expected": "B",
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-48a22af69a0953ce76ec0a78549737e7",
+            "wall_seconds": 0.3913,
+            "client_ttft_seconds": 0.328,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 15.750114975839324,
+              "seconds": 0.389736642,
+              "prefill_seconds": 0.303773151,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.327014575,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "0e9044a8fa71",
+              "min_rows": 3
+            },
+            "speculative": {
+              "rounds": 1,
+              "drafted": 2,
+              "accepted": 1,
+              "acceptance_rate": 0.5,
+              "tokens_per_round": 2.0
+            },
+            "usage": {
+              "prompt_tokens": 117,
+              "completion_tokens": 2,
+              "total_tokens": 119,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-48a22af69a0953ce76ec0a78549737e7 prompt=117 cached=0 thinking=False effort=none tokens=2 sha=0e9044a8fa71 finish=stop rounds=1 accepted=1/2",
+            "content": "B",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "mmlu_2_algo",
+          "passed": true,
+          "picked": "A",
+          "expected": "A",
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-96a68caafbb1752b2b2d49141bae468e",
+            "wall_seconds": 0.4249,
+            "client_ttft_seconds": 0.3547,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 14.240801442684326,
+              "seconds": 0.422876643,
+              "prefill_seconds": 0.33764918,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.353461888,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "702cf91d6157",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 1,
+              "drafted": 3,
+              "accepted": 1,
+              "acceptance_rate": 0.3333333333333333,
+              "tokens_per_round": 2.0
+            },
+            "usage": {
+              "prompt_tokens": 152,
+              "completion_tokens": 2,
+              "total_tokens": 154,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-96a68caafbb1752b2b2d49141bae468e prompt=152 cached=0 thinking=False effort=none tokens=2 sha=702cf91d6157 finish=stop rounds=1 accepted=1/3",
+            "content": "A",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "mmlu_3_chem",
+          "passed": true,
+          "picked": "C",
+          "expected": "C",
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-95e2bbc9c2b3433d6d22476eaf833344",
+            "wall_seconds": 0.3826,
+            "client_ttft_seconds": 0.3076,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 13.203584001967227,
+              "seconds": 0.380811805,
+              "prefill_seconds": 0.289313236,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.30633525,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "2e38586949ce",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 1,
+              "drafted": 3,
+              "accepted": 1,
+              "acceptance_rate": 0.3333333333333333,
+              "tokens_per_round": 2.0
+            },
+            "usage": {
+              "prompt_tokens": 115,
+              "completion_tokens": 2,
+              "total_tokens": 117,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-95e2bbc9c2b3433d6d22476eaf833344 prompt=115 cached=0 thinking=False effort=none tokens=2 sha=2e38586949ce finish=stop rounds=1 accepted=1/3",
+            "content": "C",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "mmlu_4_phys",
+          "passed": true,
+          "picked": "A",
+          "expected": "A",
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-1eba045f79979ceee727d9eca92f33e4",
+            "wall_seconds": 0.3563,
+            "client_ttft_seconds": 0.2902,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 14.952872359305921,
+              "seconds": 0.354544748,
+              "prefill_seconds": 0.275061497,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.289011221,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "702cf91d6157",
+              "min_rows": 5
+            },
+            "speculative": {
+              "rounds": 1,
+              "drafted": 4,
+              "accepted": 1,
+              "acceptance_rate": 0.25,
+              "tokens_per_round": 2.0
+            },
+            "usage": {
+              "prompt_tokens": 115,
+              "completion_tokens": 2,
+              "total_tokens": 117,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-1eba045f79979ceee727d9eca92f33e4 prompt=115 cached=0 thinking=False effort=none tokens=2 sha=702cf91d6157 finish=stop rounds=1 accepted=1/4",
+            "content": "A",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "mmlu_5_net",
+          "passed": true,
+          "picked": "B",
+          "expected": "B",
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-f175c73ff489ca7f231feb7e7fb8fe41",
+            "wall_seconds": 0.413,
+            "client_ttft_seconds": 0.334,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 12.63868619946971,
+              "seconds": 0.411316555,
+              "prefill_seconds": 0.299213621,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.332967731,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "0e9044a8fa71",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 1,
+              "drafted": 3,
+              "accepted": 1,
+              "acceptance_rate": 0.3333333333333333,
+              "tokens_per_round": 2.0
+            },
+            "usage": {
+              "prompt_tokens": 101,
+              "completion_tokens": 2,
+              "total_tokens": 103,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-f175c73ff489ca7f231feb7e7fb8fe41 prompt=101 cached=0 thinking=False effort=none tokens=2 sha=0e9044a8fa71 finish=stop rounds=1 accepted=1/3",
+            "content": "B",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "mmlu_6_calc_circuit",
+          "passed": false,
+          "picked": "C",
+          "expected": "B",
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-44ee1c75b143aedb0c05e7a930692ee1",
+            "wall_seconds": 0.3672,
+            "client_ttft_seconds": 0.2922,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 13.290131722349638,
+              "seconds": 0.365674662,
+              "prefill_seconds": 0.26633341,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.291218171,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "2e38586949ce",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 1,
+              "drafted": 3,
+              "accepted": 1,
+              "acceptance_rate": 0.3333333333333333,
+              "tokens_per_round": 2.0
+            },
+            "usage": {
+              "prompt_tokens": 100,
+              "completion_tokens": 2,
+              "total_tokens": 102,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-44ee1c75b143aedb0c05e7a930692ee1 prompt=100 cached=0 thinking=False effort=none tokens=2 sha=2e38586949ce finish=stop rounds=1 accepted=1/3",
+            "content": "C",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "mmlu_7_calc_thermo",
+          "passed": true,
+          "picked": "B",
+          "expected": "B",
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-138f61652bb9a583e24d81a9979bd126",
+            "wall_seconds": 0.397,
+            "client_ttft_seconds": 0.3291,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 14.684278755657743,
+              "seconds": 0.395611335,
+              "prefill_seconds": 0.302993378,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.328183354,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "0e9044a8fa71",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 1,
+              "drafted": 3,
+              "accepted": 1,
+              "acceptance_rate": 0.3333333333333333,
+              "tokens_per_round": 2.0
+            },
+            "usage": {
+              "prompt_tokens": 125,
+              "completion_tokens": 2,
+              "total_tokens": 127,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-138f61652bb9a583e24d81a9979bd126 prompt=125 cached=0 thinking=False effort=none tokens=2 sha=0e9044a8fa71 finish=stop rounds=1 accepted=1/3",
+            "content": "B",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "mmlu_8_calc_cache",
+          "passed": true,
+          "picked": "B",
+          "expected": "B",
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-0fef85099b56580929c81096f43fa4e3",
+            "wall_seconds": 0.4187,
+            "client_ttft_seconds": 0.348,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 14.048705005826138,
+              "seconds": 0.417248574,
+              "prefill_seconds": 0.335044729,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.346759857,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "0e9044a8fa71",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 1,
+              "drafted": 3,
+              "accepted": 1,
+              "acceptance_rate": 0.3333333333333333,
+              "tokens_per_round": 2.0
+            },
+            "usage": {
+              "prompt_tokens": 155,
+              "completion_tokens": 2,
+              "total_tokens": 157,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-0fef85099b56580929c81096f43fa4e3 prompt=155 cached=0 thinking=False effort=none tokens=2 sha=0e9044a8fa71 finish=stop rounds=1 accepted=1/3",
+            "content": "B",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "mmlu_9_calc_prob",
+          "passed": true,
+          "picked": "B",
+          "expected": "B",
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-645adf56e9257c4e0633e39f3d4fe5b9",
+            "wall_seconds": 0.3544,
+            "client_ttft_seconds": 0.2799,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 13.415464236371252,
+              "seconds": 0.353175906,
+              "prefill_seconds": 0.257825883,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.279085621,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "0e9044a8fa71",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 1,
+              "drafted": 3,
+              "accepted": 1,
+              "acceptance_rate": 0.3333333333333333,
+              "tokens_per_round": 2.0
+            },
+            "usage": {
+              "prompt_tokens": 91,
+              "completion_tokens": 2,
+              "total_tokens": 93,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-645adf56e9257c4e0633e39f3d4fe5b9 prompt=91 cached=0 thinking=False effort=none tokens=2 sha=0e9044a8fa71 finish=stop rounds=1 accepted=1/3",
+            "content": "B",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "mmlu_10_calc_linalg",
+          "passed": true,
+          "picked": "B",
+          "expected": "B",
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-ea626e9ea5b6cf3957b4ad069c26c901",
+            "wall_seconds": 0.3707,
+            "client_ttft_seconds": 0.2958,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 13.292124380415869,
+              "seconds": 0.368921175,
+              "prefill_seconds": 0.263733295,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.294948362,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "0e9044a8fa71",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 1,
+              "drafted": 3,
+              "accepted": 1,
+              "acceptance_rate": 0.3333333333333333,
+              "tokens_per_round": 2.0
+            },
+            "usage": {
+              "prompt_tokens": 99,
+              "completion_tokens": 2,
+              "total_tokens": 101,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-ea626e9ea5b6cf3957b4ad069c26c901 prompt=99 cached=0 thinking=False effort=none tokens=2 sha=0e9044a8fa71 finish=stop rounds=1 accepted=1/3",
+            "content": "B",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        }
+      ],
+      "code": [
+        {
+          "id": "code_1_dijkstra",
+          "passed": true,
+          "error": "",
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-136ff7c5b509aa167e7b2d81a5c76f4e",
+            "wall_seconds": 2.5428,
+            "client_ttft_seconds": 0.2896,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 83.87237889363674,
+              "seconds": 2.541442722,
+              "prefill_seconds": 0.275042008,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.288566839,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "6c4735dc358b",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 34,
+              "drafted": 166,
+              "accepted": 156,
+              "acceptance_rate": 0.9397590361445783,
+              "tokens_per_round": 5.588235294117647
+            },
+            "usage": {
+              "prompt_tokens": 92,
+              "completion_tokens": 190,
+              "total_tokens": 282,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-136ff7c5b509aa167e7b2d81a5c76f4e prompt=92 cached=0 thinking=False effort=none tokens=190 sha=6c4735dc358b finish=stop rounds=34 accepted=156/166",
+            "content": "import heapq\n\ndef shortest_path(n: int, edges: list[tuple[int, int, int]], src: int, dst: int) -> int:\n    graph = [[] for _ in range(n)]\n    for u, v, w in edges:\n        graph[u].append((v, w))\n    dist = [float('inf')] * n\n    dist[src] = 0\n    pq = [(0, src)]\n    while pq:\n        d, u = heapq.heappop(pq)\n        if d != dist[u]:\n            continue\n        if u == dst:\n            return d\n        for v, w in graph[u]:\n            nd = d + w\n            if nd < dist[v]:\n                dist[v] = nd\n                heapq.heappush(pq, (nd, v))\n    return -1 if dist[dst] == float('inf') else dist[dst]",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "code_2_merge_intervals",
+          "passed": true,
+          "error": "",
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-2262bab87706016eb039bfb38e0a171c",
+            "wall_seconds": 1.9186,
+            "client_ttft_seconds": 0.1958,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 69.0615818016051,
+              "seconds": 1.917289316,
+              "prefill_seconds": 0.170415631,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.194658362,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "aebd9f8bf07d",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 25,
+              "drafted": 120,
+              "accepted": 95,
+              "acceptance_rate": 0.7916666666666666,
+              "tokens_per_round": 4.8
+            },
+            "usage": {
+              "prompt_tokens": 47,
+              "completion_tokens": 120,
+              "total_tokens": 167,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-2262bab87706016eb039bfb38e0a171c prompt=47 cached=0 thinking=False effort=none tokens=120 sha=aebd9f8bf07d finish=stop rounds=25 accepted=95/120",
+            "content": "```python\ndef merge_intervals(intervals: list[list[int]]) -> list[list[int]]:\n    if not intervals:\n        return []\n    intervals = sorted(intervals, key=lambda x: x[0])\n    merged = [intervals[0][:]]\n    for start, end in intervals[1:]:\n        last = merged[-1]\n        if start <= last[1]:\n            if end > last[1]:\n                last[1] = end\n        else:\n            merged.append([start, end])\n    return merged\n```",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "code_3_edit_distance",
+          "passed": true,
+          "error": "",
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-d29759976a194c039769e44623149405",
+            "wall_seconds": 2.1771,
+            "client_ttft_seconds": 0.1725,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 77.30882270310221,
+              "seconds": 2.175293775,
+              "prefill_seconds": 0.158984678,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.171418858,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "9bf72a3739b5",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 29,
+              "drafted": 139,
+              "accepted": 127,
+              "acceptance_rate": 0.9136690647482014,
+              "tokens_per_round": 5.379310344827586
+            },
+            "usage": {
+              "prompt_tokens": 39,
+              "completion_tokens": 156,
+              "total_tokens": 195,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-d29759976a194c039769e44623149405 prompt=39 cached=0 thinking=False effort=none tokens=156 sha=9bf72a3739b5 finish=stop rounds=29 accepted=127/139",
+            "content": "```python\ndef edit_distance(s1: str, s2: str) -> int:\n    m, n = len(s1), len(s2)\n    prev = list(range(n + 1))\n    for i in range(1, m + 1):\n        curr = [i] + [0] * n\n        for j in range(1, n + 1):\n            cost = 0 if s1[i - 1] == s2[j - 1] else 1\n            curr[j] = min(\n                prev[j] + 1,\n                curr[j - 1] + 1,\n                prev[j - 1] + cost,\n            )\n        prev = curr\n    return prev[n]\n```",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "code_4_eval_rpn",
+          "passed": true,
+          "error": "",
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-b70412926bdd57378778f4e7325a29d5",
+            "wall_seconds": 2.5728,
+            "client_ttft_seconds": 0.2169,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 49.23633399698577,
+              "seconds": 2.571345764,
+              "prefill_seconds": 0.194517451,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.215911188,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "81f8043bfca7",
+              "min_rows": 3
+            },
+            "speculative": {
+              "rounds": 22,
+              "drafted": 104,
+              "accepted": 95,
+              "acceptance_rate": 0.9134615384615384,
+              "tokens_per_round": 5.318181818181818
+            },
+            "usage": {
+              "prompt_tokens": 60,
+              "completion_tokens": 117,
+              "total_tokens": 177,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-b70412926bdd57378778f4e7325a29d5 prompt=60 cached=0 thinking=False effort=none tokens=117 sha=81f8043bfca7 finish=stop rounds=22 accepted=95/104",
+            "content": "```python\ndef eval_rpn(tokens: list[str]) -> int:\n    stack = []\n    for token in tokens:\n        if token in (\"+\", \"-\", \"*\", \"/\"):\n            b = stack.pop()\n            a = stack.pop()\n            if token == \"+\":\n                stack.append(a + b)\n            elif token == \"-\":\n                stack.append(a - b)\n            elif token == \"*\":\n                stack.append(a * b)\n            else:\n                stack.append(int(a / b))\n        else:\n            stack.append(int(token))\n    return stack.pop()\n```",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "code_5_lis",
+          "passed": true,
+          "error": "",
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-715924af41d7a96613466c08fdbc92a4",
+            "wall_seconds": 1.2175,
+            "client_ttft_seconds": 0.1828,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 72.47033112715641,
+              "seconds": 1.216087016,
+              "prefill_seconds": 0.16647469,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.181716281,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "51fe4a8a6007",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 15,
+              "drafted": 71,
+              "accepted": 61,
+              "acceptance_rate": 0.8591549295774648,
+              "tokens_per_round": 5.066666666666666
+            },
+            "usage": {
+              "prompt_tokens": 43,
+              "completion_tokens": 76,
+              "total_tokens": 119,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-715924af41d7a96613466c08fdbc92a4 prompt=43 cached=0 thinking=False effort=none tokens=76 sha=51fe4a8a6007 finish=stop rounds=15 accepted=61/71",
+            "content": "```python\nfrom bisect import bisect_left\n\ndef length_of_lis(nums: list[int]) -> int:\n    tails = []\n    for x in nums:\n        i = bisect_left(tails, x)\n        if i == len(tails):\n            tails.append(x)\n        else:\n            tails[i] = x\n    return len(tails)\n```",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        }
+      ],
+      "ifeval": [
+        {
+          "id": "ifeval_1_json_no_fence",
+          "passed": true,
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-be6fae7a6c0ba069c23dfa6e15d9eb23",
+            "wall_seconds": 0.6007,
+            "client_ttft_seconds": 0.2202,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 49.90436668619188,
+              "seconds": 0.599217622,
+              "prefill_seconds": 0.196853776,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.2193937,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "460c4803895b",
+              "min_rows": 1
+            },
+            "speculative": {
+              "rounds": 6,
+              "drafted": 19,
+              "accepted": 14,
+              "acceptance_rate": 0.7368421052631579,
+              "tokens_per_round": 3.3333333333333335
+            },
+            "usage": {
+              "prompt_tokens": 57,
+              "completion_tokens": 20,
+              "total_tokens": 77,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-be6fae7a6c0ba069c23dfa6e15d9eb23 prompt=57 cached=0 thinking=False effort=none tokens=20 sha=460c4803895b finish=stop rounds=6 accepted=14/19",
+            "content": "{\"cluster\":\"roce\",\"nodes\":[148,149],\"roce_gbps\":185}",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "ifeval_2_exact_bullets",
+          "passed": true,
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-c475e3a4a61dc16aba670d29f1d00f8d",
+            "wall_seconds": 3.3505,
+            "client_ttft_seconds": 0.1717,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 33.3384396919804,
+              "seconds": 3.349126387,
+              "prefill_seconds": 0.14564511,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.170870557,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "68c54eb94065",
+              "min_rows": 1
+            },
+            "speculative": {
+              "rounds": 63,
+              "drafted": 73,
+              "accepted": 44,
+              "acceptance_rate": 0.6027397260273972,
+              "tokens_per_round": 1.6984126984126984
+            },
+            "usage": {
+              "prompt_tokens": 34,
+              "completion_tokens": 107,
+              "total_tokens": 141,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-c475e3a4a61dc16aba670d29f1d00f8d prompt=34 cached=0 thinking=False effort=none tokens=107 sha=68c54eb94065 finish=stop rounds=63 accepted=44/73",
+            "content": "- RDMA enables high-throughput, low-latency remote memory access by leveraging hardware-level direct memory operations, reducing CPU involvement and overhead.\n- It simplifies programming of distributed systems by exposing remote memory as a directly addressable resource, avoiding complex message-passing code.\n- RDMA improves scalability and resource utilization by allowing fine-grained, on-demand access to remote memory pools without statically partitioning data.\n- It enhances fault tolerance and flexibilty through decoupled memory access semantics, enabling dynamic reconfiguration and efficient data sharing across nodes.",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "ifeval_3_forbidden_letter",
+          "passed": true,
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-4623b36220c22a6827e9866c12b47495",
+            "wall_seconds": 0.5611,
+            "client_ttft_seconds": 0.1355,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 23.483144444704063,
+              "seconds": 0.559859908,
+              "prefill_seconds": 0.124967465,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.134556443,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "0b7a28df0632",
+              "min_rows": 1
+            },
+            "speculative": {
+              "rounds": 9,
+              "drafted": 2,
+              "accepted": 2,
+              "acceptance_rate": 1.0,
+              "tokens_per_round": 1.2222222222222223
+            },
+            "usage": {
+              "prompt_tokens": 30,
+              "completion_tokens": 11,
+              "total_tokens": 41,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-4623b36220c22a6827e9866c12b47495 prompt=30 cached=0 thinking=False effort=none tokens=11 sha=0b7a28df0632 finish=stop rounds=9 accepted=2/2",
+            "content": "A laptop can run programs and do math quickly.",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "ifeval_4_csv_strict",
+          "passed": true,
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-49a7c5a2a32c78eb1930742e75ad5e26",
+            "wall_seconds": 0.8111,
+            "client_ttft_seconds": 0.1808,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 68.18510086916912,
+              "seconds": 0.809671734,
+              "prefill_seconds": 0.164543611,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.179758674,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "8d7309f2f725",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 10,
+              "drafted": 41,
+              "accepted": 34,
+              "acceptance_rate": 0.8292682926829268,
+              "tokens_per_round": 4.4
+            },
+            "usage": {
+              "prompt_tokens": 41,
+              "completion_tokens": 44,
+              "total_tokens": 85,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-49a7c5a2a32c78eb1930742e75ad5e26 prompt=41 cached=0 thinking=False effort=none tokens=44 sha=8d7309f2f725 finish=stop rounds=10 accepted=34/41",
+            "content": "rank,ip,role\n1,10.0.0.1,primary\n2,10.0.0.2,replica\n3,10.0.0.3,replica",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "ifeval_5_end_phrase",
+          "passed": true,
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-0df9de8418688fadf0cd48619d9e85d8",
+            "wall_seconds": 1.5157,
+            "client_ttft_seconds": 0.1439,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 48.83176869920549,
+              "seconds": 1.514247075,
+              "prefill_seconds": 0.131278826,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.143058242,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "11245c4809bf",
+              "min_rows": 1
+            },
+            "speculative": {
+              "rounds": 26,
+              "drafted": 55,
+              "accepted": 42,
+              "acceptance_rate": 0.7636363636363637,
+              "tokens_per_round": 2.6153846153846154
+            },
+            "usage": {
+              "prompt_tokens": 31,
+              "completion_tokens": 68,
+              "total_tokens": 99,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-0df9de8418688fadf0cd48619d9e85d8 prompt=31 cached=0 thinking=False effort=none tokens=68 sha=11245c4809bf finish=stop rounds=26 accepted=42/55",
+            "content": "KV cache quantization compresses the stored key and value tensors in a transformer's attention cache to lower precision (e.g., 8-bit or 4-bit) to reduce memory usage and speed up inference. This trades some numerical accuracy for substantially lower memory bandwidth and larger batch capacity during long-context generation. [END OF REPORT]",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        }
+      ],
+      "agent_vision": [
+        {
+          "id": "tool_1_governor",
+          "passed": true,
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-506702ce6a01f995b9d75fc73f696fb6",
+            "wall_seconds": 1.8096,
+            "client_ttft_seconds": 1.8094,
+            "finish_reason": "tool_calls",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 88.29949682555386,
+              "seconds": 1.806435211,
+              "prefill_seconds": 0.527573263,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.54017853,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "827f78581951",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 20,
+              "drafted": 98,
+              "accepted": 93,
+              "acceptance_rate": 0.9489795918367347,
+              "tokens_per_round": 5.65
+            },
+            "usage": {
+              "prompt_tokens": 457,
+              "completion_tokens": 113,
+              "total_tokens": 570,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-506702ce6a01f995b9d75fc73f696fb6 prompt=457 cached=0 thinking=False effort=none tokens=113 sha=827f78581951 finish=stop rounds=20 accepted=93/98",
+            "content": "",
+            "reasoning_len": 0,
+            "tool_calls": [
+              {
+                "name": "set_gpu_clock_governor",
+                "arguments": "{\"node_ip\":\"192.168.10.148\",\"min_clk_mhz\":1800,\"max_clk_mhz\":2500,\"zone_hi_c\":84}"
+              }
+            ]
+          }
+        },
+        {
+          "id": "tool_2_roce",
+          "passed": true,
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-fda59e7239d9b05cbf27b2af17f8586b",
+            "wall_seconds": 1.3378,
+            "client_ttft_seconds": 1.3376,
+            "finish_reason": "tool_calls",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 80.78915141399597,
+              "seconds": 1.335303885,
+              "prefill_seconds": 0.517636078,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.532085288,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "970f98ec2088",
+              "min_rows": 4
+            },
+            "speculative": {
+              "rounds": 13,
+              "drafted": 63,
+              "accepted": 53,
+              "acceptance_rate": 0.8412698412698413,
+              "tokens_per_round": 5.076923076923077
+            },
+            "usage": {
+              "prompt_tokens": 443,
+              "completion_tokens": 66,
+              "total_tokens": 509,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-fda59e7239d9b05cbf27b2af17f8586b prompt=443 cached=0 thinking=False effort=none tokens=66 sha=970f98ec2088 finish=stop rounds=13 accepted=53/63",
+            "content": "",
+            "reasoning_len": 0,
+            "tool_calls": [
+              {
+                "name": "query_roce_counters",
+                "arguments": "{\"interface\":\"rocep1s0f0\",\"gid_index\":3}"
+              }
+            ]
+          }
+        },
+        {
+          "id": "tool_3_followup",
+          "passed": true,
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-ff34585214f83290f349cad05b4a7c60",
+            "wall_seconds": 2.8575,
+            "client_ttft_seconds": 0.5603,
+            "finish_reason": "length",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 55.270461160081496,
+              "seconds": 2.855096439,
+              "prefill_seconds": 0.546279013,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.55926431,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "0507ea55a3bb",
+              "min_rows": 2
+            },
+            "speculative": {
+              "rounds": 40,
+              "drafted": 130,
+              "accepted": 87,
+              "acceptance_rate": 0.6692307692307692,
+              "tokens_per_round": 3.2
+            },
+            "usage": {
+              "prompt_tokens": 559,
+              "completion_tokens": 128,
+              "total_tokens": 687,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-ff34585214f83290f349cad05b4a7c60 prompt=559 cached=0 thinking=False effort=none tokens=128 sha=0507ea55a3bb finish=length rounds=40 accepted=87/130",
+            "content": "Here are the RoCEv2 RDMA counters for **rocep1s0f0**, GID index **3**:\n\n| Counter | Value |\n|---|---|\n| RX bytes | 9,876,543,210 |\n| TX bytes | 9,876,543,210 |\n| CNP packets | 0 |\n| Link speed | 185 Gbps |\n\nA couple of observations:\n- RX and TX byte counts are identical, which is expected for a symmetric RDMA flow but worth confirming against your workload if you didn't expect perfectly balanced traffic.\n- **CNP packets = 0** — no congestion notification",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "vision_4_quadrants",
+          "passed": true,
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-d84e713d79957951af8a5ead478b6d80",
+            "wall_seconds": 6.458,
+            "client_ttft_seconds": 5.558,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 56.68731653337572,
+              "seconds": 6.439660103,
+              "prefill_seconds": 5.503867549,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 5.556951695,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "aa0820839631",
+              "min_rows": 3
+            },
+            "speculative": {
+              "rounds": 12,
+              "drafted": 52,
+              "accepted": 40,
+              "acceptance_rate": 0.7692307692307693,
+              "tokens_per_round": 4.333333333333333
+            },
+            "usage": {
+              "prompt_tokens": 11225,
+              "completion_tokens": 52,
+              "total_tokens": 11277,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-d84e713d79957951af8a5ead478b6d80 prompt=11225 cached=0 thinking=False effort=none tokens=52 sha=aa0820839631 finish=stop rounds=12 accepted=40/52",
+            "content": "Based on the image provided, the colors of the four outer quadrants are:\n\n*   **Top-Left:** Red\n*   **Top-Right:** Green\n*   **Bottom-Left:** Blue\n*   **Bottom-Right:** Yellow",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        },
+        {
+          "id": "vision_5_cache_resume",
+          "passed": true,
+          "cached_hit": true,
+          "response": {
+            "status_code": 200,
+            "id": "chatcmpl-2ed6188a61b49445b3b2a48e58d5ef7d",
+            "wall_seconds": 1.3048,
+            "client_ttft_seconds": 0.7292,
+            "finish_reason": "stop",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 60.70393490051746,
+              "seconds": 1.288089649,
+              "prefill_seconds": 0.699003241,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.728113422,
+              "sampling": "greedy",
+              "drafts": true,
+              "token_sha": "63c14c4cb475",
+              "min_rows": 3
+            },
+            "speculative": {
+              "rounds": 9,
+              "drafted": 32,
+              "accepted": 27,
+              "acceptance_rate": 0.84375,
+              "tokens_per_round": 4.0
+            },
+            "usage": {
+              "prompt_tokens": 11300,
+              "completion_tokens": 36,
+              "total_tokens": 11336,
+              "prompt_tokens_details": {
+                "cached_tokens": 10240
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-2ed6188a61b49445b3b2a48e58d5ef7d prompt=11300 cached=10240 thinking=False effort=none tokens=36 sha=63c14c4cb475 finish=stop rounds=9 accepted=27/32",
+            "content": "The pattern located in the very center of the image is a **checkerboard** (or checkerboard) pattern. It uses the colors **black** and **white**.",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        }
+      ]
+    },
+    "summary": {
+      "math": {
+        "passed": 4,
+        "total": 5,
+        "score_pct": 80.0
+      },
+      "mmlu_pro": {
+        "passed": 9,
+        "total": 10,
+        "score_pct": 90.0
+      },
+      "code": {
+        "passed": 5,
+        "total": 5,
+        "score_pct": 100.0
+      },
+      "ifeval": {
+        "passed": 5,
+        "total": 5,
+        "score_pct": 100.0
+      },
+      "agent_vision": {
+        "passed": 5,
+        "total": 5,
+        "score_pct": 100.0
+      },
+      "overall": {
+        "passed": 28,
+        "total": 30,
+        "score_pct": 93.3
+      }
+    }
+  },
+  "perf_and_stress": {
+    "single_decode": {
+      "temp_0.30": {
+        "code": {
+          "status_code": 200,
+          "id": "chatcmpl-a413fb3efd83539f0a971028f5b50887",
+          "wall_seconds": 11.4847,
+          "client_ttft_seconds": 1.3193,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 37.676637459911426,
+            "seconds": 11.483548412,
+            "prefill_seconds": 0.165381367,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 1.318560831,
+            "sampling": "exact",
+            "drafts": true,
+            "token_sha": "a4cdbfaadd19",
+            "min_rows": 2
+          },
+          "speculative": {
+            "rounds": 130,
+            "drafted": 334,
+            "accepted": 253,
+            "acceptance_rate": 0.7574850299401198,
+            "tokens_per_round": 2.953846153846154
+          },
+          "usage": {
+            "prompt_tokens": 43,
+            "completion_tokens": 384,
+            "total_tokens": 427,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-a413fb3efd83539f0a971028f5b50887 prompt=43 cached=0 thinking=False effort=none tokens=384 sha=a4cdbfaadd19 finish=length rounds=130 accepted=253/334",
+          "content": "# LRU Cache Implementation\n\nBelow is a complete, production-quality implementation of an **LRU (Least Recently Used) Cache** — essentially an LRU/LRU-style eviction cache (often called LRU or LRU-style; the classic name is LRU/LRU — I'll implement the standard \"Least Recently Used\" semantics, which is identical to LRU/LRU/LRU cache behavior: evict the least-recently-used entry when capacity is exceeded).\n\n> Note: \"LRU\" is commonly used as a synonym for LRU (Least Recently Used). The implementation below uses a doubly linked list + hash map for O(1) get/put, with thread-safety via `threading.RLock`.\n\n```python\n\"\"\"\nlru_cache.py\n\nA thread-safe LRU (Least Recently Used) cache.\n\nDesign:\n    - Hash map: dict[key -> Node] for O(1) lookup.\n    - Doubly linked list: nodes ordered from most-recently-used (head)\n      to least-recently-used (tail). Eviction removes the tail.\n    - A single RLock guards all mutations and reads of shared state.\n\nComplexity:\n    get(key)  -> O(1)\n    put(key)  -> O(1)\n    evict     -> O(1)\n\"\"\"\n\nfrom __future__ import annotations\n\nimport threading\nfrom dataclasses import dataclass\nfrom typing import Any, Dict, Generic, Optional, TypeVar\n\nK = TypeVar(\"K\")\nV = TypeVar(\"V\")\n\n\n@dataclass\nclass _Node(Generic[K, V]):\n    \"\"\"A node in the doubly linked list.\"\"\"\n\n    key: K\n    value: V\n    prev: Optional[\"_Node[K, V]\"] = None\n    next: Optional[\"_Node[K, V]\"] = None\n\n\n",
+          "reasoning_len": 0,
+          "tool_calls": []
+        },
+        "prose": {
+          "status_code": 200,
+          "id": "chatcmpl-0f657f89fc76504ad553cd7deec1b40c",
+          "wall_seconds": 12.845,
+          "client_ttft_seconds": 0.2242,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 30.346793654503955,
+            "seconds": 12.843711793,
+            "prefill_seconds": 0.19595562,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 0.223519553,
+            "sampling": "exact",
+            "drafts": true,
+            "token_sha": "57b90ae60d32",
+            "min_rows": 1
+          },
+          "speculative": {
+            "rounds": 204,
+            "drafted": 278,
+            "accepted": 179,
+            "acceptance_rate": 0.6438848920863309,
+            "tokens_per_round": 1.8823529411764706
+          },
+          "usage": {
+            "prompt_tokens": 64,
+            "completion_tokens": 384,
+            "total_tokens": 448,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-0f657f89fc76504ad553cd7deec1b40c prompt=64 cached=0 thinking=False effort=none tokens=384 sha=57b90ae60d32 finish=length rounds=204 accepted=179/278",
+          "content": "# 分散式大語言模型推論在雙節點 RoCEv2 網路架構下的深度分析\n\n以下針對您提出的四個技術面向進行詳細剖析。需先說明：**「RoCEv2」並非業界廣泛公開的標準術語**（截至我的知識範圍），我將其理解為一種**雙節點（dual-node）RoCE 類（Ring-of-Compute-Engines / RDMA-over-Converged-Ethernet 類）高速互連架構的第二版**，並在此假設下展開分析；若您指的是特定廠商或論文中的專有名詞，請補充出處，我可再校正。\n\n---\n\n## 一、通訊瓶頸（Communication Bottleneck）\n\n在雙節點架構下，瓶頸主要來自三個層面：\n\n**1. 節點間互連頻寬**\n- 雙節點意味著模型切分為兩半（典型為 tensor-parallel 的 2-way split 或 pipeline 的 2-stage split）。每一層前向傳播需交換激活值（activation）或梯度，通訊量與 hidden dimension × batch size 成正比。\n- 若 RoCEv2 提供的是 ~400–900 GB/s 級別的互連（類 NVLink / IB NDR 級），則在 70B 級模型、batch=8、seq=4k 的設定下，每層交換可達數十 MB，累積後成為主要延遲來源。\n\n**2. 同步屏障（Barrier）成本**\n- 雙節點下 All-Reduce 與 All-Gather 的同步點密集；每層前向與反向各有一次以上的集合通訊，屏障等待時間在負載不平衡時被放大。\n\n**3. 協定開銷（Protocol",
+          "reasoning_len": 0,
+          "tool_calls": []
+        },
+        "structured": {
+          "status_code": 200,
+          "id": "chatcmpl-385ce0f136477e0d4801578c3c73dc56",
+          "wall_seconds": 5.6694,
+          "client_ttft_seconds": 0.2822,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 71.09000574026739,
+            "seconds": 5.667833227,
+            "prefill_seconds": 0.259571796,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 0.281243965,
+            "sampling": "exact",
+            "drafts": true,
+            "token_sha": "b948f670fe45",
+            "min_rows": 1
+          },
+          "speculative": {
+            "rounds": 81,
+            "drafted": 339,
+            "accepted": 303,
+            "acceptance_rate": 0.8938053097345132,
+            "tokens_per_round": 4.7407407407407405
+          },
+          "usage": {
+            "prompt_tokens": 82,
+            "completion_tokens": 384,
+            "total_tokens": 466,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-385ce0f136477e0d4801578c3c73dc56 prompt=82 cached=0 thinking=False effort=none tokens=384 sha=b948f670fe45 finish=length rounds=81 accepted=303/339",
+          "content": "[\n  {\n    \"node_id\": \"gpu-node-001\",\n    \"rack\": \"rack-a1\",\n    \"ip_address\": \"10.20.1.11\",\n    \"gpu_model\": \"Nimbus X900\",\n    \"vram_gb\": 80,\n    \"interconnect_gbps\": 400,\n    \"active_streams\": 128,\n    \"thermal_c\": 62.4,\n    \"status\": \"healthy\"\n  },\n  {\n    \"node_id\": \"gpu-node-002\",\n    \"rack\": \"rack-a1\",\n    \"ip_address\": \"10.20.1.12\",\n    \"gpu_model\": \"Nimbus X900\",\n    \"vram_gb\": 80,\n    \"interconnect_gbps\": 400,\n    \"active_streams\": 96,\n    \"thermal_c\": 68.1,\n    \"status\": \"healthy\"\n  },\n  {\n    \"node_id\": \"gpu-node-003\",\n    \"rack\": \"rack-a2\",\n    \"ip_address\": \"10.20.1.23\",\n    \"gpu_model\": \"Nimbus X900\",\n    \"vram_gb\": 80,\n    \"interconnect_gbps\": 400,\n    \"active_streams\": 144,\n    \"thermal_c\": 71.7,\n    \"status\": \"degraded\"\n  },\n  {\n    \"node_id\": \"gpu-node-004\",\n    \"rack\": \"rack-a2\",\n    \"ip_address\": \"10.20.1.24\",\n    \"gpu_model\": \"Voltrix V80\",\n    \"vram_gb\": 64,\n    \"interconnect_gbps\": 300,\n    \"active_streams\": 64,\n    \"thermal_c\": 59.",
+          "reasoning_len": 0,
+          "tool_calls": []
+        }
+      },
+      "temp_0.0": {
+        "code": {
+          "status_code": 200,
+          "id": "chatcmpl-1654acebebc511f5e783318e3959ca85",
+          "wall_seconds": 8.024,
+          "client_ttft_seconds": 0.1893,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 48.88394287650033,
+            "seconds": 8.02243339,
+            "prefill_seconds": 0.169394709,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 0.188294954,
+            "sampling": "greedy",
+            "drafts": true,
+            "token_sha": "5478d1b78cc8",
+            "min_rows": 1
+          },
+          "speculative": {
+            "rounds": 130,
+            "drafted": 308,
+            "accepted": 253,
+            "acceptance_rate": 0.8214285714285714,
+            "tokens_per_round": 2.953846153846154
+          },
+          "usage": {
+            "prompt_tokens": 43,
+            "completion_tokens": 384,
+            "total_tokens": 427,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-1654acebebc511f5e783318e3959ca85 prompt=43 cached=0 thinking=False effort=none tokens=384 sha=5478d1b78cc8 finish=length rounds=130 accepted=253/308",
+          "content": "# LRU Cache Implementation\n\nBelow is a complete, production-quality implementation of an **LRU (Least Recently Used) Cache** — a cache with a fixed capacity that evicts the least-recently-used entry when full. It uses a **doubly linked list** (implemented via `__slots__`-based nodes) plus a **hash map** for O(1) access, and is protected by a **re-entrant lock** for thread safety.\n\n```python\n\"\"\"\nlru_cache.py\n\nA thread-safe LRU (Least Recently Used) cache.\n\nDesign:\n    - A doubly linked list of nodes ordered from most-recently-used (head)\n      to least-recently-used (tail).\n    - A dict mapping keys -> nodes for O(1) lookup.\n    - A re-entrant lock (threading.RLock) guarding all mutations.\n\nOperations:\n    get(key)          -> value or default; promotes key to head.\n    put(key, value)   -> insert/update; promotes to head; evicts tail if full.\n    peek(key)         -> value without promoting.\n    __contains__      -> membership without promoting.\n    __len__           -> current size.\n    clear()           -> empty the cache.\n    items()           -> snapshot list of (key, value) from MRU to LRU.\n\"\"\"\n\nfrom __future__ import annotations\n\nimport thread\nfrom dataclasses import dataclass\nfrom typ import Any, Dict, Generic, Iterator, List, Optional, Tuple, TypeVar\n\nK = TypeVar(\"K\")\nV = TypeVar(\"V\")\n\n\n@dataclass(slots=True)\nclass _Node(Generic[K, V]):\n    \"\"\"A single node in the doubly linked list.\"\"\"\n    key: K\n    value: V\n    prev: Optional[\"_Node[K, V]",
+          "reasoning_len": 0,
+          "tool_calls": []
+        },
+        "prose": {
+          "status_code": 200,
+          "id": "chatcmpl-6cb2303498a2eeeee805712657938aa5",
+          "wall_seconds": 10.554,
+          "client_ttft_seconds": 0.2422,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 37.142654043333614,
+            "seconds": 10.552405372,
+            "prefill_seconds": 0.218316794,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 0.241367404,
+            "sampling": "greedy",
+            "drafts": true,
+            "token_sha": "6c4a0e907cc5",
+            "min_rows": 1
+          },
+          "speculative": {
+            "rounds": 198,
+            "drafted": 263,
+            "accepted": 185,
+            "acceptance_rate": 0.7034220532319392,
+            "tokens_per_round": 1.9393939393939394
+          },
+          "usage": {
+            "prompt_tokens": 64,
+            "completion_tokens": 384,
+            "total_tokens": 448,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-6cb2303498a2eeeee805712657938aa5 prompt=64 cached=0 thinking=False effort=none tokens=384 sha=6c4a0e907cc5 finish=length rounds=198 accepted=185/263",
+          "content": "# 分散式大語言模型推論在雙節點 RoCEv2 網路架構下的深度分析\n\n以下針對您提出的四個技術面向進行系統性拆解。需先說明：**「RoCEv2」並非業界標準術語**（常見於 RoCE、RoCEv2 者多為研究者自訂之拓撲代號），故以下分析以「雙節點（2-node）RoCEv2 拓撲」之合理工程假設為基礎——即兩節點間以高頻寬互連（如 NVLink / RDMA over PCIe Gen5、或 400G 乙太）構成對稱式 All-Reduce 域，並在此假設下展開分析。\n\n---\n\n## 一、通訊瓶頸（Communication Bottleneck）分析\n\n雙節點架構下，瓶頸主要來自三個層面：\n\n**1. 頻寬-延遲乘積（Bandwidth-Delay Product）限制**\n- 兩節點間若採 RDMA，單向有效頻寬約 25–50 GB/s（PCIe Gen5 x16 實測），而 LLM 推論之 tensor 平行切分常使每層需交換 activation 或 KV cache。以 70B 模型、FP16、batch=1 估算，每 token 之 hidden state 交換量約 2×d_model×layers×2B ≈ 數百 MB 級，極易觸發頻寬牆。\n- 瓶頸非僅頻寬，而是**頻寬×延遲**：雙節點之 RTT（round-trip time）若 > 10 μs，則小訊息之交換亦成延遲主導。\n\n**2. All-Reduce 之同步屏障效應**\n-",
+          "reasoning_len": 0,
+          "tool_calls": []
+        },
+        "structured": {
+          "status_code": 200,
+          "id": "chatcmpl-2f7fbabcef31c44ed596f4f2b7a21130",
+          "wall_seconds": 5.3374,
+          "client_ttft_seconds": 0.2775,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 75.68208238638697,
+            "seconds": 5.335963771,
+            "prefill_seconds": 0.261569067,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 0.276271349,
+            "sampling": "greedy",
+            "drafts": true,
+            "token_sha": "4a77fbcdbe5f",
+            "min_rows": 1
+          },
+          "speculative": {
+            "rounds": 77,
+            "drafted": 339,
+            "accepted": 307,
+            "acceptance_rate": 0.9056047197640118,
+            "tokens_per_round": 4.987012987012987
+          },
+          "usage": {
+            "prompt_tokens": 82,
+            "completion_tokens": 384,
+            "total_tokens": 466,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-2f7fbabcef31c44ed596f4f2b7a21130 prompt=82 cached=0 thinking=False effort=none tokens=384 sha=4a77fbcdbe5f finish=length rounds=77 accepted=307/339",
+          "content": "[\n  {\n    \"node_id\": \"gpu-node-001\",\n    \"rack\": \"rack-a1\",\n    \"ip_address\": \"10.20.1.11\",\n    \"gpu_model\": \"Nimbus X900\",\n    \"vram_gb\": 80,\n    \"interconnect_gbps\": 400,\n    \"active_streams\": 128,\n    \"thermal_c\": 62.4,\n    \"status\": \"healthy\"\n  },\n  {\n    \"node_id\": \"gpu-node-002\",\n    \"rack\": \"rack-a1\",\n    \"ip_address\": \"10.20.1.12\",\n    \"gpu_model\": \"Nimbus X900\",\n    \"vram_gb\": 80,\n    \"interconnect_gbps\": 400,\n    \"active_streams\": 96,\n    \"thermal_c\": 68.1,\n    \"status\": \"healthy\"\n  },\n  {\n    \"node_id\": \"gpu-node-003\",\n    \"rack\": \"rack-a2\",\n    \"ip_address\": \"10.20.1.23\",\n    \"gpu_model\": \"Nimbus X900\",\n    \"vram_gb\": 80,\n    \"interconnect_gbps\": 400,\n    \"active_streams\": 144,\n    \"thermal_c\": 71.7,\n    \"status\": \"degraded\"\n  },\n  {\n    \"node_id\": \"gpu-node-004\",\n    \"rack\": \"rack-a2\",\n    \"ip_address\": \"10.20.1.24\",\n    \"gpu_model\": \"Nimbus X900\",\n    \"vram_gb\": 80,\n    \"interconnect_gbps\": 400,\n    \"active_streams\": 0,\n    \"thermal_c\": 34.",
+          "reasoning_len": 0,
+          "tool_calls": []
+        }
+      }
+    },
+    "cold_prefill": {
+      "8k": {
+        "status_code": 200,
+        "id": "chatcmpl-396e1903bf66a5fac5c28b8eaec8a223",
+        "wall_seconds": 7.2902,
+        "client_ttft_seconds": 6.8038,
+        "finish_reason": "length",
+        "tensorfold": {
+          "enable_thinking": false,
+          "reasoning_effort": "none",
+          "engine": "lanes",
+          "tokens_per_second": 30.82189682399627,
+          "seconds": 7.272756035,
+          "prefill_seconds": 6.750603351,
+          "prefill_widths": [],
+          "prefill_raised": [],
+          "time_to_first_token": 6.802666878,
+          "sampling": "greedy",
+          "drafts": true,
+          "token_sha": "4336381bbe31",
+          "min_rows": 1
+        },
+        "speculative": {
+          "rounds": 9,
+          "drafted": 11,
+          "accepted": 6,
+          "acceptance_rate": 0.5454545454545454,
+          "tokens_per_round": 1.7777777777777777
+        },
+        "usage": {
+          "prompt_tokens": 14299,
+          "completion_tokens": 16,
+          "total_tokens": 14315,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "log_line": "[tensorfold] done chatcmpl-396e1903bf66a5fac5c28b8eaec8a223 prompt=14299 cached=0 thinking=False effort=none tokens=16 sha=4336381bbe31 finish=length rounds=9 accepted=6/11",
+        "content": "這些詞彙屬於高效能運算（HPC/AI 加速器",
+        "reasoning_len": 0,
+        "tool_calls": [],
+        "computed_prefill_tok_s": 2118.2
+      },
+      "32k": {
+        "status_code": 200,
+        "id": "chatcmpl-c8b7ba12f99aa6ec21490042b1e5ac4e",
+        "wall_seconds": 30.9564,
+        "client_ttft_seconds": 28.2635,
+        "finish_reason": "length",
+        "tensorfold": {
+          "enable_thinking": false,
+          "reasoning_effort": "none",
+          "engine": "lanes",
+          "tokens_per_second": 5.569831739816726,
+          "seconds": 30.891876968,
+          "prefill_seconds": 28.17041289,
+          "prefill_widths": [],
+          "prefill_raised": [],
+          "time_to_first_token": 28.261891365,
+          "sampling": "greedy",
+          "drafts": true,
+          "token_sha": "d1cc30bcbe07",
+          "min_rows": 1
+        },
+        "speculative": {
+          "rounds": 11,
+          "drafted": 7,
+          "accepted": 5,
+          "acceptance_rate": 0.7142857142857143,
+          "tokens_per_round": 1.4545454545454546
+        },
+        "usage": {
+          "prompt_tokens": 57873,
+          "completion_tokens": 16,
+          "total_tokens": 57889,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "log_line": "[tensorfold] done chatcmpl-c8b7ba12f99aa6ec21490042b1e5ac4e prompt=57873 cached=0 thinking=False effort=none tokens=16 sha=d1cc30bcbe07 finish=length rounds=11 accepted=5/7",
+        "content": "這些詞彙屬於高效能運算架構（尤其是 GPU/加速器",
+        "reasoning_len": 0,
+        "tool_calls": [],
+        "computed_prefill_tok_s": 2054.4
+      }
+    },
+    "cut_in_test": {
+      "long_32k": {
+        "status_code": 200,
+        "id": "chatcmpl-3db74b97e6886c2c6ac440eea79979bb",
+        "wall_seconds": 29.0755,
+        "client_ttft_seconds": 26.8494,
+        "finish_reason": "length",
+        "tensorfold": {
+          "enable_thinking": false,
+          "reasoning_effort": "none",
+          "engine": "lanes",
+          "tokens_per_second": 6.736172461082473,
+          "seconds": 29.009418861,
+          "prefill_seconds": 26.775613821,
+          "prefill_widths": [],
+          "prefill_raised": [],
+          "time_to_first_token": 26.84763322,
+          "sampling": "greedy",
+          "drafts": true,
+          "token_sha": "50583bd8ec6e",
+          "min_rows": 1
+        },
+        "speculative": {
+          "rounds": 9,
+          "drafted": 10,
+          "accepted": 6,
+          "acceptance_rate": 0.6,
+          "tokens_per_round": 1.7777777777777777
+        },
+        "usage": {
+          "prompt_tokens": 57873,
+          "completion_tokens": 16,
+          "total_tokens": 57889,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "log_line": "[tensorfold] done chatcmpl-3db74b97e6886c2c6ac440eea79979bb prompt=57873 cached=0 thinking=False effort=none tokens=16 sha=50583bd8ec6e finish=length rounds=9 accepted=6/10",
+        "content": "這些詞彙屬於高效能運算（HPC／AI 加速器",
+        "reasoning_len": 0,
+        "tool_calls": []
+      },
+      "short_behind_1s": {
+        "status_code": 200,
+        "id": "chatcmpl-bd7a5d2d29f2cb98dba1dd52db927203",
+        "wall_seconds": 1.2083,
+        "client_ttft_seconds": 1.0007,
+        "finish_reason": "stop",
+        "tensorfold": {
+          "enable_thinking": false,
+          "reasoning_effort": "none",
+          "engine": "lanes",
+          "tokens_per_second": 33.73799666542316,
+          "seconds": 1.206507729,
+          "prefill_seconds": 0.242669238,
+          "prefill_widths": [],
+          "prefill_raised": [],
+          "time_to_first_token": 0.999565167,
+          "sampling": "greedy",
+          "drafts": true,
+          "token_sha": "6480e8976641",
+          "min_rows": 2
+        },
+        "speculative": {
+          "rounds": 3,
+          "drafted": 6,
+          "accepted": 5,
+          "acceptance_rate": 0.8333333333333334,
+          "tokens_per_round": 2.6666666666666665
+        },
+        "usage": {
+          "prompt_tokens": 26,
+          "completion_tokens": 8,
+          "total_tokens": 34,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "log_line": "[tensorfold] done chatcmpl-bd7a5d2d29f2cb98dba1dd52db927203 prompt=26 cached=0 thinking=False effort=none tokens=8 sha=6480e8976641 finish=stop rounds=3 accepted=5/6",
+        "content": "123 + 456 = 579",
+        "reasoning_len": 0,
+        "tool_calls": []
+      }
+    },
+    "concurrency_scaling": {
+      "C1": {
+        "wall_seconds": 8.8343,
+        "total_tokens": 384,
+        "aggregate_wall_tok_s": 43.47,
+        "per_stream_mean_tok_s": 44.35,
+        "streams": {
+          "s1_code": {
+            "status_code": 200,
+            "id": "chatcmpl-6cff8a3c0a416c3f059bc5e93eb70b61",
+            "wall_seconds": 8.8143,
+            "client_ttft_seconds": 0.1796,
+            "finish_reason": "length",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 44.35486509125856,
+              "seconds": 8.80851162,
+              "prefill_seconds": 0.1597409,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.174248078,
+              "sampling": "exact",
+              "drafts": true,
+              "token_sha": "d93c689483c8",
+              "min_rows": 2
+            },
+            "speculative": {
+              "rounds": 125,
+              "drafted": 353,
+              "accepted": 258,
+              "acceptance_rate": 0.7308781869688386,
+              "tokens_per_round": 3.072
+            },
+            "usage": {
+              "prompt_tokens": 43,
+              "completion_tokens": 384,
+              "total_tokens": 427,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-6cff8a3c0a416c3f059bc5e93eb70b61 prompt=43 cached=0 thinking=False effort=none tokens=384 sha=d93c689483c8 finish=length rounds=125 accepted=258/353",
+            "content": "# LRU Cache Implementation\n\nBelow is a complete, production-quality implementation of an **LRU (Least Recently Used) Cache** — a cache with a configurable capacity that evicts the least-recently-used entry when full. It uses a **doubly linked list** for O(1) recency ordering and a **hash map** for O(1) lookups, with **thread-safety** via a reentrant lock, full **type annotations**, and a **thorough unit test suite**.\n\n```python\n\"\"\"\nlru_cache.py\n\nA thread-safe LRU (Least Recently Used) Cache implementation.\n\nDesign:\n    - A doubly linked list maintains recency order.\n        * head  -> most recently used entry\n        * tail  -> least recently used entry (eviction candidate)\n    - A dict (hash map) maps keys -> nodes for O(1) lookups.\n    - A reentrant lock (RLock) guards all public operations so the cache\n      is safe to share across threads.\n\nComplexity:\n    get / put / delete / contains : O(1) average\n    eviction                      : O(1)\n    space                         : O(capacity)\n\"\"\"\n\nfrom __future__ import annotations\n\nimport threading\nfrom typing import Any, Dict, Generic, Iterator, Optional, TypeVar\n\n\nK = TypeVar(\"K\")\nV = TypeVar(\"V\")\n\n\nclass _Node(Generic[K, V]):\n    \"\"\"A node in the doubly linked list.\"\"\"\n\n    __slots__ = (\"key\", \"value\", \"prev\", \"next\")\n\n    def __init__(self, key: K, value: V) -> None:\n        self.key: K = key\n        self.value: V = value\n        self.prev: Optional[_Node[K, V]] = None\n        self.next: Optional[_Node[",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        }
+      },
+      "C2": {
+        "wall_seconds": 15.0346,
+        "total_tokens": 768,
+        "aggregate_wall_tok_s": 51.08,
+        "per_stream_mean_tok_s": 33.75,
+        "streams": {
+          "s1_code": {
+            "status_code": 200,
+            "id": "chatcmpl-c7e985c287032e4a26c5fdca5c59d51c",
+            "wall_seconds": 9.4624,
+            "client_ttft_seconds": 0.1908,
+            "finish_reason": "length",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 41.30990710038691,
+              "seconds": 9.456956444,
+              "prefill_seconds": 0.170792287,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.186141638,
+              "sampling": "exact",
+              "drafts": true,
+              "token_sha": "d93c689483c8",
+              "min_rows": 2
+            },
+            "speculative": {
+              "rounds": 124,
+              "drafted": 341,
+              "accepted": 259,
+              "acceptance_rate": 0.7595307917888563,
+              "tokens_per_round": 3.096774193548387
+            },
+            "usage": {
+              "prompt_tokens": 43,
+              "completion_tokens": 384,
+              "total_tokens": 427,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-c7e985c287032e4a26c5fdca5c59d51c prompt=43 cached=0 thinking=False effort=none tokens=384 sha=d93c689483c8 finish=length rounds=124 accepted=259/341",
+            "content": "# LRU Cache Implementation\n\nBelow is a complete, production-quality implementation of an **LRU (Least Recently Used) Cache** — a cache with a configurable capacity that evicts the least-recently-used entry when full. It uses a **doubly linked list** for O(1) recency ordering and a **hash map** for O(1) lookups, with **thread-safety** via a reentrant lock, full **type annotations**, and a **thorough unit test suite**.\n\n```python\n\"\"\"\nlru_cache.py\n\nA thread-safe LRU (Least Recently Used) Cache implementation.\n\nDesign:\n    - A doubly linked list maintains recency order.\n        * head  -> most recently used entry\n        * tail  -> least recently used entry (eviction candidate)\n    - A dict (hash map) maps keys -> nodes for O(1) lookups.\n    - A reentrant lock (RLock) guards all public operations so the cache\n      is safe to share across threads.\n\nComplexity:\n    get / put / delete / contains : O(1) average\n    eviction                      : O(1)\n    space                         : O(capacity)\n\"\"\"\n\nfrom __future__ import annotations\n\nimport threading\nfrom typing import Any, Dict, Generic, Iterator, Optional, TypeVar\n\n\nK = TypeVar(\"K\")\nV = TypeVar(\"V\")\n\n\nclass _Node(Generic[K, V]):\n    \"\"\"A node in the doubly linked list.\"\"\"\n\n    __slots__ = (\"key\", \"value\", \"prev\", \"next\")\n\n    def __init__(self, key: K, value: V) -> None:\n        self.key: K = key\n        self.value: V = value\n        self.prev: Optional[_Node[K, V]] = None\n        self.next: Optional[_Node[",
+            "reasoning_len": 0,
+            "tool_calls": []
+          },
+          "s2_prose": {
+            "status_code": 200,
+            "id": "chatcmpl-32c15e845e28bd65c600775e815e8dbf",
+            "wall_seconds": 15.0198,
+            "client_ttft_seconds": 0.4007,
+            "finish_reason": "length",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 26.19678402137131,
+              "seconds": 15.015136948,
+              "prefill_seconds": 0.209437159,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.395899194,
+              "sampling": "exact",
+              "drafts": true,
+              "token_sha": "d6c3a8493d99",
+              "min_rows": 1
+            },
+            "speculative": {
+              "rounds": 195,
+              "drafted": 264,
+              "accepted": 188,
+              "acceptance_rate": 0.7121212121212122,
+              "tokens_per_round": 1.9692307692307693
+            },
+            "usage": {
+              "prompt_tokens": 64,
+              "completion_tokens": 384,
+              "total_tokens": 448,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-32c15e845e28bd65c600775e815e8dbf prompt=64 cached=0 thinking=False effort=none tokens=384 sha=d6c3a8493d99 finish=length rounds=195 accepted=188/264",
+            "content": "# 分散式大語言模型推論在雙節點 RoCEv2 網路架構下的深度分析\n\n以下針對您提出的四個技術面向進行詳細分析。需先說明：**「RoCEv2」並非業界標準術語**（常見相關概念為 RoCE、RoCEv2 可能是特定研究團隊或廠商的內部命名，例如某些分散式推論框架的網路層抽象）。因此以下分析將以「雙節點（2-node）分散式推論」的通用架構為基礎，並對應您描述的 RoCEv2 特性進行合理推論；若您有該架構的具體規格文件，可再校正。\n\n---\n\n## 一、通訊瓶頸（Communication Bottleneck）\n\n### 1.1 雙節點架構的本質限制\n在 2-node 分散式推論中，節點間通訊成為**唯一跨節點資料路徑**，瓶頸來源有三：\n\n| 瓶頸層級 | 具體成因 | 對推論的影響 |\n|---|---|---|\n| **鏈路頻寬** | 節點間多為 25–100 Gbps（RDMA/IB）或 1–10 Gbps（乙太網） | Tensor Parallel 的 All-Reduce 與 Activion 傳輸受頻寬直接限制 |\n| **延遲（Latency）** | 跨節點 RTT 約 5–50 μs（IB）至 100–500 μs（乙太網） | 每層同步點引入固定延遲，層數愈多累積愈顯 |\n| **協定開銷** | RoCEv2 若採 RDMA 語意，需 QP 建立、ACK 協定、重傳機制 | ",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        }
+      },
+      "C4": {
+        "wall_seconds": 21.2025,
+        "total_tokens": 1536,
+        "aggregate_wall_tok_s": 72.44,
+        "per_stream_mean_tok_s": 31.26,
+        "streams": {
+          "s3_structured": {
+            "status_code": 200,
+            "id": "chatcmpl-d8fc2adb47990431d3a114262495a22c",
+            "wall_seconds": 9.3731,
+            "client_ttft_seconds": 0.6644,
+            "finish_reason": "length",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 43.97866407837875,
+              "seconds": 9.340819921,
+              "prefill_seconds": 0.267783791,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.632365552,
+              "sampling": "exact",
+              "drafts": true,
+              "token_sha": "6367ec596eea",
+              "min_rows": 1
+            },
+            "speculative": {
+              "rounds": 84,
+              "drafted": 347,
+              "accepted": 300,
+              "acceptance_rate": 0.8645533141210374,
+              "tokens_per_round": 4.571428571428571
+            },
+            "usage": {
+              "prompt_tokens": 82,
+              "completion_tokens": 384,
+              "total_tokens": 466,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-d8fc2adb47990431d3a114262495a22c prompt=82 cached=0 thinking=False effort=none tokens=384 sha=6367ec596eea finish=length rounds=84 accepted=300/347",
+            "content": "[\n  {\n    \"node_id\": \"gpu-node-001\",\n    \"rack\": \"rack-a1\",\n    \"ip_address\": \"10.42.0.11\",\n    \"gpu_model\": \"Nimbus X900\",\n    \"vram_gb\": 80,\n    \"interconnect_gbps\": 400,\n    \"active_streams\": 128,\n    \"thermal_c\": 62.4,\n    \"status\": \"healthy\"\n  },\n  {\n    \"node_id\": \"gpu-node-002\",\n    \"rack\": \"rack-a1\",\n    \"ip_address\": \"10.42.0.12\",\n    \"gpu_model\": \"Nimbus X900\",\n    \"vram_gb\": 80,\n    \"interconnect_gbps\": 400,\n    \"active_streams\": 96,\n    \"thermal_c\": 58.1,\n    \"status\": \"healthy\"\n  },\n  {\n    \"node_id\": \"gpu-node-003\",\n    \"rack\": \"rack-a2\",\n    \"ip_address\": \"10.42.0.23\",\n    \"gpu_model\": \"Nimbus X900\",\n    \"vram_gb\": 80,\n    \"interconnect_gbps\": 400,\n    \"active_streams\": 142,\n    \"thermal_c\": 71.8,\n    \"status\": \"degraded\"\n  },\n  {\n    \"node_id\": \"gpu-node-004\",\n    \"rack\": \"rack-a2\",\n    \"ip_address\": \"10.42.0.24\",\n    \"gpu_model\": \"Voltrix A7\",\n    \"vram_gb\": 48,\n    \"interconnect_gbps\": 200,\n    \"active_streams\": 64,\n    \"thermal_c\": 54.",
+            "reasoning_len": 0,
+            "tool_calls": []
+          },
+          "s1_code": {
+            "status_code": 200,
+            "id": "chatcmpl-58c8fff5d740f3fb59c9b202f68b0b66",
+            "wall_seconds": 13.6583,
+            "client_ttft_seconds": 0.3974,
+            "finish_reason": "length",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 28.881715209922582,
+              "seconds": 13.626489747,
+              "prefill_seconds": 0.165159226,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.36585977,
+              "sampling": "exact",
+              "drafts": true,
+              "token_sha": "d93c689483c8",
+              "min_rows": 1
+            },
+            "speculative": {
+              "rounds": 132,
+              "drafted": 344,
+              "accepted": 251,
+              "acceptance_rate": 0.7296511627906976,
+              "tokens_per_round": 2.909090909090909
+            },
+            "usage": {
+              "prompt_tokens": 43,
+              "completion_tokens": 384,
+              "total_tokens": 427,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-58c8fff5d740f3fb59c9b202f68b0b66 prompt=43 cached=0 thinking=False effort=none tokens=384 sha=d93c689483c8 finish=length rounds=132 accepted=251/344",
+            "content": "# LRU Cache Implementation\n\nBelow is a complete, production-quality implementation of an **LRU (Least Recently Used) Cache** — a cache with a configurable capacity that evicts the least-recently-used entry when full. It uses a **doubly linked list** for O(1) recency ordering and a **hash map** for O(1) lookups, with **thread-safety** via a reentrant lock, full **type annotations**, and a **thorough unit test suite**.\n\n```python\n\"\"\"\nlru_cache.py\n\nA thread-safe LRU (Least Recently Used) Cache implementation.\n\nDesign:\n    - A doubly linked list maintains recency order.\n        * head  -> most recently used entry\n        * tail  -> least recently used entry (eviction candidate)\n    - A dict (hash map) maps keys -> nodes for O(1) lookups.\n    - A reentrant lock (RLock) guards all public operations so the cache\n      is safe to share across threads.\n\nComplexity:\n    get / put / delete / contains : O(1) average\n    eviction                      : O(1)\n    space                         : O(capacity)\n\"\"\"\n\nfrom __future__ import annotations\n\nimport threading\nfrom typing import Any, Dict, Generic, Iterator, Optional, TypeVar\n\n\nK = TypeVar(\"K\")\nV = TypeVar(\"V\")\n\n\nclass _Node(Generic[K, V]):\n    \"\"\"A node in the doubly linked list.\"\"\"\n\n    __slots__ = (\"key\", \"value\", \"prev\", \"next\")\n\n    def __init__(self, key: K, value: V) -> None:\n        self.key: K = key\n        self.value: V = value\n        self.prev: Optional[_Node[K, V]] = None\n        self.next: Optional[_Node[",
+            "reasoning_len": 0,
+            "tool_calls": []
+          },
+          "s2_prose": {
+            "status_code": 200,
+            "id": "chatcmpl-c1f4462740270eda06b0cb3b512bb084",
+            "wall_seconds": 20.2813,
+            "client_ttft_seconds": 0.2317,
+            "finish_reason": "length",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 19.102802129873098,
+              "seconds": 20.249751918,
+              "prefill_seconds": 0.200212402,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.200594704,
+              "sampling": "exact",
+              "drafts": true,
+              "token_sha": "d6c3a8493d99",
+              "min_rows": 1
+            },
+            "speculative": {
+              "rounds": 203,
+              "drafted": 240,
+              "accepted": 180,
+              "acceptance_rate": 0.75,
+              "tokens_per_round": 1.8916256157635467
+            },
+            "usage": {
+              "prompt_tokens": 64,
+              "completion_tokens": 384,
+              "total_tokens": 448,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-c1f4462740270eda06b0cb3b512bb084 prompt=64 cached=0 thinking=False effort=none tokens=384 sha=d6c3a8493d99 finish=length rounds=203 accepted=180/240",
+            "content": "# 分散式大語言模型推論在雙節點 RoCEv2 網路架構下的深度分析\n\n以下針對您提出的四個技術面向進行詳細分析。需先說明：**「RoCEv2」並非業界標準術語**（常見相關概念為 RoCE、RoCEv2 可能是特定研究團隊或廠商的內部命名，例如某些分散式推論框架的網路層抽象）。因此以下分析將以「雙節點（2-node）分散式推論」的通用架構為基礎，並對應您描述的 RoCEv2 特性進行合理推論；若您有該架構的具體規格文件，可再校正。\n\n---\n\n## 一、通訊瓶頸（Communication Bottleneck）\n\n### 1.1 雙節點架構的本質限制\n在 2-node 分散式推論中，節點間通訊成為**唯一跨節點資料路徑**，瓶頸來源有三：\n\n| 瓶頸層級 | 具體成因 | 對推論的影響 |\n|---|---|---|\n| **鏈路頻寬** | 節點間多為 25–100 Gbps（RDMA/IB）或 1–10 Gbps（乙太網） | Tensor Parallel 的 All-Reduce 與 Activion 傳輸受頻寬直接限制 |\n| **延遲（Latency）** | 跨節點 RTT 約 5–50 μs（IB）至 100–500 μs（乙太網） | 每層同步點引入固定延遲，層數愈多累積愈顯 |\n| **協定開銷** | RoCEv2 若採 RDMA 語意，需 QP 建立、ACK 協定、重傳機制 | ",
+            "reasoning_len": 0,
+            "tool_calls": []
+          },
+          "s4_algo": {
+            "status_code": 200,
+            "id": "chatcmpl-094e51dadecae544bf1f18da3394107b",
+            "wall_seconds": 21.1843,
+            "client_ttft_seconds": 9.6013,
+            "finish_reason": "length",
+            "tensorfold": {
+              "enable_thinking": false,
+              "reasoning_effort": "none",
+              "engine": "lanes",
+              "tokens_per_second": 33.064311859089294,
+              "seconds": 11.806856632,
+              "prefill_seconds": 0.147674718,
+              "prefill_widths": [],
+              "prefill_raised": [],
+              "time_to_first_token": 0.223821633,
+              "sampling": "exact",
+              "drafts": true,
+              "token_sha": "d4c555d97ed7",
+              "min_rows": 1
+            },
+            "speculative": {
+              "rounds": 136,
+              "drafted": 341,
+              "accepted": 248,
+              "acceptance_rate": 0.7272727272727273,
+              "tokens_per_round": 2.823529411764706
+            },
+            "usage": {
+              "prompt_tokens": 38,
+              "completion_tokens": 384,
+              "total_tokens": 422,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0
+              }
+            },
+            "log_line": "[tensorfold] done chatcmpl-094e51dadecae544bf1f18da3394107b prompt=38 cached=0 thinking=False effort=none tokens=384 sha=d4c555d97ed7 finish=length rounds=136 accepted=248/341",
+            "content": "# Red-Black Tree Implementation in Python\n\nBelow is a complete, self-contained implementation of a **Red-Black Tree** (a self-balancing binary search tree). It includes insertion with fix-up, search, rotations, and inorder traversal.\n\n```python\n\"\"\"\nRed-Black Tree (RBT) Implementation\n====================================\n\nA Red-Black Tree is a self-balancing binary search tree where each node\ncarries an extra bit of \"color\" (RED or BLACK). The tree maintains the\nfollowing invariants:\n\n1. Every node is either RED or BLACK.\n2. The root is always BLACK.\n3. Every leaf (NIL) is BLACK.\n4. If a node is RED, both its children are BLACK (no two consecutive REDs).\n5. For every node, all paths from that node to descendant leaves contain\n   the same number of BLACK nodes (equal \"black-height\").\n\nThese invariants guarantee that the height of the tree is O(log n),\nso all operations (search, insert, delete) run in O(log n) time.\n\nComplexity Analysis\n-------------------\n- insert(x):   O(log n)  -- search down O(log n) + fix-up O(log n)\n- search(x):   O(log n)  -- standard BST search\n- left_rotate / right_rotate: O(1)\n- inorder():   O(n)      -- visits every node once\n- Space:       O(n)      -- one node per inserted key\n\"\"\"\n\n\nclass Color:\n    RED = \"RED\"\n    BLACK = \"BLACK\"\n\n\nclass Node:\n    \"\"\"A single node of the Red-Black Tree.\"\"\"\n\n    __slots__ = (\"key\", \"color\", \"left\", \"right\", \"parent\")\n\n    def __init__(self, key, color=Color.RED, parent=None):\n        self.key = key\n       ",
+            "reasoning_len": 0,
+            "tool_calls": []
+          }
+        }
+      }
+    },
+    "stress_burst_c10_port8889": {
+      "status_counts": {
+        "200": 6,
+        "429": 4
+      },
+      "immediate_429_count": 3,
+      "tiered_429_count": 1,
+      "completed_200_count": 6,
+      "workers": {
+        "worker_7": {
+          "status_code": 429,
+          "wall_seconds": 0.0013,
+          "error_body": "{\"error\":{\"message\":\"DGX Spark concurrency limit reached for 'DeepSeek-V4.1-Flash-1017-TF' (running: 4/4, tiered queue: 4/4, reason: queue_full). Fast-failing for client fallback.\",\"type\":\"server_busy\",\"code\":429,\"param\":null}}"
+        },
+        "worker_8": {
+          "status_code": 429,
+          "wall_seconds": 0.0016,
+          "error_body": "{\"error\":{\"message\":\"DGX Spark concurrency limit reached for 'DeepSeek-V4.1-Flash-1017-TF' (running: 4/4, tiered queue: 4/4, reason: queue_full). Fast-failing for client fallback.\",\"type\":\"server_busy\",\"code\":429,\"param\":null}}"
+        },
+        "worker_9": {
+          "status_code": 429,
+          "wall_seconds": 0.0012,
+          "error_body": "{\"error\":{\"message\":\"DGX Spark concurrency limit reached for 'DeepSeek-V4.1-Flash-1017-TF' (running: 4/4, tiered queue: 4/4, reason: queue_full). Fast-failing for client fallback.\",\"type\":\"server_busy\",\"code\":429,\"param\":null}}"
+        },
+        "worker_6": {
+          "status_code": 429,
+          "wall_seconds": 10.0048,
+          "error_body": "{\"error\":{\"message\":\"DGX Spark concurrency limit reached for 'DeepSeek-V4.1-Flash-1017-TF' (running: 4/4, tiered queue: 3/4, reason: tiered_timeout_pos_4). Fast-failing for client fallback.\",\"type\":\"server_busy\",\"code\":429,\"param\":null}}"
+        },
+        "worker_0": {
+          "status_code": 200,
+          "id": "chatcmpl-e6dff267cf9b0e6a9e6881e0baf238ee",
+          "wall_seconds": 12.1948,
+          "client_ttft_seconds": 1.8364,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 36.9772006318118,
+            "seconds": 12.187476229,
+            "prefill_seconds": 0.131252828,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 1.829955746,
+            "sampling": "exact",
+            "drafts": true,
+            "token_sha": "179bb6da6b33",
+            "min_rows": 1
+          },
+          "speculative": {
+            "rounds": 123,
+            "drafted": 319,
+            "accepted": 260,
+            "acceptance_rate": 0.8150470219435737,
+            "tokens_per_round": 3.1219512195121952
+          },
+          "usage": {
+            "prompt_tokens": 23,
+            "completion_tokens": 384,
+            "total_tokens": 407,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-e6dff267cf9b0e6a9e6881e0baf238ee prompt=23 cached=0 thinking=False effort=none tokens=384 sha=179bb6da6b33 finish=length rounds=123 accepted=260/319",
+          "content": "# Thread-Safe Priority Queue Implementation\n\nBelow is a complete, production-quality implementation of a thread-safe priority queue using a binary heap. It supports arbitrary priority ordering, blocking and non-blocking operations, bounded capacity, and safe iteration.\n\n```python\nimport heapq\nimport threading\nimport time\nfrom typing import Any, Callable, Generic, Iterable, List, Optional, Tuple, TypeVar\n\nT = TypeVar(\"T\")\n\n\nclass ThreadSafePriorityQueue(Generic[T]):\n    \"\"\"\n    A thread-safe priority queue backed by a binary heap.\n\n    Features\n    --------\n    - O(log n) push/pop, O(1) peek\n    - Thread-safe via a single re-entrant lock\n    - Optional bounded capacity with blocking put\n    - Optional custom priority key function\n    - Blocking get() with timeout\n    - Safe snapshot iteration (returns a copy)\n    - Stable tie-breaking via insertion counter\n\n    Parameters\n    ----------\n    maxsize : int, optional\n        Maximum number of items. ``None`` means unbounded.\n    key : callable, optional\n        Function mapping an item to a sortable priority. If ``None``,\n        items themselves must be comparable.\n    \"\"\"\n\n    def __init__(\n        self,\n        maxsize: Optional[int] = None,\n        key: Optional[Callable[[T], Any]] = None,\n    ) -> None:\n        if maxsize is not None and maxsize <= 0:\n            raise ValueError(\"maxsize must be positive or None\")\n        self._heap: List[Tuple[Any, int, T]] = []\n        self._counter = 0\n        self._maxsize = maxsize\n        self._key = key\n        self._lock = threading.Lock()\n        self._not_empty = threading.Condition(self._lock)\n        self._not_full",
+          "reasoning_len": 0,
+          "tool_calls": []
+        },
+        "worker_1": {
+          "status_code": 200,
+          "id": "chatcmpl-25f01599a458e528aba1c804b5b7909d",
+          "wall_seconds": 12.5054,
+          "client_ttft_seconds": 1.7054,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 35.46304072224697,
+            "seconds": 12.498611829,
+            "prefill_seconds": 0.124044543,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 1.699272179,
+            "sampling": "exact",
+            "drafts": true,
+            "token_sha": "bbe9fdefbf22",
+            "min_rows": 1
+          },
+          "speculative": {
+            "rounds": 125,
+            "drafted": 314,
+            "accepted": 259,
+            "acceptance_rate": 0.8248407643312102,
+            "tokens_per_round": 3.072
+          },
+          "usage": {
+            "prompt_tokens": 23,
+            "completion_tokens": 384,
+            "total_tokens": 407,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-25f01599a458e528aba1c804b5b7909d prompt=23 cached=0 thinking=False effort=none tokens=384 sha=bbe9fdefbf22 finish=length rounds=125 accepted=259/314",
+          "content": "# Thread-Safe Priority Queue Implementation\n\nBelow is a complete, production-quality implementation of a thread-safe priority queue using a binary heap. It supports priority-based insertion, blocking/non-blocking retrieval, bounded capacity, and safe concurrent access.\n\n```python\nimport heapq\nimport threading\nimport time\nfrom typing import Any, Optional, Tuple, List\n\n\nclass ThreadSafePriorityQueue:\n    \"\"\"\n    A thread-safe priority queue backed by a binary min-heap.\n\n    Lower priority values are dequeued first (min-heap semantics).\n    Ties are broken by insertion order (FIFO within same priority).\n\n    Features:\n      - Thread-safe via a single reentrant lock (RLock).\n      - Blocking and non-blocking dequeue.\n      - Optional bounded capacity with blocking put.\n      - Peek without removing.\n      - Safe iteration snapshot.\n      - Graceful shutdown.\n    \"\"\"\n\n    def __init__(\n        self,\n        maxsize: Optional[int] = None,\n    ) -> None:\n        \"\"\"\n        :param maxsize: Maximum number of items allowed (None = unbounded).\n        \"\"\"\n        if maxsize is not None and maxsize <= 0:\n            raise ValueError(\"maxsize must be positive or None\")\n\n        self._heap: List[Tuple[int, int, Any]] = []\n        self._counter = 0\n        self._maxsize = maxsize\n        self._lock = threading.RLock()\n        self._not_empty = threading.Condition(self._lock)\n        self._not_full = threading.Condition(self._lock)\n        self._closed = False\n\n    # ------------------------------------------------------------------\n    # Internal helpers (must be called with lock held)\n    # ------------------------------------------------------------------\n    def _put_unlocked(self, priority: int, item: Any) -> None:\n        order = self._counter\n        self._counter += 1\n",
+          "reasoning_len": 0,
+          "tool_calls": []
+        },
+        "worker_2": {
+          "status_code": 200,
+          "id": "chatcmpl-b5ddfaec373971fc84c8ea6d72f05820",
+          "wall_seconds": 14.5662,
+          "client_ttft_seconds": 1.9636,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 30.390557479414415,
+            "seconds": 14.559275915,
+            "prefill_seconds": 0.127055345,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 1.957208674,
+            "sampling": "exact",
+            "drafts": true,
+            "token_sha": "5bf5a6efd08e",
+            "min_rows": 1
+          },
+          "speculative": {
+            "rounds": 146,
+            "drafted": 308,
+            "accepted": 237,
+            "acceptance_rate": 0.7694805194805194,
+            "tokens_per_round": 2.6301369863013697
+          },
+          "usage": {
+            "prompt_tokens": 23,
+            "completion_tokens": 384,
+            "total_tokens": 407,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-b5ddfaec373971fc84c8ea6d72f05820 prompt=23 cached=0 thinking=False effort=none tokens=384 sha=5bf5a6efd08e finish=length rounds=146 accepted=237/308",
+          "content": "# Thread-Safe Priority Queue Implementation\n\nBelow is a complete, production-quality implementation of a thread-safe priority queue built on Python's `heapq` module, with proper locking, condition variables, and clean API design.\n\n```python\n\"\"\"\nthread_safe_priority_queue.py\n\nA thread-safe priority queue implementation using heapq.\n\nFeatures:\n    - Thread-safe push/pop operations via RLock\n    - Blocking pop with optional timeout\n    - Non-blocking try_pop\n    - Peek without removing\n    - Priority ordering (lower value = higher priority)\n    - Stable ordering for equal priorities via insertion counter\n    - Bounded capacity support (optional)\n    - Context manager support\n    - Clean shutdown semantics\n\"\"\"\n\nfrom __future__ import annotations\n\nimport heapq\nimport threading\nimport time\nfrom dataclasses import dataclass, field\nfrom typing import Any, Generic, Iterable, Optional, TypeVar\n\n\nT = TypeVar(\"T\")\n\n\n@dataclass(order=True)\nclass _Entry(Generic[T]):\n    \"\"\"Internal heap entry. Ordering is by (priority, sequence).\"\"\"\n    priority: float\n    sequence: int\n    item: T = field(compare=False)\n\n\nclass ThreadSafePriorityQueue(Generic[T]):\n    \"\"\"\n    A thread-safe priority queue.\n\n    Lower priority values are popped first (min-heap semantics).\n    For equal priorities, FIFO order is preserved via an internal\n    monotonically increasing sequence counter.\n\n    All public methods are thread-safe. Blocking operations use a\n    Condition variable tied to the internal lock.\n    \"\"\"\n\n    def __init__(\n        self,\n        maxsize: Optional[int] = None,\n    ) -> None:\n        \"\"\"\n        Args:\n            maxsize: Optional maximum number of items. If None, unbounded.\n                     If 0 or negative, treated as unbounded.\n        \"\"\"\n        if",
+          "reasoning_len": 0,
+          "tool_calls": []
+        },
+        "worker_4": {
+          "status_code": 200,
+          "id": "chatcmpl-0dac3ec3122c937263332049bd81cd59",
+          "wall_seconds": 15.9676,
+          "client_ttft_seconds": 12.5621,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 18.4975086165146,
+            "seconds": 3.610322902,
+            "prefill_seconds": 0.11499529,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 0.20532017,
+            "sampling": "exact",
+            "drafts": true,
+            "token_sha": "540782e81671",
+            "min_rows": 2
+          },
+          "speculative": {
+            "rounds": 25,
+            "drafted": 53,
+            "accepted": 38,
+            "acceptance_rate": 0.7169811320754716,
+            "tokens_per_round": 2.56
+          },
+          "usage": {
+            "prompt_tokens": 23,
+            "completion_tokens": 64,
+            "total_tokens": 87,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-0dac3ec3122c937263332049bd81cd59 prompt=23 cached=0 thinking=False effort=none tokens=64 sha=540782e81671 finish=length rounds=25 accepted=38/53",
+          "content": "# Thread-Safe Priority Queue Implementation\n\nBelow is a complete, production-quality implementation of a thread-safe priority queue built on Python's `heapq` module, with proper locking, condition variables, and clean API design.\n\n```python\n\"\"\"\nthread_safe_priority_queue.py\n\nA thread-safe priority queue built on top",
+          "reasoning_len": 0,
+          "tool_calls": []
+        },
+        "worker_5": {
+          "status_code": 200,
+          "id": "chatcmpl-55568e560d1f3e34d3809ff4b878ffa1",
+          "wall_seconds": 16.6775,
+          "client_ttft_seconds": 13.7461,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 21.48950302126534,
+            "seconds": 3.121789972,
+            "prefill_seconds": 0.125483529,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 0.190615889,
+            "sampling": "exact",
+            "drafts": true,
+            "token_sha": "69b89460965a",
+            "min_rows": 1
+          },
+          "speculative": {
+            "rounds": 23,
+            "drafted": 55,
+            "accepted": 41,
+            "acceptance_rate": 0.7454545454545455,
+            "tokens_per_round": 2.782608695652174
+          },
+          "usage": {
+            "prompt_tokens": 23,
+            "completion_tokens": 64,
+            "total_tokens": 87,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-55568e560d1f3e34d3809ff4b878ffa1 prompt=23 cached=0 thinking=False effort=none tokens=64 sha=69b89460965a finish=length rounds=23 accepted=41/55",
+          "content": "# Thread-Safe Priority Queue Implementation\n\nBelow is a complete, production-quality implementation of a thread-safe priority queue using Python's `heapq` module with proper locking, condition variables, and support for both blocking and non-blocking operations.\n\n```python\n\"\"\"\nthread_safe_priority_queue.py\n\nA thread-safe priority",
+          "reasoning_len": 0,
+          "tool_calls": []
+        },
+        "worker_3": {
+          "status_code": 200,
+          "id": "chatcmpl-e445f193875e60437d18a1a0f8466bac",
+          "wall_seconds": 22.0626,
+          "client_ttft_seconds": 12.4014,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 39.640435724916394,
+            "seconds": 9.863914961,
+            "prefill_seconds": 0.114603885,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 0.203181029,
+            "sampling": "exact",
+            "drafts": true,
+            "token_sha": "88e630eae89c",
+            "min_rows": 1
+          },
+          "speculative": {
+            "rounds": 122,
+            "drafted": 323,
+            "accepted": 261,
+            "acceptance_rate": 0.8080495356037152,
+            "tokens_per_round": 3.1475409836065573
+          },
+          "usage": {
+            "prompt_tokens": 23,
+            "completion_tokens": 384,
+            "total_tokens": 407,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-e445f193875e60437d18a1a0f8466bac prompt=23 cached=0 thinking=False effort=none tokens=384 sha=88e630eae89c finish=length rounds=122 accepted=261/323",
+          "content": "# Thread-Safe Priority Queue Implementation\n\nBelow is a complete, production-quality implementation of a thread-safe priority queue using a binary heap. It supports arbitrary priority ordering, blocking/non-blocking get/put, timeouts, and safe iteration.\n\n```python\nimport heapq\nimport threading\nimport time\nfrom typing import Any, Callable, Generic, Iterable, List, Optional, Tuple, TypeVar\n\nT = TypeVar(\"T\")\n\n\nclass ThreadSafePriorityQueue(Generic[T]):\n    \"\"\"\n    A thread-safe priority queue backed by a binary min-heap.\n\n    Items are stored as (priority, sequence, item) tuples so that:\n      * Lower priority values are dequeued first (min-heap semantics).\n      * Ties are broken by insertion order (FIFO), giving stable ordering.\n      * Items that are not comparable with each other never need to be\n        compared, because the sequence number is always unique.\n\n    All public methods are safe to call from multiple threads.\n    \"\"\"\n\n    def __init__(\n        self,\n        maxsize: Optional[int] = None,\n        key: Optional[Callable[[T], Any]] = None,\n    ) -> None:\n        \"\"\"\n        :param maxsize: Maximum number of items allowed (None = unbounded).\n        :param key:     Optional callable mapping an item to its priority.\n                        If None, the item itself is used as its priority\n                        (and must therefore be comparable).\n        \"\"\"\n        if maxsize is not None and maxsize <= 0:\n            raise ValueError(\"maxsize must be positive or None\")\n\n        self._heap: List[Tuple[Any, int, T]] = []\n        self._maxsize = maxsize\n        self._key = key\n\n        self._seq = 0                       # monotonically increasing tie-breaker\n        self._lock = threading.Lock",
+          "reasoning_len": 0,
+          "tool_calls": []
+        }
+      }
+    },
+    "stress_heavy_stall_c8_port8889": {
+      "status_counts": {
+        "200": 4,
+        "429": 4
+      },
+      "tiered_429_dropouts": [
+        [
+          "worker_3",
+          20.8347,
+          "{\"error\":{\"message\":\"DGX Spark concurrency limit reached for 'DeepSeek-V4.1-Flash-1017-TF' (running: 4/4, tiered queue: 2/4, reason: tiered_timeout_pos_1). Fast-failing for client fallback.\",\"type\":\"server_busy\",\"code\":429,\"param\":null}}"
+        ],
+        [
+          "worker_5",
+          15.5965,
+          "{\"error\":{\"message\":\"DGX Spark concurrency limit reached for 'DeepSeek-V4.1-Flash-1017-TF' (running: 4/4, tiered queue: 3/4, reason: tiered_timeout_pos_3). Fast-failing for client fallback.\",\"type\":\"server_busy\",\"code\":429,\"param\":null}}"
+        ],
+        [
+          "worker_6",
+          10.5459,
+          "{\"error\":{\"message\":\"DGX Spark concurrency limit reached for 'DeepSeek-V4.1-Flash-1017-TF' (running: 4/4, tiered queue: 3/4, reason: tiered_timeout_pos_4). Fast-failing for client fallback.\",\"type\":\"server_busy\",\"code\":429,\"param\":null}}"
+        ],
+        [
+          "worker_7",
+          0.4943,
+          "{\"error\":{\"message\":\"DGX Spark concurrency limit reached for 'DeepSeek-V4.1-Flash-1017-TF' (running: 4/4, tiered queue: 4/4, reason: queue_full). Fast-failing for client fallback.\",\"type\":\"server_busy\",\"code\":429,\"param\":null}}"
+        ]
+      ],
+      "workers": {
+        "worker_7": {
+          "status_code": 429,
+          "wall_seconds": 0.4943,
+          "error_body": "{\"error\":{\"message\":\"DGX Spark concurrency limit reached for 'DeepSeek-V4.1-Flash-1017-TF' (running: 4/4, tiered queue: 4/4, reason: queue_full). Fast-failing for client fallback.\",\"type\":\"server_busy\",\"code\":429,\"param\":null}}"
+        },
+        "worker_6": {
+          "status_code": 429,
+          "wall_seconds": 10.5459,
+          "error_body": "{\"error\":{\"message\":\"DGX Spark concurrency limit reached for 'DeepSeek-V4.1-Flash-1017-TF' (running: 4/4, tiered queue: 3/4, reason: tiered_timeout_pos_4). Fast-failing for client fallback.\",\"type\":\"server_busy\",\"code\":429,\"param\":null}}"
+        },
+        "worker_5": {
+          "status_code": 429,
+          "wall_seconds": 15.5965,
+          "error_body": "{\"error\":{\"message\":\"DGX Spark concurrency limit reached for 'DeepSeek-V4.1-Flash-1017-TF' (running: 4/4, tiered queue: 3/4, reason: tiered_timeout_pos_3). Fast-failing for client fallback.\",\"type\":\"server_busy\",\"code\":429,\"param\":null}}"
+        },
+        "worker_3": {
+          "status_code": 429,
+          "wall_seconds": 20.8347,
+          "error_body": "{\"error\":{\"message\":\"DGX Spark concurrency limit reached for 'DeepSeek-V4.1-Flash-1017-TF' (running: 4/4, tiered queue: 2/4, reason: tiered_timeout_pos_1). Fast-failing for client fallback.\",\"type\":\"server_busy\",\"code\":429,\"param\":null}}"
+        },
+        "worker_2": {
+          "status_code": 200,
+          "id": "chatcmpl-b5efe2b5672d78f5c49976f68cb9cb5b",
+          "wall_seconds": 31.8759,
+          "client_ttft_seconds": 1.3668,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 29.467143427981078,
+            "seconds": 31.026613679,
+            "prefill_seconds": 0.177301744,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 0.518882016,
+            "sampling": "exact",
+            "drafts": true,
+            "token_sha": "be8caf98711d",
+            "min_rows": 1
+          },
+          "speculative": {
+            "rounds": 396,
+            "drafted": 687,
+            "accepted": 503,
+            "acceptance_rate": 0.7321688500727802,
+            "tokens_per_round": 2.272727272727273
+          },
+          "usage": {
+            "prompt_tokens": 44,
+            "completion_tokens": 900,
+            "total_tokens": 944,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-b5efe2b5672d78f5c49976f68cb9cb5b prompt=44 cached=0 thinking=False effort=none tokens=900 sha=be8caf98711d finish=length rounds=396 accepted=503/687",
+          "content": "# Chapter 12: Linux Kernel Memory Management — Slab Allocators, Page Tables, and NUMA Balancing\n\n## 12.1 Introduction: The Kernel's Memory Landscape\n\nThe Linux kernel is, at its core, a memory manager. Every process, every device driver, every filesystem cache, and every network buffer ultimately depends on the kernel's ability to allocate, track, and reclaim physical memory pages. Unlike user-space allocators (which can lean on `malloc` and the virtual memory subsystem), the kernel must manage memory with no safety net: a leaked page is a leaked page forever, and a corrupted page table can bring down the entire machine.\n\nThis chapter covers four interlocking subsystems: the **buddy allocator** (the foundation of physical page management), the **slab allocators** (the kernel's object caches), the **page tables** (the translation structures that map virtual to physical memory), and **NUMA balancing** (the policies that keep memory access local to the CPU that uses it). We will walk through each with concrete code examples drawn from the mainline kernel.\n\n## 12.2 The Buddy Allocator: Physical Page Management\n\nThe buddy allocator manages physical memory in power-of-two blocks called *orders*. An order-0 block is a single 4 KiB page; an order-10 block is 4 MiB (1024 pages). When a request comes in for `2^n` pages, the allocator finds the smallest free block of at least that order, and if it is larger, recursively splits it in half, returning the unused half to the free lists.\n\nThe core data structure is `struct free_area`, embedded in each `struct page`:\n\n```c\nstruct free_area {\n    struct list_head list;\n    unsigned long nr_free;\n    /* ... */\n};\n\nstruct page {\n    unsigned long flags;\n    atomic_t _refcount;\n    /* ... */\n    union {\n        struct {\n            struct list_head lru;\n            /* ... */\n        } lru;\n        struct {\n            struct list_head list;\n            /* ... */\n        } buddy;\n        /* ... */\n    };\n};\n```\n\nAllocation walks the free lists from the requested order upward:\n\n```c\nstatic inline\nstruct page *__rmqueue_dequeue(struct rmqueue *rmqueue)\n{\n    struct list_head *head = rmqueue->head.next;\n    struct page *page = list_entry(head, struct page, buddy.list);\n    list_del(&page->buddy.list);\n    return page;\n}\n\nstruct page *__alloc_pages_nodemask(gfp_t gfp_mask,\n                                    unsigned int order,\n                                    int migratetype,\n                                    unsigned int nodemask,\n                                    nodemask_t *nodemask_p)\n{\n    struct page *page = NULL;\n    unsigned int current_order;\n\n    for (current_order = order; current_order < MAX_ORDER; current_order++) {\n        struct free_area *area;\n        struct page *buddy;\n\n        area = &contig_page_data(nodemask)->free_area[migratetype][current_order];\n        if (list_empty(&area->list))\n            continue;\n\n        page = __rmqueue_dequeue(&area->rmqueue);\n        area->nr_free--;\n\n        /* Split larger blocks down to the requested order. */\n        while (current_order > order) {\n            current_order--;\n            buddy = page + (PAGE_SIZE << current_order);\n            set_buddy(page, buddy);\n            set_buddy(buddy, page);\n            set_order(buddy, current_order);\n            __rmqueue_add(&contig_page_data(nodemask)\n                          ->free_area[migratetype][current_order].rmqueue,\n                          buddy);\n        }\n        break;\n    }\n    return page;\n}\n```\n\nThe buddy system's elegance is its coalescing: when a block is freed, the allocator checks whether its *buddy* (the block at the same order whose address differs by one bit at the order's position) is also free. If so, they merge and the check recurses upward. This keeps fragmentation bounded without any explicit compaction pass.\n\n## 12.3 Slab Allocators: Object Caches\n\nThe buddy allocator is page-granular. But the kernel allocates millions of small, fixed-size objects — `struct task",
+          "reasoning_len": 0,
+          "tool_calls": []
+        },
+        "worker_1": {
+          "status_code": 200,
+          "id": "chatcmpl-66b3bc5ad35a0a1d1265cac155197328",
+          "wall_seconds": 33.6592,
+          "client_ttft_seconds": 1.1895,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 27.68793874670969,
+            "seconds": 32.809826774,
+            "prefill_seconds": 0.177159314,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 0.341358592,
+            "sampling": "exact",
+            "drafts": true,
+            "token_sha": "009b47a1423e",
+            "min_rows": 1
+          },
+          "speculative": {
+            "rounds": 415,
+            "drafted": 657,
+            "accepted": 484,
+            "acceptance_rate": 0.7366818873668188,
+            "tokens_per_round": 2.1686746987951806
+          },
+          "usage": {
+            "prompt_tokens": 44,
+            "completion_tokens": 900,
+            "total_tokens": 944,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-66b3bc5ad35a0a1d1265cac155197328 prompt=44 cached=0 thinking=False effort=none tokens=900 sha=009b47a1423e finish=length rounds=415 accepted=484/657",
+          "content": "# Chapter 14: Linux Kernel Memory Management — Slab Allocators, Page Tables, and NUMA Balancing\n\n## 14.1 Introduction\n\nMemory management is arguably the most intricate subsystem in the Linux kernel. Every allocation, every page fault, and every reclaim decision flows through layers of abstraction that have evolved over three decades. This chapter examines three pillars of that subsystem: the **slab allocator** (a slab-derived caching layer), the **page table** structures that map virtual to physical memory, and the **NUMA balancing** machinery that keeps memory access local to the CPU that needs it. Throughout, we provide annotated code examples drawn from the kernel's own idioms.\n\n> **Note on terminology:** The names used here — \"slab allocator,\" \"NUMA,\" \"page tables\" — follow the conventions of this text. In mainline Linux you will encounter `slab` as `slab`, `NUMA` as `NUMA`, and page tables as `page tables`. The concepts are identical; only the spelling differs.\n\n## 14.2 The Physical Memory Model\n\nBefore any allocator can function, the kernel must know what memory exists. During boot, the firmware (BIOS or EFI) reports memory regions via the **EFI memory map**. The kernel parses this map into a `memblk` array:\n\n```c\nstruct memblk {\n    unsigned long start_pfn;   /* starting page frame number */\n    unsigned long end_pfn;     /* one past the last usable frame */\n    unsigned int   numa_nid;   /* NUMA node identifier */\n    unsigned int   flags;      /* MEMBLK_HOTPLUG, MEMBLK_KERNEL, ... */\n};\n\nstatic struct memblk embmap[MEMMAP_MAX];\nstatic unsigned int embmap_nr;\n```\n\nEach block is later handed to the buddy allocator, which maintains free lists of order-0 through order-10 page groups. The buddy system is the bedrock: it satisfies large contiguous requests and fragments gracefully under pressure. Everything else — slab caches, vmmalloc, page tables — sits atop it.\n\nA crucial invariant: **physical page frames are numbered globally**, but their NUMA affinity is per-block. The function `pfn_to_nid()` performs the translation:\n\n```c\nstatic inline int pfn_to_nid(unsigned long pfn)\n{\n    struct memblk *b = &embmap[0];\n    while (b < &embmap[embmap_nr]) {\n        if (pfn >= b->start_pfn && pfn < b->end_pfn)\n            return b->numa_nid;\n        b++;\n    }\n    return NUMA_NO_NID;\n}\n```\n\n## 14.3 The Slab Allocator\n\n### 14.3.1 Design Goals\n\nThe slab allocator solves a problem the buddy system handles poorly: **many small, same-sized objects**. Allocating a 64-byte `task_struct` from the buddy system would waste an entire 4 KiB page and incur split/merge overhead. The slab allocator instead carves pages into object-sized slots and caches them per size class and per NUMA node.\n\nIts goals:\n1. **O(1) allocation** for cached objects.\n2. **Cache-friendly layout** — objects of one cache packed contiguously.\n3. **NUMA awareness** — per-node caches so a CPU allocates from local memory.\n4. **Constructors/destructors** for objects needing initialization.\n\n### 14.3.2 Core Structures\n\n```c\nstruct slab_cache {\n    unsigned int   obj_size;      /* bytes per object */\n    unsigned int   obj_align;     /* alignment requirement */\n    unsigned int   objs_per_slab; /* objects in a full slab */\n    unsigned long  flags;         /* SLAB_HWCHACHE, SLAB_POISON, ... */\n    void         (*ctor)(void *); /* constructors */\n    void         (*dtor)(void *); /* destructors */\n    struct slab_node *nodes;      /* one per NUMA node */\n    struct list_head  caches;     /* linkage in global cache list */\n};\n\nstruct slab_node {\n    struct list_head partial;     /* slabs with free slots */\n    struct list_head",
+          "reasoning_len": 0,
+          "tool_calls": []
+        },
+        "worker_4": {
+          "status_code": 200,
+          "id": "chatcmpl-def569df8857a0411c9c9e5b9c21a901",
+          "wall_seconds": 34.0634,
+          "client_ttft_seconds": 31.9108,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 29.256292139256846,
+            "seconds": 2.383510628,
+            "prefill_seconds": 0.169263991,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 0.231087904,
+            "sampling": "exact",
+            "drafts": true,
+            "token_sha": "2401dfca7deb",
+            "min_rows": 1
+          },
+          "speculative": {
+            "rounds": 28,
+            "drafted": 49,
+            "accepted": 36,
+            "acceptance_rate": 0.7346938775510204,
+            "tokens_per_round": 2.2857142857142856
+          },
+          "usage": {
+            "prompt_tokens": 44,
+            "completion_tokens": 64,
+            "total_tokens": 108,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-def569df8857a0411c9c9e5b9c21a901 prompt=44 cached=0 thinking=False effort=none tokens=64 sha=2401dfca7deb finish=length rounds=28 accepted=36/49",
+          "content": "# Chapter 12: Linux Kernel Memory Management — Slab Allocators, Page Tables, and NUMA Balancing\n\n## 12.1 Introduction and Scope\n\nThe Linux kernel is, at its heart, a memory manager. Every process, every device driver, every filesystem cache, and every network buffer ultimately draws",
+          "reasoning_len": 0,
+          "tool_calls": []
+        },
+        "worker_0": {
+          "status_code": 200,
+          "id": "chatcmpl-8f843b57ca914f8ee9a2c99c79394f98",
+          "wall_seconds": 34.9056,
+          "client_ttft_seconds": 1.0125,
+          "finish_reason": "length",
+          "tensorfold": {
+            "enable_thinking": false,
+            "reasoning_effort": "none",
+            "engine": "lanes",
+            "tokens_per_second": 26.524723796738883,
+            "seconds": 34.069174917,
+            "prefill_seconds": 0.167445168,
+            "prefill_widths": [],
+            "prefill_raised": [],
+            "time_to_first_token": 0.176916658,
+            "sampling": "exact",
+            "drafts": true,
+            "token_sha": "a2a2eaad00ae",
+            "min_rows": 1
+          },
+          "speculative": {
+            "rounds": 438,
+            "drafted": 613,
+            "accepted": 462,
+            "acceptance_rate": 0.7536704730831973,
+            "tokens_per_round": 2.0547945205479454
+          },
+          "usage": {
+            "prompt_tokens": 44,
+            "completion_tokens": 900,
+            "total_tokens": 944,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "log_line": "[tensorfold] done chatcmpl-8f843b57ca914f8ee9a2c99c79394f98 prompt=44 cached=0 thinking=False effort=none tokens=900 sha=a2a2eaad00ae finish=length rounds=438 accepted=462/613",
+          "content": "# Chapter 12: Linux Kernel Memory Management — Slab Allocators, Page Tables, and NUMA Balancing\n\n## 12.1 Introduction and Scope\n\nMemory management is arguably the most intricate subsystem in the Linux kernel. Every allocation, every page fault, and every reclaim decision passes through layers of abstraction designed to balance speed, fragmentation, and scalability across thousands of CPUs. This chapter examines three intertwined pillars: the **slab allocator** (the kernel's object cache), the **page table** structures that map virtual to physical memory, and the **NUMA balancing** machinery that keeps memory access local to the CPU that needs it. Throughout, we present annotated code drawn from the kernel tree (simplified for pedagogy) so that the reader can trace the actual control flow.\n\nA word on terminology before we proceed: the reader familiar with other systems may know the \"slab\" allocator under a different spelling. In this chapter we adopt the kernel's own convention, \"slab,\" consistently, including in identifiers such as `struct slab_cache` and `slab_alloc()`. Similarly, \"NUMA\" denotes non-uniform memory access, and \"page table\" refers to the multi-level radix structures that translate addresses.\n\n## 12.2 The Physical Memory Model\n\nThe kernel models physical memory as a set of **page frames**, each typically 4 KiB, tracked by `struct page`. Frames are grouped into **zones** (DMA, Normal, HighMem on 32-bit systems; a single Normal zome on 64-bit systems) and further into **NUMA nodes**. The `struct page` is deliberately compact; flags are packed into a single word so that scanning a range of frames touches minimal cache lines.\n\n```c\nstruct page {\n    unsigned long flags;      /* PG_locked, PG_dirty, PG_slab, ... */\n    atomic_t _refcount;\n    union {\n        struct {                  /* when on LRU list */\n            struct list_head lru;\n            ...\n        };\n        struct {                  /* when slab-allocated */\n            struct slab_cache *slab_cache;\n            void *freelist;\n        };\n        ...\n    };\n};\n```\n\nThe `flags` word doubles as the LRU generation counter in its high bits, a trick that lets the reclaimer distinguish recently-touched pages without a separate timestamp field. When a frame is owned by a slab cache, the union's slab branch is active and `PG_slab` is set; the reclaimer must never free such a frame directly.\n\n## 12.3 The Slab Allocator\n\n### 12.3.1 Motivation\n\nAllocating and freeing individual pages for every small kernel object (a `struct file`, an inode, a network buffer header) would be catastrophically wasteful: each page carries metadata overhead, and the buddy allocator's power-of-two splitting fragments badly under mixed-size workloads. The slab allocator instead maintains **caches** of same-sized objects, carving them from contiguous page runs called **slabs** (historically \"slab pages\"). Freed objects return to a per-CPU frelist, avoiding global locks on the hot path.\n\n### 12.3.2 Cache Structure\n\n```c\nstruct slab_cache {\n    unsigned int size;          /* object size, possibly padded */\n    unsigned int align;\n    unsigned int objs_per_slab;\n    unsigned int cpu_slab;      /* objects in a per-CPU slab */\n    struct slab_cache *freelist; /* for cache-of-caches */\n    struct kmem_cache *kmem_cache; /* backing pages */\n    struct array_cache array[NR_CPUS]; /* per-CPU fast path */\n    struct node_cache node[NR_NODES];  /* per-NUMA-node partial slabs */\n    ...\n};\n\nstruct array_cache {\n    void *freelist;             /* singly-linked free objects */\n    unsigned int avail;         /* count in freelist */\n    unsigned int limit;         /* batch refill threshold */\n    ...\n};\n```\n\nThe `array[]` array is the heart of scalability: each CPU owns a private freelist, and allocation from it requires no atomic operations at all. Only when `avail` drops below `limit` does the CPU take the `node[]` lock and refill from a",
+          "reasoning_len": 0,
+          "tool_calls": []
+        }
+      }
+    }
+  },
+  "system_after": {
+    "health": {
+      "status": "ok",
+      "model": "DeepSeek-V4.1-Flash-1017-TF",
+      "model_ids": [
+        "DeepSeek-V4.1-Flash-1017-TF",
+        "DeepSeek-V4.1-Flash-TF",
+        "current"
+      ],
+      "max_batch_size": 4,
+      "warming": false,
+      "memory": {
+        "active": 111252728100,
+        "cache": 0,
+        "peak": 111252728100
+      },
+      "live": {
+        "connections": 1,
+        "waiting": 0,
+        "decode_tokens_per_second": 99.0,
+        "prefill_tokens_per_second": 0.0
+      }
+    },
+    "proxy": {
+      "status": "ok",
+      "upstream_healthy": true,
+      "upstream_url": "http://127.0.0.1:8888",
+      "current_model": "DeepSeek-V4.1-Flash-1017-TF",
+      "concurrency_limit": 4,
+      "queue_buffer": 4,
+      "tiered_timeouts": [
+        20.0,
+        15.0,
+        10.0,
+        5.0
+      ],
+      "extension_seconds": 5.0,
+      "active_running": 1,
+      "waiting_in_queue": 0,
+      "queue_positions": [],
+      "queue_extended": [],
+      "model_limits_config": {
+        "dsv41": 2,
+        "DeepSeek-V4.1-Flash-EXL3": 2,
+        "DeepSeek-V4.1-Flash-TF": 4,
+        "DeepSeek-V4.1-Flash-1017-TF": 4,
+        "GLM-5.3-Flash": 4,
+        "GLM-5.3-Flash-EXL3": 4
+      },
+      "default_limit": 4
+    },
+    "node1": {
+      "mem_available_mib": 7414,
+      "swap_used_mib": 717,
+      "buddy_normal_orders_9_to_13": [
+        11,
+        4,
+        1,
+        46,
+        0
+      ],
+      "buddy_2mib_plus_blocks_total": 62,
+      "gpu_telemetry": "2333 MHz, 72, 50.31 W"
+    },
+    "node2": {
+      "mem_available_mib": 11886,
+      "swap_used_mib": 0,
+      "buddy_normal_orders_9_to_13": [
+        37,
+        107,
+        39,
+        13,
+        180
+      ],
+      "buddy_2mib_plus_blocks_total": 376,
+      "gpu_telemetry": "2320 MHz, 73, 47.77 W"
+    }
+  }
+}
