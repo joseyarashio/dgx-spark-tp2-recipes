@@ -1,0 +1,19 @@
+{
+  "stage": "p4a_cutin_tail",
+  "timestamp": "2026-11-02 15:19:58",
+  "anthropic_compat": {
+    "0029_no_budget_status": 400,
+    "0031_mid_system_status": 400,
+    "0030_clear_thinking_status": 400
+  },
+  "multiturn_long_cutin": {
+    "history_tokens": 15366,
+    "turn2_cutin_ttft_s": 1.519,
+    "bg_32k_ttft_s": 34.191
+  },
+  "multiturn_vision_cutin": {
+    "vision_prompt_tokens": 6345,
+    "vision_turn2_cutin_ttft_s": 1.58,
+    "bg_32k_ttft_s": 34.413
+  }
+}
