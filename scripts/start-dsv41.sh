@@ -16,7 +16,7 @@ if [ ! -f "$KIT_DIR/vision/gate_bias_vl.safetensors" ]; then
   echo "ERROR: 1017 vision kit is not ready at $KIT_DIR"
   exit 1
 fi
-CACHE_DIR="/home/joseyarashio/.cache/dsv41-1017-rank-cache/tf-ds-rank"
+CACHE_DIR="/home/joseyarashio/.cache/dsv41-plusten-rank-cache/tf-ds-rank"
 SERVED_NAME="DeepSeek-V4.1-Flash-1017-TF"
 
 SERVER_BIN="/home/joseyarashio/TensorFold-dsv41-zig/out/native/bin/tensorfold-native"
