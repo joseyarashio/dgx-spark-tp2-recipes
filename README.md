@@ -97,6 +97,14 @@ This cuts Turn-2 multi-turn vision TTFT from `2.21s ~ 7.28s` down to **`0.73s`**
 - **`patches/0027-tool-call-prose.patch`**: Fixes two critical agent bugs in DeepSeek-V4.1 tool calling: (1) non-streaming replies with tool calls previously returned `"content": null`, discarding the model's reasoning/plan prose before the tool call; (2) streaming replies emitted the two `\n\n` framing newlines before `<｜DSML｜ calls>` as content, causing the next turn's history to become `text\n\n\n\n<｜DSML｜ calls>` and breaking KV prefix cache matching right before the calls.
 - **`patches/0028-plain-request-text.patch`**: Inserts a Unicode noncharacter mark (`U+FDD0`) inside any added-token spelling (`<｜User｜>`, `</think>`, `<｜DSML｜`) found in user/tool messages before template rendering, and strips it prior to BPE pre-tokenization. Tool outputs containing raw logs or source code can never inject control tokens.
 
+#### 4. P4 Production Hardening Suite & Vision Architecture
+- **Incremental Tail Cut-In (`PR #95` / `Patch 0045`)**: Evaluates `prompt.len - resume_at <= 4096` instead of full prompt length. A multi-turn conversation with 15K~300K cached history and 1.5K new tokens now cuts in between in-flight 32K prefill pieces in **1.52s** (down from 31.7s, a **20.9× reduction**).
+- **Vision Prepare Scratch Arena (`PR #112` / `Patch 0056`)**: PNG decoding, bicubic resizing, padding, and patchification now run in an isolated `ArenaAllocator` reset after each image, copying only 16-aligned final payloads into request memory. Memory drop during multi-screenshot requests fell by **68%** (0.71 GiB → 0.23 GiB), completely preventing long-agent screenshot OOM.
+- **CUDA Graph LRU Capping (`Patch 0033`)**: Enforces `TF_DS_GRAPH_CAP=128` with LRU eviction to prevent device/host memory creep across long-running multi-week production uptime.
+- **Anthropic Compatibility & Keepalive (`Patches 0029–0032`)**: Full `/v1/messages` compatibility (optional `budget_tokens`, lenient `clear_thinking`, mid-turn system roles) and 25s SSE `: ping` keepalive.
+- **Verified Synthetic Vision Probe**: Real base64 data-URL input natively verified with `scripts/vision_probe.py` (Circle/Square shape & color 100%, 4-quadrant counting 100%, OCR token accuracy 100%).
+- **Triple-Layer Boot Self-Healing**: Automated recovery via Docker `--restart unless-stopped`, user systemd `spark-fastfail-proxy.service` (Port 8889), and `spark-dsv41-cluster.service` boot health-check watchdog.
+
 ---
 
 ### Quick Start & Operations

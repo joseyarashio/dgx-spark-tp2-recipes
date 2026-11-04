@@ -32,6 +32,13 @@
 5. **Port 8889 優先權排程與階梯式秒退 429 網關（`proxy/proxy.py`）**：
    - 支援 `X-Priority` 優先權佇列（`0: 前景互動`、`1: 一般`、`2: 背景批次`）與背景槽位上限（`background_max_slots = 3`），強制保留第 4 槽給主互動 Agent（3 路背景滿載下前景 **`1.40s`** 完成交付）。
    - 嚴格將 Slot 鎖定至 SSE 串流（`aiter_raw()`）完整結束，並提供 `[20s, 15s, 10s, 5s]` 階梯超時與防驚群延展，超額突發 **`1.2 ms`** 秒退 HTTP 429 觸發雲端備援。
+6. **P4 生產環境終極硬化與真看圖架構**：
+   - **多輪長對話增量插隊 (`PR #95` / `Patch 0045`)**：改以「未快取之增量 tokens（`prompt.len - resume_at ≤ 4096`）」計算。帶有 15K~300K 快取歷史的對話在背景有 32K 冷預填運行時，首字回應延遲由 31.7 秒大幅縮減至 **1.52 秒**（**快 20.9 倍**）。
+   - **圖片預處理獨立 Scratch Arena (`PR #112` / `Patch 0056`)**：PNG 解碼、雙三次縮放、padding 與 patchify 在獨立 `ArenaAllocator` 進行並在每張圖後立即重置，僅拷貝 16-byte 對齊的最終 payload 至請求 arena。多截圖場景記憶體消耗**降低 68%**（0.71 GiB 降至 0.23 GiB），徹底解決 Agent 多輪看圖累積導致的 OOM 崩潰。
+   - **CUDA Graph 上限管理 (`Patch 0033`)**：鎖定 `TF_DS_GRAPH_CAP=128` 並採 LRU 自動淘汰，杜絕長達數週連續運行時顯存緩慢膨脹。
+   - **Anthropic 前端相容與保活 (`Patches 0029–0032`)**：全面相容 Claude Code / `/v1/messages` 規範，並在冷預填超過 25 秒時自動送出 SSE `: ping` 保持連線。
+   - **合成視覺探針驗證 (`scripts/vision_probe.py`)**：以實體 data URL 格式驗證紅圓/綠方幾何形狀與色彩（100%）、四象限方格計數（100%）與精確 OCR 文字提取（100%）。
+   - **三重開機自癒防護**：Docker `--restart unless-stopped` + user systemd `spark-fastfail-proxy.service` + `spark-dsv41-cluster.service` 開機健康檢查與自癒啟動。
 
 ---
 
