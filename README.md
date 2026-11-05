@@ -50,7 +50,8 @@ All stages were evaluated on the exact same dual DGX Spark hardware using a **30
 | **`v0-baseline-1012`**<br>*(10/12 Zig + LibertAIDAI 2.9b)* | — | 90.9 tok/s<br>*(74.5%)* | 75.9 tok/s<br>*(67.6%)* | 65.7 / 112.1 | 75.6 / 86.0 / 112.2 | 26.35 s | 2.21 s<br>*(cached=0)* | 4.67G / 5.34G |
 | **`v1-step1-zig-engine`**<br>*(10/25 Zig + Alias + Cut-In + Vision Skip)* | **28/30**<br>*(93.3%)* | 88.3 tok/s<br>*(74.5%)* | 74.0 tok/s<br>*(67.6%)* | 64.2 / 109.8 | 75.6 / 86.0 / 112.2 | **0.94 s**<br>*(28× faster)* | **0.76 s**<br>*(cached=10K)* | 7.70G / 10.37G |
 | **`v2b1-f32-gate-bias`**<br>*(+ Official 43-Layer FP32 Router Bias)* | **28/30**<br>*(93.3%)* | 85.8 tok/s<br>*(71.7%)* | **90.2 tok/s**<br>*(79.9%, +21.4%)* | **67.3** / 107.8 | 74.9 / 86.7 / 115.2 | 1.13 s | **0.72 s** | 8.55G / 11.07G |
-| **`v2b2-production-champion`** ⭐<br>*(Plus-Ten 6-bit MTP + P1/P2/P4 Hardened)* | **28/30**<br>*(93.3%)* | **95.5 tok/s**<br>*(80.3%, 3.76 TPR)* | 81.1 tok/s<br>*(74.1%)* | 62.2 / 107.9 | 77.9 / **90.2** / **116.3** | **0.94 s**<br>*(Tail Cut-In 1.52s)* | **0.73 s** | **8.04G / 11.00G** |
+| **`v2b2-production-champion`** ⭐<br>*(Plus-Ten 6-bit MTP + P1/P2/P4e Full Hardened)* | **28/30**<br>*(93.3%)* | **95.5 tok/s**<br>*(80.3%, 3.76 TPR)* | 81.1 tok/s<br>*(74.1%)* | 62.2 / 107.9 | 77.9 / **90.2** / **116.3** | **0.94 s**<br>*(Tail Cut-In 1.55s)* | **0.73 s** | **8.04G / 11.00G** |
+| **`v2b2-p4e-64row-extended`**<br>*(+ 64-Row Cubins & 32-Stream Support)* | **28/30**<br>*(93.3%)* | 93.0 tok/s<br>*(80.3%)* | 80.1 tok/s<br>*(74.1%)* | 60.7 / 106.2 | 76.8 / 87.7 / 113.3 | 1.21 s | **0.73 s** | 8.04G / 11.00G |
 | **`v2a-ooa-hybrid-2.7bpw`**<br>*(OOA K2..K5 Sensitivity MoE)* | 27/30<br>*(90.0%)* | 91.3 tok/s<br>*(77.7%)* | 75.2 tok/s<br>*(66.7%)* | 62.9 / **108.3** | **82.2** / 86.4 / 115.3 | 1.00 s | 0.74 s | 9.85G / **12.99G** |
 | **`v2c-ultimate-fusion`**<br>*(Plus-Ten 6-bit Backbone + OOA MoE)* | 27/30<br>*(90.0%)* | 84.1 tok/s<br>*(75.5%)* | 83.8 tok/s<br>*(74.2%)* | 66.9 / 106.2 | 82.1 / 88.5 / 116.2 | **0.95 s** | **0.73 s** | **10.35G** / 12.90G |
 
@@ -103,6 +104,7 @@ This cuts Turn-2 multi-turn vision TTFT from `2.21s ~ 7.28s` down to **`0.73s`**
 - **CUDA Graph LRU Capping (`Patch 0033`)**: Enforces `TF_DS_GRAPH_CAP=128` with LRU eviction to prevent device/host memory creep across long-running multi-week production uptime.
 - **Anthropic Compatibility & Keepalive (`Patches 0029–0032`)**: Full `/v1/messages` compatibility (optional `budget_tokens`, lenient `clear_thinking`, mid-turn system roles) and 25s SSE `: ping` keepalive.
 - **Verified Synthetic Vision Probe**: Real base64 data-URL input natively verified with `scripts/vision_probe.py` (Circle/Square shape & color 100%, 4-quadrant counting 100%, OCR token accuracy 100%).
+- **64-Row Decode Window & 32-Stream Support (`v0.7.5` / `v2b2-p4e-64row-extended`)**: Grafts 16 new `_rowmm_parts` cubins (K=5120, N=384, rows 49..64) into the kit (`aot.json` entries 198 → 214) and widens the engine to `round.max_rows = 64` and `max_streams = 32`. While keeping our verified 4-slot concurrency and 1.05M pool intact (preserving 8+ GiB free RAM), this completely removes the legacy 48-row ceiling and enables batch-invariant scaling.
 - **Triple-Layer Boot Self-Healing**: Automated recovery via Docker `--restart unless-stopped`, user systemd `spark-fastfail-proxy.service` (Port 8889), and `spark-dsv41-cluster.service` boot health-check watchdog.
 
 ---
