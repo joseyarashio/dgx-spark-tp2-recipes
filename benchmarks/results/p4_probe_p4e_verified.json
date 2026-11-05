@@ -1,0 +1,19 @@
+{
+  "stage": "p4e_verified",
+  "timestamp": "2026-11-05 10:20:33",
+  "anthropic_compat": {
+    "0029_no_budget_status": 200,
+    "0031_mid_system_status": 200,
+    "0030_clear_thinking_status": 200
+  },
+  "multiturn_long_cutin": {
+    "history_tokens": 15366,
+    "turn2_cutin_ttft_s": 1.556,
+    "bg_32k_ttft_s": 36.599
+  },
+  "multiturn_vision_cutin": {
+    "vision_prompt_tokens": 6345,
+    "vision_turn2_cutin_ttft_s": 1.722,
+    "bg_32k_ttft_s": 36.87
+  }
+}
