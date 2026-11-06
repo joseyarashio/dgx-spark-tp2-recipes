@@ -1,0 +1,33 @@
+{
+  "manifest_version": "1.0.0",
+  "cluster_topology": {
+    "nodes": 2,
+    "interconnect": "ConnectX-7 200Gbps RoCEv2 dual-rail direct",
+    "measured_bandwidth_gbps": 185.0,
+    "host_memory_per_node_gib": 121.0,
+    "gpu_microarchitecture": "NVIDIA Grace-Blackwell SM121 (GB10)",
+    "cpu_microarchitecture": "MediaTek 10x Cortex-X925 (3.9GHz) + 10x Cortex-A725 (2.8GHz)",
+    "cpu_pinning": "5-9,15-19 (10x Cortex-X925 Super-Cores)"
+  },
+  "cryptographic_hashes": {
+    "recipe_commit": "4830496b2c39142470d36a98dc90f73049562052",
+    "engine_commit": "3cf40b247a737fbd2295628cc69e83729313eb33",
+    "patchset_sha256": "8c53d057437ef65a96c088727e6aa2780d99586117aef89ffaf8a0be80c12efb",
+    "kernel_manifest_sha256": "ae370ac9aef8cfd937319037b850a825748085c8c54e9e0bbd8421bb5565ddf5",
+    "launch_config_sha256": "bdd1a117d5cc0cb97dfd67d84cb679c532dac89ab785b60beeed68e5046425c1",
+    "proxy_sha256": "dcb805d254f4e60be351a494b1959706a7c8fcc233bb63d1fc98d9e4bcd10921"
+  },
+  "memory_audit_ledger": {
+    "rank0_device_working_set_gib": 99.2,
+    "rank1_device_working_set_gib": 99.2,
+    "kv_pool_allocated_tokens": 1048576,
+    "kv_pool_footprint_gib": 6.44,
+    "host_prompt_cache_budget_gib": 3.0,
+    "cuda_graph_lru_cap": 128,
+    "cuda_graph_footprint_gib": 0.65,
+    "node1_available_memory_gib": 7.6,
+    "node2_available_memory_gib": 9.3,
+    "engram_disk_mmap_mode": "Demand-Paged File-Backed (203 GB on NVMe)",
+    "status": "Safe Watermark Maintained (Zero OOM Risk)"
+  }
+}
