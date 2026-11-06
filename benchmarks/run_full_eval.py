@@ -169,6 +169,8 @@ def stream_chat(
     tool_calls_list = [tool_calls_map[k] for k in sorted(tool_calls_map.keys())]
 
     log_line = ""
+    cached_tokens = 0
+    prompt_tokens = 0
     if cmpl_id:
         try:
             out = subprocess.run(
@@ -176,6 +178,12 @@ def stream_chat(
                 shell=True, text=True, capture_output=True
             ).stdout.strip()
             log_line = out
+            m_c = re.search(r"cached=([0-9]+)", log_line)
+            if m_c:
+                cached_tokens = int(m_c.group(1))
+            m_p = re.search(r"prompt=([0-9]+)", log_line)
+            if m_p:
+                prompt_tokens = int(m_p.group(1))
         except Exception:
             pass
 
@@ -188,6 +196,8 @@ def stream_chat(
         "tensorfold": tf_meta,
         "speculative": spec_meta,
         "usage": usage_meta,
+        "cached_tokens": cached_tokens,
+        "prompt_tokens": prompt_tokens,
         "log_line": log_line,
         "content": content_text,
         "reasoning_len": len(reasoning_text),
@@ -840,7 +850,7 @@ def run_concurrency_cache_benchmark(label: str = "baseline"):
         w = d1_workers[f"worker_{i}"]
         ttft = w.get("client_ttft_seconds", w["wall_seconds"])
         out_t = w.get("usage", {}).get("completion_tokens", 0)
-        c_tok = w.get("usage", {}).get("cached_tokens", 0) or w.get("tensorfold", {}).get("cached", 0)
+        c_tok = w.get("cached_tokens", 0) or w.get("usage", {}).get("cached_tokens", 0) or w.get("tensorfold", {}).get("cached", 0)
         print(f"       worker_{i}: TTFT={ttft:.2f}s, wall={w['wall_seconds']:.2f}s, out_tok={out_t}, cached={c_tok}")
 
     d_results["d1_burst_delay_hit"] = {
@@ -886,7 +896,7 @@ def run_concurrency_cache_benchmark(label: str = "baseline"):
     for i in range(4):
         w = d2_workers[f"worker_{i}"]
         ttft = w.get("client_ttft_seconds", w["wall_seconds"])
-        c_tok = w.get("usage", {}).get("cached_tokens", 0) or w.get("tensorfold", {}).get("cached", 0)
+        c_tok = w.get("cached_tokens", 0) or w.get("usage", {}).get("cached_tokens", 0) or w.get("tensorfold", {}).get("cached", 0)
         print(f"       worker_{i} (offset +{w['stagger_delay_s']:.0f}s): TTFT={ttft:.2f}s, wall={w['wall_seconds']:.2f}s, cached={c_tok}")
 
     d_results["d2_staggered_inflight"] = {
@@ -921,8 +931,8 @@ def run_concurrency_cache_benchmark(label: str = "baseline"):
         )
         assistant_reply = res.get("content", "Analysis complete.")
         conversation.append({"role": "assistant", "content": assistant_reply})
-        p_toks = res.get("usage", {}).get("prompt_tokens", 0) or res.get("tensorfold", {}).get("prompt", 0)
-        c_toks = res.get("usage", {}).get("cached_tokens", 0) or res.get("tensorfold", {}).get("cached", 0)
+        p_toks = res.get("prompt_tokens", 0) or res.get("usage", {}).get("prompt_tokens", 0) or res.get("tensorfold", {}).get("prompt", 0)
+        c_toks = res.get("cached_tokens", 0) or res.get("usage", {}).get("cached_tokens", 0) or res.get("tensorfold", {}).get("cached", 0)
         ttft = res.get("client_ttft_seconds", res["wall_seconds"])
         out_toks = res.get("usage", {}).get("completion_tokens", 0)
         gen_time = max(0.001, res["wall_seconds"] - ttft)
