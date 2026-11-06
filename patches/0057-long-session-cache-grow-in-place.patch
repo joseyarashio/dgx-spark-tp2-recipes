@@ -1,0 +1,93 @@
+diff --git a/zig/src/families/dsv41/lanes.zig b/zig/src/families/dsv41/lanes.zig
+index 75f27ec6..89ad93eb 100644
+--- a/zig/src/families/dsv41/lanes.zig
++++ b/zig/src/families/dsv41/lanes.zig
+@@ -545,6 +545,8 @@ pub const Lanes = struct {
+             } else s.reuse_failed = true;
+         }
+         const base = if (kept != null and !moved) kept.?.base else try self.placeKept(taken[0..nt], size, kept);
++        // placeKept may grow the source in place when a separate copy cannot fit.
++        if (kept) |sn| moved = base != sn.base;
+         if (s.cut_in > 0) {
+             const resume_at: usize = if (kept) |sn| (if (moved and sn.stale) 0 else sn.at) else 0;
+             if (len - resume_at > s.cut_in or lanes.Engine.picturesPast(s.images, resume_at)) {
+@@ -556,7 +558,7 @@ pub const Lanes = struct {
+             sn.wanted = 0;
+             if (!moved) sn.end = @max(sn.end, base + size); // its extent now: the next resume in place finds it held
+         }
+-        if (kept) |sn| if (moved and sn.stale) { // the placement needed the kept rows' room: the prompt runs from 0
++        if (kept) |sn| if (sn.stale) { // the placement needed the kept rows' room: the prompt runs from 0
+             if (sn.at >= note_rows) std.log.info("dsv41: the kept state of {d} tokens at {d} found no room to move to ({d} positions); the prompt runs from 0", .{ sn.at, sn.base, size });
+             kept = null;
+             s.reuse_failed = true;
+@@ -779,15 +781,23 @@ pub const Lanes = struct {
+             n += 1;
+         }
+         if (n == 0) return;
+-        if (try self.begin(.pass)) {
+-            try self.wire.int(gpa, u32, @intCast(n));
+-            try self.wire.int(gpa, u32, @intCast(steps));
+-            for (0..n) |i| {
+-                try self.wire.int(gpa, i64, tokens[i]);
+-                try self.wire.int(gpa, i64, q0[i]);
+-                try self.wire.int(gpa, i64, slots[i]);
++        // a pass runs block rows a stream through the decode window's linears (prompt.grouped: 128 rows at most), so
++        // more streams than 128 / block (25 at the 5-row block) draft in passes of that many, each its own wire message
++        const pass_rows = 128;
++        const per = @max(1, pass_rows / block);
++        var g0: usize = 0;
++        while (g0 < n) : (g0 += per) {
++            const g1 = @min(n, g0 + per);
++            if (try self.begin(.pass)) {
++                try self.wire.int(gpa, u32, @intCast(g1 - g0));
++                try self.wire.int(gpa, u32, @intCast(steps));
++                for (g0..g1) |i| {
++                    try self.wire.int(gpa, i64, tokens[i]);
++                    try self.wire.int(gpa, i64, q0[i]);
++                    try self.wire.int(gpa, i64, slots[i]);
++                }
++                try self.flush();
+             }
+-            try self.flush();
+         }
+         const t0 = m.now();
+         try m.pass(tokens[0..n], q0[0..n], slots[0..n], steps);
+@@ -836,7 +846,8 @@ pub const Lanes = struct {
+     /// the copy needs another state's room or would leave none for another request of its size: a copy that fills the
+     /// pool makes the next prompt evict a kept state (the 5 x 500K check with the duplicate admitted fourth). Kept
+     /// states hold their stream's whole extent back while a placement still fits so (placeSoft): its tail stays free
+-    /// for the resume in place, which then stales nothing.
++    /// for the resume in place, which then stales nothing. If a separate copy cannot fit but the source can grow
++    /// in place clear of live streams and loading restores, only the kept rows in its new tail give way.
+     fn placeKept(self: *Lanes, live: []const [2]usize, size: usize, source: ?*Snap) !usize {
+         const gpa = self.gpa;
+         var kept: std.ArrayList([3]usize) = .empty;
+@@ -858,6 +869,16 @@ pub const Lanes = struct {
+                 return if (try roomAfter(gpa, rows.items, b, size, self.m.pool_cap)) b else error.ContextFull;
+             }
+             if (got) |b| return b;
++            // A restored point may hold only its prefix's rows, with another idle
++            // state in the waiting request's tail. A disjoint copy needs room for
++            // BOTH the source and the whole request: impossible past half a pool.
++            // Prefer a copy while it fits (shared-prefix forks keep their later
++            // marks); under pressure grow here, retiring only the overwritten
++            // tail. Never overwrite a live stream or an in-flight restore.
++            if (source) |sn| if (self.canGrowHere(live, size, sn)) {
++                self.staleOver(sn.base + sn.at, sn.base + size, sn);
++                return sn.base;
++            };
+             const victim = for (self.snaps.items) |sn| {
+                 if (!sn.stale and sn != source and !clashes(live, sn.base, sn.base + sn.at)) break sn;
+             } else if (source) |sn| (if (!sn.stale and !clashes(live, sn.base, sn.base + sn.at)) sn else return error.ContextFull) else return error.ContextFull;
+@@ -866,6 +887,11 @@ pub const Lanes = struct {
+         }
+     }
+ 
++    fn canGrowHere(self: *const Lanes, live: []const [2]usize, size: usize, source: *const Snap) bool {
++        if (source.stale or source.base + size > self.m.pool_cap or clashes(live, source.base, source.base + size)) return false;
++        return true;
++    }
++
+     /// Whether a kept state other than `except` and its shorter siblings has rows in [lo, hi); a longer one may be another conversation's.
+     fn keptOver(self: *const Lanes, lo: usize, hi: usize, except: *const Snap) bool {
+         for (self.snaps.items) |sn| if (sn != except and !sn.stale and (sn.base != except.base or sn.at > except.at) and sn.base < hi and lo < sn.base + sn.at) return true;
