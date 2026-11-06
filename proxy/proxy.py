@@ -49,13 +49,46 @@ state: Dict[str, Any] = {
 
 
 class Waiter:
-    def __init__(self, pos: int, priority: int = 1):
+    def __init__(self, pos: int, priority: int = 1, prefix_key: str = ""):
         self.pos = pos
         self.priority = priority  # 0: interactive/foreground, 1: normal, 2: background/batch
+        self.prefix_key = prefix_key
         self.promoted = False
         self.extended = False
         self.deadline = 0.0
         self.event = asyncio.Event()
+
+
+# Single-Flight Prefix State Machine (Strata Proposal 2)
+# Tracks in-flight prefill per prefix key to eliminate Delay-Hit redundant prefill.
+prefix_inflight: Dict[str, asyncio.Event] = {}
+prefix_lock = asyncio.Lock()
+
+
+def compute_prefix_key(body_bytes: bytes) -> str:
+    """Extracts canonical prefix hash for prompts > 4000 characters."""
+    if len(body_bytes) < 4000:
+        return ""
+    try:
+        data = json.loads(body_bytes)
+        messages = data.get("messages", [])
+        if not messages:
+            return ""
+        prefix_str = ""
+        for m in messages:
+            content = m.get("content", "")
+            if isinstance(content, str):
+                prefix_str += content[:16384]
+            elif isinstance(content, list):
+                for p in content:
+                    if p.get("type") == "text":
+                        prefix_str += p.get("text", "")[:16384]
+        if len(prefix_str) < 4000:
+            return ""
+        import hashlib
+        return hashlib.sha256(prefix_str[:32768].encode()).hexdigest()[:16]
+    except Exception:
+        return ""
 
 
 waiting_queue: deque[Waiter] = deque()
@@ -181,12 +214,32 @@ def _wake_next_locked():
     state["waiting_in_queue"] = len(waiting_queue)
 
 
-async def acquire_slot(priority: int = 1) -> Tuple[bool, str]:
+async def acquire_slot(priority: int = 1, prefix_key: str = "") -> Tuple[bool, str]:
     """
-    Acquire an execution slot with Tiered Dynamic Queue Management, Priority Scheduling, and Anti-Herd Extension.
+    Acquire an execution slot with Tiered Dynamic Queue Management, Priority Scheduling, Anti-Herd Extension,
+    and Strata Single-Flight Prefix Coordination.
     priority: 0 = high/foreground, 1 = normal, 2 = background/batch.
     Background requests (priority >= 2) cannot consume more than background_max_slots (default 3 of 4).
     """
+    # Single-Flight Check: if another identical prefix is currently building in prefill,
+    # wait briefly for it to complete its KV commit so we hit cache instead of duplicating prefill!
+    leader_event: Optional[asyncio.Event] = None
+    if prefix_key:
+        async with prefix_lock:
+            if prefix_key in prefix_inflight:
+                leader_event = prefix_inflight[prefix_key]
+            else:
+                prefix_inflight[prefix_key] = asyncio.Event()
+
+    if leader_event:
+        logger.info(f"Single-Flight Delay-Hit Mitigation: Waiting for leader prefill [prefix: {prefix_key}]...")
+        try:
+            # Wait up to 25s for leader prefill to finish and commit KV
+            await asyncio.wait_for(leader_event.wait(), timeout=25.0)
+            logger.info(f"Single-Flight Leader finished: Follower attached to cached prefix [prefix: {prefix_key}]")
+        except asyncio.TimeoutError:
+            logger.warning(f"Single-Flight Leader wait timed out for prefix {prefix_key}, falling back to normal acquire.")
+
     async with queue_lock:
         limit = state["current_limit"]
         queue_max = state["queue_buffer"]
@@ -215,7 +268,7 @@ async def acquire_slot(priority: int = 1) -> Tuple[bool, str]:
 
         # 3. Enter tiered queue with priority
         pos = len(waiting_queue)
-        waiter = Waiter(pos, priority=priority)
+        waiter = Waiter(pos, priority=priority, prefix_key=prefix_key)
         waiting_queue.append(waiter)
         state["waiting_in_queue"] = len(waiting_queue)
         initial_timeout = get_timeout(pos)
@@ -365,6 +418,9 @@ async def proxy_all(request: Request, path: str):
     is_completion = path.strip("/").endswith("chat/completions") or path.strip("/").endswith("completions")
 
     if is_completion and request.method == "POST":
+        body_bytes = await request.body()
+        prefix_key = compute_prefix_key(body_bytes)
+
         # Extract Priority Header: 0 = high/foreground, 1 = normal, 2 = background/batch
         prio_hdr = request.headers.get("x-priority") or request.headers.get("priority")
         priority = 1
@@ -375,7 +431,7 @@ async def proxy_all(request: Request, path: str):
             elif prio_lower in ["low", "background", "batch", "2"]:
                 priority = 2
 
-        acquired, reason = await acquire_slot(priority=priority)
+        acquired, reason = await acquire_slot(priority=priority, prefix_key=prefix_key)
         if not acquired:
             curr_model = state["current_model"]
             limit = state["current_limit"]
@@ -403,27 +459,37 @@ async def proxy_all(request: Request, path: str):
             )
 
         try:
-            return await handle_forward(request, path, release_on_close=True)
+            return await handle_forward(request, path, release_on_close=True, cached_body=body_bytes, prefix_key=prefix_key)
         except Exception:
             await release_slot()
+            if prefix_key:
+                async with prefix_lock:
+                    if prefix_key in prefix_inflight:
+                        prefix_inflight[prefix_key].set()
+                        del prefix_inflight[prefix_key]
             raise
     else:
         return await handle_forward(request, path, release_on_close=False)
 
 
-async def handle_forward(request: Request, path: str, release_on_close: bool = False):
+async def handle_forward(
+    request: Request,
+    path: str,
+    release_on_close: bool = False,
+    cached_body: Optional[bytes] = None,
+    prefix_key: str = "",
+):
     upstream_url = f"{state['upstream_url']}/{path}"
     query = request.url.query
     if query:
         upstream_url = f"{upstream_url}?{query}"
 
     req_headers = {k: v for k, v in request.headers.items() if k.lower() not in EXCLUDE_HEADERS}
-    body = await request.body()
+    body = cached_body if cached_body is not None else await request.body()
 
     # Context volume estimation & advisory
     est_prompt_tokens = 0
     if len(body) > 1024:
-        # Rough token approximation (chars/3.2 for multilingual/code)
         est_prompt_tokens = len(body) // 3
         if est_prompt_tokens > 250000:
             logger.warning(
@@ -441,6 +507,11 @@ async def handle_forward(request: Request, path: str, release_on_close: bool = F
     except Exception as e:
         if release_on_close:
             await release_slot()
+        if prefix_key:
+            async with prefix_lock:
+                if prefix_key in prefix_inflight:
+                    prefix_inflight[prefix_key].set()
+                    del prefix_inflight[prefix_key]
         logger.error(f"Failed to connect to upstream {upstream_url}: {e}")
         return JSONResponse(
             status_code=502,
@@ -456,20 +527,33 @@ async def handle_forward(request: Request, path: str, release_on_close: bool = F
             resp_headers["x-spark-compaction-advisory"] = "prompt_exceeds_250k_compaction_recommended"
 
     async def stream_body():
+        released = False
+        prefix_notified = False
         try:
-            async for chunk in upstream_resp.aiter_raw():
+            async for chunk in upstream_resp.aiter_bytes():
+                # Notify single-flight waiters as soon as first chunk arrives (prefill finished!)
+                if prefix_key and not prefix_notified:
+                    prefix_notified = True
+                    async with prefix_lock:
+                        if prefix_key in prefix_inflight:
+                            prefix_inflight[prefix_key].set()
+                            del prefix_inflight[prefix_key]
                 yield chunk
         finally:
-            await upstream_resp.aclose()
-            if release_on_close:
+            if not released and release_on_close:
+                released = True
                 await release_slot()
+            if prefix_key and not prefix_notified:
+                async with prefix_lock:
+                    if prefix_key in prefix_inflight:
+                        prefix_inflight[prefix_key].set()
+                        del prefix_inflight[prefix_key]
+            await upstream_resp.aclose()
 
-    media_type = upstream_resp.headers.get("content-type")
     return StreamingResponse(
         stream_body(),
         status_code=upstream_resp.status_code,
         headers=resp_headers,
-        media_type=media_type,
     )
 
 
