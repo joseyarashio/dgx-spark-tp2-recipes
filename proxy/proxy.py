@@ -63,7 +63,6 @@ class Waiter:
 # Single-Flight Prefix State Machine (Strata Proposal 2)
 # Tracks in-flight prefill per prefix key to eliminate Delay-Hit redundant prefill.
 prefix_inflight: Dict[str, asyncio.Event] = {}
-prefix_committed: Dict[str, float] = {}  # prefix_key -> timestamp committed
 prefix_lock = asyncio.Lock()
 
 
@@ -224,29 +223,20 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "") -> Tuple[bool, s
     Background requests (priority >= 2) cannot consume more than background_max_slots (default 3 of 4).
     """
     # Single-Flight Check: if another identical prefix is currently building in prefill,
-    # wait briefly for it to complete its KV commit so we hit cache instead of duplicating prefill!
+    # wait for it to complete its KV prefill so we hit cache instead of duplicating prefill!
     leader_event: Optional[asyncio.Event] = None
     if prefix_key:
-        now = time.time()
         async with prefix_lock:
-            # Clean up old committed entries (> 300s)
-            expired = [k for k, ts in prefix_committed.items() if now - ts > 300]
-            for k in expired:
-                del prefix_committed[k]
-
             if prefix_key in prefix_inflight:
                 leader_event = prefix_inflight[prefix_key]
-            elif prefix_key in prefix_committed and (now - prefix_committed[prefix_key] < 60):
-                # Prefix recently committed within 60s: proceed immediately to attach cache!
-                leader_event = None
             else:
                 prefix_inflight[prefix_key] = asyncio.Event()
 
     if leader_event:
         logger.info(f"Single-Flight Delay-Hit Mitigation: Waiting for leader prefill [prefix: {prefix_key}]...")
         try:
-            # Wait up to 25s for leader prefill to finish and commit KV
-            await asyncio.wait_for(leader_event.wait(), timeout=25.0)
+            # Wait up to 30s for leader prefill to finish and commit KV
+            await asyncio.wait_for(leader_event.wait(), timeout=30.0)
             logger.info(f"Single-Flight Leader finished: Follower attached to cached prefix [prefix: {prefix_key}]")
         except asyncio.TimeoutError:
             logger.warning(f"Single-Flight Leader wait timed out for prefix {prefix_key}, falling back to normal acquire.")
@@ -546,9 +536,9 @@ async def handle_forward(
                 if prefix_key and not prefix_notified:
                     prefix_notified = True
                     async with prefix_lock:
-                        prefix_committed[prefix_key] = time.time()
                         if prefix_key in prefix_inflight:
-                            prefix_inflight[prefix_key].set()
+                            ev = prefix_inflight[prefix_key]
+                            ev.set()
                             del prefix_inflight[prefix_key]
                 yield chunk
         finally:
