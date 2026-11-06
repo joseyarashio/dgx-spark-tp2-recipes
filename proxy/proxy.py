@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import sys
+import time
 from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -62,6 +63,7 @@ class Waiter:
 # Single-Flight Prefix State Machine (Strata Proposal 2)
 # Tracks in-flight prefill per prefix key to eliminate Delay-Hit redundant prefill.
 prefix_inflight: Dict[str, asyncio.Event] = {}
+prefix_committed: Dict[str, float] = {}  # prefix_key -> timestamp committed
 prefix_lock = asyncio.Lock()
 
 
@@ -225,9 +227,18 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "") -> Tuple[bool, s
     # wait briefly for it to complete its KV commit so we hit cache instead of duplicating prefill!
     leader_event: Optional[asyncio.Event] = None
     if prefix_key:
+        now = time.time()
         async with prefix_lock:
+            # Clean up old committed entries (> 300s)
+            expired = [k for k, ts in prefix_committed.items() if now - ts > 300]
+            for k in expired:
+                del prefix_committed[k]
+
             if prefix_key in prefix_inflight:
                 leader_event = prefix_inflight[prefix_key]
+            elif prefix_key in prefix_committed and (now - prefix_committed[prefix_key] < 60):
+                # Prefix recently committed within 60s: proceed immediately to attach cache!
+                leader_event = None
             else:
                 prefix_inflight[prefix_key] = asyncio.Event()
 
@@ -535,6 +546,7 @@ async def handle_forward(
                 if prefix_key and not prefix_notified:
                     prefix_notified = True
                     async with prefix_lock:
+                        prefix_committed[prefix_key] = time.time()
                         if prefix_key in prefix_inflight:
                             prefix_inflight[prefix_key].set()
                             del prefix_inflight[prefix_key]
