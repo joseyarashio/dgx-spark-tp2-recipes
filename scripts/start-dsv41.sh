@@ -71,6 +71,7 @@ sleep 1
 echo "[2/5] Launching Rank 1 on Worker ($WORKER_IP)..."
 ssh -o BatchMode=yes joseyarashio@"$WORKER_IP" "
   docker run -d --restart unless-stopped --name dsv41-rank1 \
+    --cpuset-cpus='5-9,15-19' \
     --gpus all --network host --ipc host --ulimit memlock=-1 --ulimit stack=67108864 \
     --cap-add IPC_LOCK --device /dev/infiniband \
     -v /home/joseyarashio:/home/joseyarashio \
@@ -88,6 +89,7 @@ sleep 2
 # 3. Launch Rank 0 on Head
 echo "[3/5] Launching Rank 0 on Head ($HEAD_IP)..."
 docker run -d --restart unless-stopped --name dsv41-rank0 \
+  --cpuset-cpus='5-9,15-19' \
   --gpus all --network host --ipc host --ulimit memlock=-1 --ulimit stack=67108864 \
   --cap-add IPC_LOCK --device /dev/infiniband \
   -v /home/joseyarashio:/home/joseyarashio \
