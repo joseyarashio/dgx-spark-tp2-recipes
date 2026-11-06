@@ -420,6 +420,16 @@ async def handle_forward(request: Request, path: str, release_on_close: bool = F
     req_headers = {k: v for k, v in request.headers.items() if k.lower() not in EXCLUDE_HEADERS}
     body = await request.body()
 
+    # Context volume estimation & advisory
+    est_prompt_tokens = 0
+    if len(body) > 1024:
+        # Rough token approximation (chars/3.2 for multilingual/code)
+        est_prompt_tokens = len(body) // 3
+        if est_prompt_tokens > 250000:
+            logger.warning(
+                f"Large context payload detected: ~{est_prompt_tokens} tokens ({len(body)/1024/1024:.2f} MB). Upstream cold prefill may require extended TTFT."
+            )
+
     try:
         upstream_req = http_client.build_request(
             method=request.method,
@@ -440,6 +450,10 @@ async def handle_forward(request: Request, path: str, release_on_close: bool = F
     resp_headers = {
         k: v for k, v in upstream_resp.headers.items() if k.lower() not in EXCLUDE_HEADERS
     }
+    if est_prompt_tokens > 0:
+        resp_headers["x-spark-estimated-tokens"] = str(est_prompt_tokens)
+        if est_prompt_tokens > 250000:
+            resp_headers["x-spark-compaction-advisory"] = "prompt_exceeds_250k_compaction_recommended"
 
     async def stream_body():
         try:
