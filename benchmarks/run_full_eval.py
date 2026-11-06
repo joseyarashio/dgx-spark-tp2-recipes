@@ -53,6 +53,7 @@ def stream_chat(
     tool_choice=None,
     base_url=API_8888,
     timeout=300,
+    extra_headers=None,
 ):
     payload = {
         "model": "DeepSeek-V4.1-Flash-1017-TF",
@@ -71,10 +72,13 @@ def stream_chat(
         payload["tool_choice"] = tool_choice
 
     data = json.dumps(payload).encode("utf-8")
+    req_headers = {"Content-Type": "application/json"}
+    if extra_headers:
+        req_headers.update(extra_headers)
     req = urllib.request.Request(
         f"{base_url}/v1/chat/completions",
         data=data,
-        headers={"Content-Type": "application/json"},
+        headers=req_headers,
         method="POST",
     )
     t0 = time.perf_counter()
@@ -722,6 +726,276 @@ def run_perf_and_stress(label):
     }
     return perf
 
+def generate_synthetic_codebase(target_tokens=32000):
+    """Generates a structured, realistic multi-module Python codebase for cache testing."""
+    base_module = '''
+# Module: core/distributed_coordinator.py
+import asyncio, time, logging, struct, uuid
+from typing import Dict, List, Optional, Tuple, Any
+
+logger = logging.getLogger("coordinator")
+
+class DistributedNode:
+    def __init__(self, node_id: str, address: str, port: int, roce_gid: int = 3):
+        self.node_id = node_id
+        self.address = address
+        self.port = port
+        self.roce_gid = roce_gid
+        self.active_channels: Dict[str, Any] = {}
+        self.heartbeat_ts = time.time()
+        self.lock = asyncio.Lock()
+
+    async def register_channel(self, channel_id: str, buffer_size: int) -> bool:
+        async with self.lock:
+            if channel_id in self.active_channels:
+                return False
+            self.active_channels[channel_id] = {
+                "created": time.time(),
+                "buffer_size": buffer_size,
+                "in_flight": 0
+            }
+            logger.info(f"Channel {channel_id} registered on {self.node_id}:{self.port}")
+            return True
+
+    async def poll_roce_counters(self) -> Dict[str, int]:
+        return {
+            "rx_packets": 1048576,
+            "tx_packets": 1048576,
+            "rx_bytes": 1073741824,
+            "tx_bytes": 1073741824,
+            "pfc_rx_pause": 0,
+            "pfc_tx_pause": 0,
+            "cnp_rx": 0,
+            "cnp_tx": 0,
+        }
+'''
+    needed_chars = int(target_tokens * 3.5)
+    repeats = (needed_chars // len(base_module)) + 1
+    full_text = ("# Distributed Systems Core Architecture Implementation\n" +
+                 "# High-Performance RoCEv2 Clustered Runtime Source\n\n")
+    for i in range(repeats):
+        full_text += f"# Section {i+1}: Clustered Channel Definition\n"
+        full_text += base_module.replace("coordinator", f"coordinator_sub_{i}")
+    return full_text[:needed_chars]
+
+def run_concurrency_cache_benchmark(label: str = "baseline"):
+    """
+    PART D: Multi-Agent Concurrency & Advanced Cache-Hit Benchmark (Strata Evaluation Suite)
+    Specifically measures:
+      D1. 4-Subagent Simultaneous Project Review (Burst Delay-Hit Scenario)
+      D2. Staggered In-Flight Arrival (Prefill Pipeline Overlap)
+      D3. 6-Turn Deep Autonomous Agent Tool Loop (Cache Growth & Retention)
+      D4. Mixed Workload Priority Slicing (2 Background Scans + 2 Foreground Interactive)
+    """
+    print("\n============================================================")
+    print(" PART D: Multi-Agent Concurrency & Advanced Cache-Hit Benchmark")
+    print("============================================================")
+    d_results: dict[str, object] = {}
+
+    codebase_32k = generate_synthetic_codebase(target_tokens=30000)
+    print(f"Generated synthetic shared codebase: {len(codebase_32k)} chars (~{len(codebase_32k)//3.5:.0f} tokens)\n")
+
+    # --- D1: 4-Subagent Simultaneous Project Review ---
+    print("  [D1: 4-Subagent Simultaneous Project Review (Burst Delay-Hit Scenario)]")
+    tasks = [
+        ("worker_0", "Audit the architecture, locking safety, and channel registration for race conditions.", 0),
+        ("worker_1", "Identify deadlock, memory leak, and unhandled exception risks in this distributed coordinator.", 1),
+        ("worker_2", "Write a complete pytest test suite covering active channels, concurrency locks, and counter polling.", 2),
+        ("worker_3", "Review error handling, logging coverage, and graceful shutdown procedures under network partition.", 3)
+    ]
+
+    def subagent_task(name, instruction, seed_offset):
+        messages = [
+            {"role": "system", "content": "You are an elite principal software engineer conducting an exhaustive codebase review."},
+            {"role": "user", "content": f"Here is the project codebase repository:\n```python\n{codebase_32k}\n```\n\nTask: {instruction}"}
+        ]
+        return stream_chat(
+            messages,
+            max_tokens=256,
+            temperature=0.20,
+            seed=500 + seed_offset,
+            base_url=API_8889,
+            timeout=300
+        )
+
+    t0_burst = time.perf_counter()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        futs = {ex.submit(subagent_task, t[0], t[1], t[2]): t[0] for t in tasks}
+        d1_workers = {}
+        for f in concurrent.futures.as_completed(futs):
+            w_name = futs[f]
+            d1_workers[w_name] = f.result()
+    wall_burst = time.perf_counter() - t0_burst
+
+    leader_ttft = d1_workers["worker_0"].get("client_ttft_seconds", d1_workers["worker_0"]["wall_seconds"])
+    follower_ttfts = [d1_workers[f"worker_{i}"].get("client_ttft_seconds", d1_workers[f"worker_{i}"]["wall_seconds"]) for i in range(1, 4)]
+    mean_follower_ttft = sum(follower_ttfts) / len(follower_ttfts)
+    total_output_tokens = sum(w.get("usage", {}).get("completion_tokens", 0) for w in d1_workers.values())
+    agg_throughput = total_output_tokens / wall_burst if wall_burst > 0 else 0.0
+
+    print(f"    -> Wall-clock total: {wall_burst:.2f}s | Aggregate throughput: {agg_throughput:.2f} tok/s")
+    print(f"    -> Leader (Worker 0) TTFT: {leader_ttft:.2f}s | Follower Mean TTFT: {mean_follower_ttft:.2f}s")
+    print(f"    -> Delay-Hit Penalty Gap: {mean_follower_ttft - leader_ttft:+.2f}s")
+    for i in range(4):
+        w = d1_workers[f"worker_{i}"]
+        ttft = w.get("client_ttft_seconds", w["wall_seconds"])
+        out_t = w.get("usage", {}).get("completion_tokens", 0)
+        c_tok = w.get("usage", {}).get("cached_tokens", 0) or w.get("tensorfold", {}).get("cached", 0)
+        print(f"       worker_{i}: TTFT={ttft:.2f}s, wall={w['wall_seconds']:.2f}s, out_tok={out_t}, cached={c_tok}")
+
+    d_results["d1_burst_delay_hit"] = {
+        "wall_total_s": wall_burst,
+        "aggregate_tok_per_s": agg_throughput,
+        "leader_ttft_s": leader_ttft,
+        "mean_follower_ttft_s": mean_follower_ttft,
+        "delay_hit_penalty_s": mean_follower_ttft - leader_ttft,
+        "workers": d1_workers
+    }
+
+    # --- D2: Staggered In-Flight Arrival ---
+    print("\n  [D2: Staggered In-Flight Arrival (Prefill Pipeline Overlap)]")
+    stagger_offsets = [0.0, 3.0, 6.0, 10.0]
+    def staggered_task(idx, delay_s):
+        if delay_s > 0:
+            time.sleep(delay_s)
+        messages = [
+            {"role": "system", "content": "You are a code reviewer."},
+            {"role": "user", "content": f"Repository codebase:\n```python\n{codebase_32k}\n```\n\nSummarize channel registration safety in 3 bullet points (Query {idx})."}
+        ]
+        res = stream_chat(
+            messages,
+            max_tokens=128,
+            temperature=0.20,
+            seed=600 + idx,
+            base_url=API_8889,
+            timeout=300
+        )
+        res["stagger_delay_s"] = delay_s
+        return res
+
+    t0_stagger = time.perf_counter()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        futs = {ex.submit(staggered_task, i, stagger_offsets[i]): f"worker_{i}" for i in range(4)}
+        d2_workers = {}
+        for f in concurrent.futures.as_completed(futs):
+            w_name = futs[f]
+            d2_workers[w_name] = f.result()
+    wall_stagger = time.perf_counter() - t0_stagger
+
+    print(f"    -> Staggered batch wall-clock: {wall_stagger:.2f}s")
+    for i in range(4):
+        w = d2_workers[f"worker_{i}"]
+        ttft = w.get("client_ttft_seconds", w["wall_seconds"])
+        c_tok = w.get("usage", {}).get("cached_tokens", 0) or w.get("tensorfold", {}).get("cached", 0)
+        print(f"       worker_{i} (offset +{w['stagger_delay_s']:.0f}s): TTFT={ttft:.2f}s, wall={w['wall_seconds']:.2f}s, cached={c_tok}")
+
+    d_results["d2_staggered_inflight"] = {
+        "wall_total_s": wall_stagger,
+        "workers": d2_workers
+    }
+
+    # --- D3: 6-Turn Deep Autonomous Agent Tool Loop ---
+    print("\n  [D3: 6-Turn Deep Autonomous Agent Tool Loop (Cache Growth & Retention)]")
+    conversation = [
+        {"role": "system", "content": "You are an autonomous coding agent executing a multi-step investigation."}
+    ]
+    turn_steps = [
+        ("Initial architecture scan: inspect DistributedNode init.", 1500),
+        ("Inspect active channel registration and locks.", 2000),
+        ("Analyze RoCE counter polling and packet metrics.", 2500),
+        ("Simulate high-concurrency race condition test.", 3000),
+        ("Analyze failure recovery during network partition.", 3500),
+        ("Compile comprehensive final report with recommendations.", 4000)
+    ]
+    d3_turns = []
+    for t_idx, (step_prompt, extra_chars) in enumerate(turn_steps, 1):
+        extra_content = f"\n\n[Tool Observation {t_idx}]:\n" + ("x" * extra_chars)
+        conversation.append({"role": "user", "content": step_prompt + extra_content})
+        res = stream_chat(
+            conversation,
+            max_tokens=96,
+            temperature=0.20,
+            seed=700 + t_idx,
+            base_url=API_8889,
+            timeout=300
+        )
+        assistant_reply = res.get("content", "Analysis complete.")
+        conversation.append({"role": "assistant", "content": assistant_reply})
+        p_toks = res.get("usage", {}).get("prompt_tokens", 0) or res.get("tensorfold", {}).get("prompt", 0)
+        c_toks = res.get("usage", {}).get("cached_tokens", 0) or res.get("tensorfold", {}).get("cached", 0)
+        ttft = res.get("client_ttft_seconds", res["wall_seconds"])
+        out_toks = res.get("usage", {}).get("completion_tokens", 0)
+        gen_time = max(0.001, res["wall_seconds"] - ttft)
+        tok_per_s = out_toks / gen_time if out_toks > 0 else 0.0
+        cache_ratio = (c_toks / p_toks * 100) if p_toks > 0 else 0.0
+        print(f"    -> Turn {t_idx}: prompt_tok={p_toks}, cached_tok={c_toks} ({cache_ratio:.1f}%), TTFT={ttft:.3f}s, out_speed={tok_per_s:.1f} tok/s")
+        d3_turns.append({
+            "turn": t_idx,
+            "prompt_tokens": p_toks,
+            "cached_tokens": c_toks,
+            "cache_hit_pct": cache_ratio,
+            "ttft_seconds": ttft,
+            "tokens_per_second": tok_per_s,
+            "wall_seconds": res.get("wall_seconds", 0)
+        })
+
+    d_results["d3_agent_loop_6turns"] = d3_turns
+
+    # --- D4: Mixed Workload Priority Slicing ---
+    print("\n  [D4: Mixed Workload Priority Slicing (2 Background + 2 Foreground Interactive)]")
+    def mixed_worker(name, prio_str, delay_s):
+        if delay_s > 0:
+            time.sleep(delay_s)
+        headers = {"X-Priority": prio_str}
+        if prio_str == "low":
+            messages = [
+                {"role": "user", "content": f"Background Scan {name}: Full repository scan.\n```python\n{codebase_32k}\n```"}
+            ]
+            m_toks = 128
+        else:
+            messages = [
+                {"role": "user", "content": f"Interactive User {name}: What is the primary port used for distributed coordinator?"}
+            ]
+            m_toks = 64
+        res = stream_chat(
+            messages,
+            max_tokens=m_toks,
+            temperature=0.20,
+            base_url=API_8889,
+            timeout=300,
+            extra_headers=headers
+        )
+        res["priority"] = prio_str
+        res["delay_s"] = delay_s
+        return res
+
+    mixed_specs = [
+        ("bg_worker_1", "low", 0.0),
+        ("bg_worker_2", "low", 0.2),
+        ("fg_user_1", "high", 1.5),
+        ("fg_user_2", "high", 2.5)
+    ]
+    t0_mixed = time.perf_counter()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        futs = {ex.submit(mixed_worker, s[0], s[1], s[2]): s[0] for s in mixed_specs}
+        d4_workers = {}
+        for f in concurrent.futures.as_completed(futs):
+            w_name = futs[f]
+            d4_workers[w_name] = f.result()
+    wall_mixed = time.perf_counter() - t0_mixed
+
+    print(f"    -> Mixed workload total wall: {wall_mixed:.2f}s")
+    for s in mixed_specs:
+        w = d4_workers[s[0]]
+        ttft = w.get("client_ttft_seconds", w["wall_seconds"])
+        print(f"       {s[0]} ({w['priority']}, delay={w['delay_s']}s): TTFT={ttft:.2f}s, wall={w['wall_seconds']:.2f}s, sc={w.get('status_code')}")
+
+    d_results["d4_mixed_priority"] = {
+        "wall_total_s": wall_mixed,
+        "workers": d4_workers
+    }
+    return d_results
+
 def main():
     label = sys.argv[1] if len(sys.argv) > 1 else "step1_libertai_2.9bpw"
     out_dir = "/home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/results"
@@ -735,6 +1009,7 @@ def main():
     res["system_before"] = get_system_metrics()
     res["question_bank"] = run_question_bank()
     res["perf_and_stress"] = run_perf_and_stress(label)
+    res["concurrency_and_cache"] = run_concurrency_cache_benchmark(label)
     res["system_after"] = get_system_metrics()
 
     out_path = os.path.join(out_dir, f"full_eval_{label}.json")
