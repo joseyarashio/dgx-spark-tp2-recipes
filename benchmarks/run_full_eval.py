@@ -623,15 +623,17 @@ def run_perf_and_stress(label):
     print(f"  [Cut-In] Long 32K TTFT={r_long['client_ttft_seconds']}s | Short Prompt TTFT (+1.0s behind)={r_short['client_ttft_seconds']}s")
     perf["cut_in_test"] = {"long_32k": r_long, "short_behind_1s": r_short}
 
-    print("\n=== PART C: Concurrency Scaling (C1 / C2 / C4) & Port 8889 Tiered 429 Stress Test ===")
+    print("\n=== PART C: Concurrency Scaling (C1 / C2 / C4 / C6) & Port 8889 Tiered 429 Stress Test ===")
     c_prompts = [
         ("s1_code", prompts["code"]),
         ("s2_prose", prompts["prose"]),
         ("s3_structured", prompts["structured"]),
         ("s4_algo", "Implement a complete Red-Black Tree in Python with insert, search, left_rotate, right_rotate, and inorder traversal methods. Include docstrings and complexity analysis."),
+        ("s5_db", "Write an asynchronous connection pool manager in Python for SQLite with WAL mode, background checkpointing, and connection leak detection."),
+        ("s6_raft", "Write a complete Raft consensus leader election implementation in Python with randomized election timers and RPC heartbeat message handlers.")
     ]
     scaling = {}
-    for c_level in [1, 2, 4]:
+    for c_level in [1, 2, 4, 6]:
         subset = c_prompts[:c_level]
         t0 = time.perf_counter()
         with concurrent.futures.ThreadPoolExecutor(max_workers=c_level) as ex:
@@ -654,22 +656,21 @@ def run_perf_and_stress(label):
         }
     perf["concurrency_scaling"] = scaling
 
-    # Burst C10 Stress Test against Port 8889 Fast-Fail Tiered Queue
-    print("  [Stress Test C10 Burst via :8889] Sending 10 concurrent requests (4 active + 4 queued + 2 immediate 429)...")
+    # Burst C14 Stress Test against Port 8889 Fast-Fail Tiered Queue (6 active + 8 queued + 2 immediate 429)
+    print("  [Stress Test C14 Burst via :8889] Sending 16 concurrent requests (6 active + 8 queued + 2 immediate 429)...")
     def burst_worker(idx):
-        # First 4 workers ask for 384 tokens (~12s); next 6 arrive 0.15s later
-        if idx >= 4:
-            time.sleep(0.15 + (idx - 4) * 0.03)
+        if idx >= 6:
+            time.sleep(0.10 + (idx - 6) * 0.02)
         return stream_chat(
             [{"role": "user", "content": f"Worker {idx}: Write a detailed Python class implementing a thread-safe priority queue with heap operations."}],
-            max_tokens=384 if idx < 4 else 64,
+            max_tokens=384 if idx < 6 else 64,
             temperature=0.30,
             seed=300 + idx,
             base_url=API_8889,
         )
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as ex:
-        futs = {ex.submit(burst_worker, i): i for i in range(10)}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
+        futs = {ex.submit(burst_worker, i): i for i in range(16)}
         burst_results = {}
         for f in concurrent.futures.as_completed(futs):
             i = futs[f]

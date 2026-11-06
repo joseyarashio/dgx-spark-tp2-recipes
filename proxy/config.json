@@ -5,14 +5,15 @@
   "model_limits": {
     "dsv41": 2,
     "DeepSeek-V4.1-Flash-EXL3": 2,
-    "DeepSeek-V4.1-Flash-TF": 4,
-    "DeepSeek-V4.1-Flash-1017-TF": 4,
+    "DeepSeek-V4.1-Flash-TF": 6,
+    "DeepSeek-V4.1-Flash-1017-TF": 6,
     "GLM-5.3-Flash": 4,
     "GLM-5.3-Flash-EXL3": 4
   },
-  "default_limit": 4,
-  "queue_buffer": 4,
-  "tiered_timeouts": [20.0, 15.0, 10.0, 5.0],
+  "default_limit": 6,
+  "queue_buffer": 8,
+  "background_max_slots": 5,
+  "tiered_timeouts": [25.0, 22.0, 20.0, 18.0, 15.0, 12.0, 10.0, 5.0],
   "extension_seconds": 5.0,
   "poll_interval_seconds": 3
 }
