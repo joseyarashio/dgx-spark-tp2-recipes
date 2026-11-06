@@ -10,7 +10,7 @@
     "cpu_pinning": "5-9,15-19 (10x Cortex-X925 Super-Cores)"
   },
   "cryptographic_hashes": {
-    "recipe_commit": "3ac7e57d7503c7cfffe438734e8795c0c76e6dc1",
+    "recipe_commit": "4eeed034bc7705c122786a3b4f23e56d0057d82c",
     "engine_commit": "3cf40b247a737fbd2295628cc69e83729313eb33",
     "patchset_sha256": "8c53d057437ef65a96c088727e6aa2780d99586117aef89ffaf8a0be80c12efb",
     "kernel_manifest_sha256": "ae370ac9aef8cfd937319037b850a825748085c8c54e9e0bbd8421bb5565ddf5",
