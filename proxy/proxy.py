@@ -13,6 +13,8 @@ import httpx
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from cold_kv import ColdKVManager
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -94,6 +96,7 @@ def compute_prefix_key(body_bytes: bytes) -> str:
 
 waiting_queue: deque[Waiter] = deque()
 queue_lock = asyncio.Lock()
+cold_kv_mgr = ColdKVManager()
 http_client: Optional[httpx.AsyncClient] = None
 
 # Hop-by-hop headers to exclude when forwarding
@@ -375,12 +378,25 @@ async def lifespan(app: FastAPI):
     limits = httpx.Limits(max_keepalive_connections=100, max_connections=200)
     http_client = httpx.AsyncClient(limits=limits, timeout=httpx.Timeout(600.0, connect=10.0))
     monitor_task = asyncio.create_task(monitor_upstream_model())
+
+    async def cold_kv_sweep_loop():
+        while True:
+            try:
+                await asyncio.sleep(60.0)
+                await cold_kv_mgr.run_maintenance_sweep()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.warning(f"Error in cold KV maintenance loop: {e}")
+
+    sweep_task = asyncio.create_task(cold_kv_sweep_loop())
     logger.info(
         f"Starting proxy with upstream: {state['upstream_url']} "
         f"(queue_buffer={state['queue_buffer']}, tiered_timeouts={state['tiered_timeouts']}, "
-        f"anti_herd_extension={state['extension_seconds']}s)"
+        f"anti_herd_extension={state['extension_seconds']}s, cold_kv=enabled)"
     )
     yield
+    sweep_task.cancel()
     monitor_task.cancel()
     if http_client:
         await http_client.aclose()
@@ -411,6 +427,7 @@ async def get_proxy_status():
         "queue_extended": extended_flags,
         "model_limits_config": state["model_limits"],
         "default_limit": state["default_limit"],
+        "cold_kv": cold_kv_mgr.get_stats(),
     }
 
 
@@ -421,6 +438,8 @@ async def proxy_all(request: Request, path: str):
     if is_completion and request.method == "POST":
         body_bytes = await request.body()
         prefix_key = compute_prefix_key(body_bytes)
+        if prefix_key:
+            await cold_kv_mgr.touch_session(prefix_key)
 
         # Extract Priority Header: 0 = high/foreground, 1 = normal, 2 = background/batch
         prio_hdr = request.headers.get("x-priority") or request.headers.get("priority")
@@ -551,6 +570,14 @@ async def handle_forward(
                         prefix_inflight[prefix_key].set()
                         del prefix_inflight[prefix_key]
             await upstream_resp.aclose()
+            # Asynchronously offload session to NVMe cold storage if it is a large conversation
+            if prefix_key and body and len(body) > 8000:
+                try:
+                    data = json.loads(body)
+                    msgs = data.get("messages", [])
+                    asyncio.create_task(cold_kv_mgr.offload_session(prefix_key, msgs, prompt_tokens=est_prompt_tokens))
+                except Exception:
+                    pass
 
     return StreamingResponse(
         stream_body(),
