@@ -10,12 +10,12 @@
     "cpu_pinning": "5-9,15-19 (10x Cortex-X925 Super-Cores)"
   },
   "cryptographic_hashes": {
-    "recipe_commit": "8c2420ce61670cc57cf2fc3a320582d4af242f32",
-    "engine_commit": "209a2398c872f06691affb1eb41ce87ab8aaa234",
+    "recipe_commit": "f13f0be17cf8b4ad89e9ccaf7f13173c11a446dc",
+    "engine_commit": "dce8d247159b284328c4d2f20c95f4d91f33e4bd",
     "patchset_sha256": "8c53d057437ef65a96c088727e6aa2780d99586117aef89ffaf8a0be80c12efb",
     "kernel_manifest_sha256": "ae370ac9aef8cfd937319037b850a825748085c8c54e9e0bbd8421bb5565ddf5",
-    "launch_config_sha256": "ed6342b795ba801fb6df337e5c63483ab1fd66ac0da4cb6262d6c9d5dac4613a",
-    "proxy_sha256": "34746c396242799f5f611c20a5c40e798fbab622a2f937e3c8122ff255e08e52"
+    "launch_config_sha256": "e4883f283188cf21d705be0f7fb56d9fcc00df5bec436de27c8937b48accb6f7",
+    "proxy_sha256": "d2719b545f14897403b27e6863fe174f94fa343fc745488140092e80ea891b96"
   },
   "memory_audit_ledger": {
     "rank0_device_working_set_gib": 99.2,

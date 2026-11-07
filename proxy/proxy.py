@@ -142,19 +142,17 @@ def compute_prefix_key(body_bytes: bytes) -> str:
 
 async def _release_prefix(prefix_key: str, owner_id: int, committed: bool = False) -> None:
     """
-    Idempotently releases Single-Flight ownership for `owner_id`.
-    If committed=True, records the prefix in `prefix_committed` so subsequent warm requests
-    do not serialize unnecessarily. If committed=False (e.g. 429, cancel, upstream error),
-    wakes any followers immediately without poisoning the key.
+    Idempotently releases Single-Flight ownership for `owner_id` with strict owner fencing.
+    Only the active owner may transition the entry or record `prefix_committed`.
     """
     if not prefix_key or owner_id <= 0:
         return
     now = time.monotonic()
     async with prefix_lock:
-        if committed:
-            prefix_committed[prefix_key] = now + PREFIX_COMMITTED_TTL_SECONDS
         entry = prefix_inflight.get(prefix_key)
         if entry is not None and entry.owner_id == owner_id:
+            if committed:
+                prefix_committed[prefix_key] = now + PREFIX_COMMITTED_TTL_SECONDS
             entry.status = "READY" if committed else "FAILED"
             entry.event.set()
             del prefix_inflight[prefix_key]
@@ -232,38 +230,47 @@ def _can_run_priority_locked(priority: int) -> bool:
     """
     Checks whether a request with `priority` is eligible to take an active GPU slot.
     Enforces both total concurrency limit AND background_max_slots ceiling (reserving at least
-    1 slot for foreground/normal requests when background_max_slots < current_limit).
+    `limit - bg_max` slots for foreground/normal requests when background_max_slots < current_limit).
     """
     limit = state["current_limit"]
     if state["active_running"] >= limit:
         return False
     if priority >= 2:
         bg_max = state.get("background_max_slots", 5)
-        if state["active_running"] >= bg_max or state["bg_running"] >= bg_max:
+        reserved_fg = max(1, limit - bg_max) if bg_max < limit else 0
+        if state["bg_running"] >= bg_max or state["active_running"] >= max(1, limit - reserved_fg):
             return False
     return True
 
 
+def _compute_waiter_score(priority: int, prefix_key: str, enqueued_at: float, now_mono: float) -> Tuple[int, int, float]:
+    """
+    Unified scheduling score used by both Direct Path and `_wake_next_locked`:
+      1. Effective priority: P2 ages to priority 1 after 10s (P0=0 always stays strictly highest).
+      2. Cache-Aware / Max-Age tie-breaker: warm committed prefix OR waiting >= 20s gets `is_cold = 0`
+         so cold waiters cannot be starved indefinitely by newly arriving warm P1 requests.
+      3. Monotonic enqueue timestamp (FIFO).
+    """
+    wait_s = max(0.0, now_mono - enqueued_at)
+    eff_prio = max(1, priority - int(wait_s // 10.0)) if priority >= 2 else priority
+    is_cold = 0 if (wait_s >= 20.0 or (prefix_key and prefix_committed.get(prefix_key, 0.0) > now_mono)) else 1
+    return (eff_prio, is_cold, enqueued_at)
+
+
 def _wake_next_locked():
     """
-    Promote eligible waiting requests using:
-      1. Priority Aging: P2 requests waiting >= 10s age up to effective priority 1 (preventing starvation by P1, while P0=0 always stays strictly highest).
-      2. Cache-Aware Promotion: Within the same effective priority, requests hitting a warm committed prefix are promoted first to maximize slot turnover.
-      3. FIFO order tie-breaker.
+    Promote eligible waiting requests using unified `_compute_waiter_score`.
     """
     limit = state["current_limit"]
     promoted_any = False
     now_mono = time.monotonic()
     while state["active_running"] < limit and len(waiting_queue) > 0:
         best_idx = -1
-        best_score = (999, 999, 999)
+        best_score = (999, 999, float("inf"))
         for i, w in enumerate(waiting_queue):
             if not _can_run_priority_locked(w.priority):
                 continue
-            wait_s = max(0.0, now_mono - w.enqueued_at)
-            eff_prio = max(1, w.priority - int(wait_s // 10.0)) if w.priority >= 2 else w.priority
-            is_cold = 0 if (w.prefix_key and prefix_committed.get(w.prefix_key, 0.0) > now_mono) else 1
-            score = (eff_prio, is_cold, i)
+            score = _compute_waiter_score(w.priority, w.prefix_key, w.enqueued_at, now_mono)
             if score < best_score:
                 best_score = score
                 best_idx = i
@@ -387,13 +394,16 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0)
                 if len(waiting_queue) >= queue_max:
                     return False, "bg_limit_queue_full"
 
-            # 1. Direct GPU execution if eligible and nobody waiting ahead with higher priority
+            # 1. Direct GPU execution if eligible and nobody waiting ahead with better unified score
             if _can_run_priority_locked(priority):
-                has_higher_waiting = any(
-                    w.priority < priority and _can_run_priority_locked(w.priority)
+                now_m = time.monotonic()
+                incoming_score = _compute_waiter_score(priority, prefix_key, now_m, now_m)
+                has_better_waiting = any(
+                    _can_run_priority_locked(w.priority)
+                    and _compute_waiter_score(w.priority, w.prefix_key, w.enqueued_at, now_m) <= incoming_score
                     for w in waiting_queue
                 )
-                if not has_higher_waiting:
+                if not has_better_waiting:
                     state["active_running"] += 1
                     if priority >= 2:
                         state["bg_running"] += 1
@@ -735,22 +745,51 @@ async def handle_forward(
             except Exception:
                 pass
 
+    def _chunk_has_generated_token(raw_text: str) -> bool:
+        for line in raw_text.splitlines():
+            s = line.strip()
+            if not s:
+                continue
+            if s.startswith("data:"):
+                s = s[5:].strip()
+                if s == "[DONE]":
+                    continue
+            if not s.startswith("{"):
+                continue
+            try:
+                obj = json.loads(s)
+                if obj.get("object") == "chat.completion":
+                    return True
+                for ch in obj.get("choices") or []:
+                    delta = ch.get("delta") or {}
+                    if (
+                        (isinstance(delta.get("content"), str) and len(delta["content"]) > 0)
+                        or (isinstance(delta.get("reasoning_content"), str) and len(delta["reasoning_content"]) > 0)
+                        or (isinstance(delta.get("tool_calls"), list) and len(delta["tool_calls"]) > 0)
+                        or (isinstance(ch.get("text"), str) and len(ch["text"]) > 0)
+                    ):
+                        return True
+            except Exception:
+                pass
+        return False
+
     async def stream_body():
         nonlocal prefix_notified
+        sse_rem = ""
         try:
             async for chunk in upstream_resp.aiter_bytes():
-                # Notify single-flight waiters ONLY after prefill completes and first actual token chunk arrives
-                # (ignore pre-prefill `{"delta":{"role":"assistant"}}` header chunk and SSE `: ping` comments)
+                # Notify single-flight waiters ONLY after prefill completes and first non-empty generated token arrives
                 if prefix_key and not prefix_notified and upstream_resp.status_code == 200:
-                    if (
-                        b'"content":' in chunk
-                        or b'"reasoning_content":' in chunk
-                        or b'"tool_calls":' in chunk
-                        or b'"object":"chat.completion"' in chunk
-                        or b'"text":' in chunk
-                    ):
-                        prefix_notified = True
-                        await _release_prefix(prefix_key, req_id, committed=True)
+                    sse_rem += chunk.decode("utf-8", errors="ignore")
+                    if "\n" in sse_rem or sse_rem.strip().endswith("}"):
+                        lines = sse_rem.splitlines(keepends=True)
+                        complete_part = "".join(lines[:-1]) if not lines[-1].endswith("\n") else sse_rem
+                        sse_rem = lines[-1] if not lines[-1].endswith("\n") else ""
+                        check_str = complete_part or sse_rem
+                        if _chunk_has_generated_token(check_str):
+                            prefix_notified = True
+                            sse_rem = ""
+                            await _release_prefix(prefix_key, req_id, committed=True)
                 yield chunk
         finally:
             await cleanup_all()

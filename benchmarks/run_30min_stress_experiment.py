@@ -69,8 +69,10 @@ def send_chat_completion(messages: List[Dict[str, str]], max_tokens: int = 384, 
     })
 
     t0 = time.perf_counter()
+    first_event_t = None
     first_token_t = None
     total_tokens = 0
+    usage_completion_tokens = 0
     cached_tokens = 0
     status_code = 0
     error_msg = None
@@ -89,16 +91,25 @@ def send_chat_completion(messages: List[Dict[str, str]], max_tokens: int = 384, 
                     break
                 try:
                     chunk = json.loads(data_part)
-                    if first_token_t is None:
-                        first_token_t = time.perf_counter()
+                    if first_event_t is None:
+                        first_event_t = time.perf_counter()
                     choices = chunk.get("choices", [])
                     if choices:
                         delta = choices[0].get("delta", {})
-                        if delta.get("content") or delta.get("reasoning_content"):
+                        has_tok = bool(
+                            (isinstance(delta.get("content"), str) and len(delta["content"]) > 0)
+                            or (isinstance(delta.get("reasoning_content"), str) and len(delta["reasoning_content"]) > 0)
+                            or (isinstance(delta.get("tool_calls"), list) and len(delta["tool_calls"]) > 0)
+                        )
+                        if has_tok:
+                            if first_token_t is None:
+                                first_token_t = time.perf_counter()
                             total_tokens += 1
                     # Extract usage / cache info if available
                     usage = chunk.get("usage")
                     if usage:
+                        if usage.get("completion_tokens"):
+                            usage_completion_tokens = int(usage["completion_tokens"])
                         prompt_details = usage.get("prompt_tokens_details") or {}
                         if "cached_tokens" in prompt_details:
                             cached_tokens = prompt_details["cached_tokens"]
@@ -113,13 +124,15 @@ def send_chat_completion(messages: List[Dict[str, str]], max_tokens: int = 384, 
 
     t1 = time.perf_counter()
     wall = round(t1 - t0, 4)
+    ttfe = round((first_event_t - t0), 4) if first_event_t else wall
     ttft = round((first_token_t - t0), 4) if first_token_t else wall
 
     return {
         "status_code": status_code,
         "wall_seconds": wall,
+        "ttfe_seconds": ttfe,
         "ttft_seconds": ttft,
-        "tokens": total_tokens,
+        "tokens": usage_completion_tokens or total_tokens,
         "cached_tokens": cached_tokens,
         "error": error_msg
     }
