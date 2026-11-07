@@ -504,7 +504,9 @@ async def handle_forward(
     if query:
         upstream_url = f"{upstream_url}?{query}"
 
+    # Ensure Connection: keep-alive is maintained and hop-by-hop headers stripped
     req_headers = {k: v for k, v in request.headers.items() if k.lower() not in EXCLUDE_HEADERS}
+    req_headers["connection"] = "keep-alive"
     body = cached_body if cached_body is not None else await request.body()
 
     # Context volume estimation & advisory
@@ -546,8 +548,16 @@ async def handle_forward(
         if est_prompt_tokens > 250000:
             resp_headers["x-spark-compaction-advisory"] = "prompt_exceeds_250k_compaction_recommended"
 
+    released = False
+
+    async def cleanup_slot():
+        nonlocal released
+        if not released and release_on_close:
+            released = True
+            await release_slot()
+
     async def stream_body():
-        released = False
+        nonlocal released
         prefix_notified = False
         try:
             async for chunk in upstream_resp.aiter_bytes():
@@ -561,16 +571,14 @@ async def handle_forward(
                             del prefix_inflight[prefix_key]
                 yield chunk
         finally:
-            if not released and release_on_close:
-                released = True
-                await release_slot()
+            await cleanup_slot()
             if prefix_key and not prefix_notified:
                 async with prefix_lock:
                     if prefix_key in prefix_inflight:
                         prefix_inflight[prefix_key].set()
                         del prefix_inflight[prefix_key]
             await upstream_resp.aclose()
-            # Asynchronously offload session to NVMe cold storage if it is a large conversation
+            # Asynchronously offload session to NVMe cold storage if it is a large conversation and memory under pressure
             if prefix_key and body and len(body) > 8000:
                 try:
                     data = json.loads(body)

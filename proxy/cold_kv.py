@@ -14,7 +14,22 @@ logger = logging.getLogger("cold-kv-manager")
 COLD_KV_DIR = Path("/home/joseyarashio/.cache/dgx_cold_kv")
 TIER1_IDLE_TTL_SECONDS = 600      # 10 minutes idle -> stage to NVMe
 TIER2_PURGE_TTL_SECONDS = 86400   # 24 hours unaccessed -> purge from NVMe
-MAX_COLD_STORAGE_BYTES = 50 * (1024 ** 3) # 50 GB maximum cold storage quota
+MAX_COLD_STORAGE_BYTES = 200 * (1024 ** 3) # 200 GB maximum cold storage quota
+HIGH_WATERMARK_FREE_MEM_GIB = 3.5 # Only trigger cold offload when free memory drops below 3.5 GiB
+
+
+def get_host_free_memory_gib() -> float:
+    """Reads available memory from /proc/meminfo in GiB."""
+    try:
+        with open("/proc/meminfo", "r") as f:
+            for line in f:
+                if line.startswith("MemAvailable:"):
+                    parts = line.split()
+                    kb = float(parts[1])
+                    return kb / (1024.0 * 1024.0)
+    except Exception:
+        pass
+    return 8.0  # safe fallback
 
 
 class ColdSessionEntry:
@@ -71,10 +86,21 @@ class ColdKVManager:
             if session_key in self.cold_index:
                 self.cold_index[session_key].last_accessed = time.time()
 
-    async def offload_session(self, session_key: str, messages: List[Dict[str, Any]], prompt_tokens: int = 0):
-        """Asynchronously stages an idle session's prompt context to local NVMe."""
+    async def offload_session(self, session_key: str, messages: List[Dict[str, Any]], prompt_tokens: int = 0, force: bool = False):
+        """
+        Asynchronously stages an idle session's prompt context to local NVMe ONLY when:
+        1. Free memory drops below HIGH_WATERMARK_FREE_MEM_GIB (3.5 GiB), OR
+        2. Force eviction flag is explicitly set.
+        Otherwise, session is kept in memory tier to ensure zero-overhead hot cache!
+        """
         if not session_key or not messages:
             return
+
+        free_mem = get_host_free_memory_gib()
+        if not force and free_mem >= HIGH_WATERMARK_FREE_MEM_GIB:
+            # Memory pool is abundant! Keep 100% in hot RAM/UMA pool
+            return
+
         file_path = self.storage_dir / f"{session_key}.json"
         payload = {
             "session_key": session_key,
