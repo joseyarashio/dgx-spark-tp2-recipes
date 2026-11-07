@@ -66,6 +66,7 @@ class Waiter:
         self.promoted = False
         self.extended = False
         self.deadline = 0.0
+        self.enqueued_at = time.monotonic()
         self.event = asyncio.Event()
 
 
@@ -244,17 +245,27 @@ def _can_run_priority_locked(priority: int) -> bool:
 
 
 def _wake_next_locked():
-    """Promote eligible waiting requests in priority order (0 > 1 > 2) while respecting background_max_slots."""
+    """
+    Promote eligible waiting requests using:
+      1. Priority Aging: P2 requests waiting >= 10s age up to effective priority 1 (preventing starvation by P1, while P0=0 always stays strictly highest).
+      2. Cache-Aware Promotion: Within the same effective priority, requests hitting a warm committed prefix are promoted first to maximize slot turnover.
+      3. FIFO order tie-breaker.
+    """
     limit = state["current_limit"]
     promoted_any = False
+    now_mono = time.monotonic()
     while state["active_running"] < limit and len(waiting_queue) > 0:
         best_idx = -1
-        best_prio = 999
+        best_score = (999, 999, 999)
         for i, w in enumerate(waiting_queue):
             if not _can_run_priority_locked(w.priority):
                 continue
-            if w.priority < best_prio:
-                best_prio = w.priority
+            wait_s = max(0.0, now_mono - w.enqueued_at)
+            eff_prio = max(1, w.priority - int(wait_s // 10.0)) if w.priority >= 2 else w.priority
+            is_cold = 0 if (w.prefix_key and prefix_committed.get(w.prefix_key, 0.0) > now_mono) else 1
+            score = (eff_prio, is_cold, i)
+            if score < best_score:
+                best_score = score
                 best_idx = i
 
         if best_idx < 0:
