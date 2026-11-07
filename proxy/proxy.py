@@ -246,14 +246,19 @@ def _can_run_priority_locked(priority: int) -> bool:
 def _compute_waiter_score(priority: int, prefix_key: str, enqueued_at: float, now_mono: float) -> Tuple[int, int, float]:
     """
     Unified scheduling score used by both Direct Path and `_wake_next_locked`:
-      1. Effective priority: P2 ages to priority 1 after 10s (P0=0 always stays strictly highest).
-      2. Cache-Aware / Max-Age tie-breaker: warm committed prefix OR waiting >= 20s gets `is_cold = 0`
-         so cold waiters cannot be starved indefinitely by newly arriving warm P1 requests.
-      3. Monotonic enqueue timestamp (FIFO).
+      1. Hard Anti-Starvation Ceiling: Any request waiting >= 15s gets elevated to top priority 0
+         and `is_cold = 0` to prevent Head-of-Line inversion from newer short tasks.
+      2. Effective priority: P2 ages to priority 1 after 8s (P0=0 always stays strictly highest).
+      3. Cache-Aware tie-breaker: warm committed prefix gets `is_cold = 0`.
+      4. Monotonic enqueue timestamp (FIFO).
     """
     wait_s = max(0.0, now_mono - enqueued_at)
-    eff_prio = max(1, priority - int(wait_s // 10.0)) if priority >= 2 else priority
-    is_cold = 0 if (wait_s >= 20.0 or (prefix_key and prefix_committed.get(prefix_key, 0.0) > now_mono)) else 1
+    if wait_s >= 15.0:
+        # Anti-Starvation Ceiling reached: elevate to highest rank
+        return (0, 0, enqueued_at)
+
+    eff_prio = max(1, priority - int(wait_s // 8.0)) if priority >= 2 else priority
+    is_cold = 0 if (prefix_key and prefix_committed.get(prefix_key, 0.0) > now_mono) else 1
     return (eff_prio, is_cold, enqueued_at)
 
 
@@ -602,6 +607,7 @@ async def get_proxy_status():
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
 async def proxy_all(request: Request, path: str):
+    req_start_t = time.perf_counter()
     is_completion = path.strip("/").endswith("chat/completions") or path.strip("/").endswith("completions")
 
     if is_completion and request.method == "POST":
@@ -657,6 +663,7 @@ async def proxy_all(request: Request, path: str):
                 prefix_key=prefix_key,
                 priority=priority,
                 req_id=req_id,
+                req_start_t=req_start_t,
             )
         except BaseException:
             await release_slot(priority=priority)
@@ -674,6 +681,7 @@ async def handle_forward(
     prefix_key: str = "",
     priority: int = 1,
     req_id: int = 0,
+    req_start_t: float = 0.0,
 ):
     upstream_url = f"{state['upstream_url']}/{path}"
     query = request.url.query
@@ -725,6 +733,8 @@ async def handle_forward(
         resp_headers["x-spark-estimated-tokens"] = str(est_prompt_tokens)
         if est_prompt_tokens > 250000:
             resp_headers["x-spark-compaction-advisory"] = "prompt_exceeds_250k_compaction_recommended"
+    if req_start_t > 0.0:
+        resp_headers["x-spark-ttfe-seconds"] = f"{time.perf_counter() - req_start_t:.4f}"
 
     released = False
     prefix_notified = False
