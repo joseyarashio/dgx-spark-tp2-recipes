@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import itertools
 import json
 import logging
 import os
@@ -12,6 +14,7 @@ from typing import Dict, Any, Optional, Tuple, List
 import httpx
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
+from starlette.background import BackgroundTask
 
 from cold_kv import ColdKVManager
 
@@ -33,22 +36,26 @@ state: Dict[str, Any] = {
     "model_limits": {
         "dsv41": 2,
         "DeepSeek-V4.1-Flash-EXL3": 2,
-        "DeepSeek-V4.1-Flash-TF": 4,
-        "DeepSeek-V4.1-Flash-1017-TF": 4,
+        "DeepSeek-V4.1-Flash-TF": 6,
+        "DeepSeek-V4.1-Flash-1017-TF": 6,
         "GLM-5.3-Flash": 4,
         "GLM-5.3-Flash-EXL3": 4,
     },
-    "default_limit": 4,
-    "queue_buffer": 4,
-    "tiered_timeouts": [20.0, 15.0, 10.0, 5.0],
+    "default_limit": 6,
+    "queue_buffer": 8,
+    "background_max_slots": 5,
+    "tiered_timeouts": [25.0, 22.0, 19.0, 16.0, 13.0, 10.0, 7.0, 4.0],
     "extension_seconds": 5.0,
     "poll_interval_seconds": 3,
     "current_model": "unknown",
-    "current_limit": 4,
+    "current_limit": 6,
     "active_running": 0,
+    "bg_running": 0,
     "waiting_in_queue": 0,
     "upstream_healthy": False,
 }
+
+_req_id_counter = itertools.count(1)
 
 
 class Waiter:
@@ -62,14 +69,34 @@ class Waiter:
         self.event = asyncio.Event()
 
 
-# Single-Flight Prefix State Machine (Strata Proposal 2)
-# Tracks in-flight prefill per prefix key to eliminate Delay-Hit redundant prefill.
-prefix_inflight: Dict[str, asyncio.Event] = {}
+class SingleFlightEntry:
+    """
+    Bounded Single-Flight Prefix Coordination State.
+    Tracks owner_id to prevent ABA deletion races and ensures immediate cleanup on 429/cancel/error.
+    """
+    def __init__(self, owner_id: int):
+        self.owner_id = owner_id
+        self.event = asyncio.Event()
+        self.waiters = 0
+        self.status = "BUILDING"  # BUILDING | READY | FAILED
+        self.created_at = time.monotonic()
+
+
+prefix_inflight: Dict[str, SingleFlightEntry] = {}
+prefix_committed: Dict[str, float] = {}  # prefix_key -> expiry monotonic timestamp
 prefix_lock = asyncio.Lock()
+
+PREFIX_COMMITTED_TTL_SECONDS = 90.0
+MAX_SINGLEFLIGHT_WAITERS = 8
+SINGLEFLIGHT_WAIT_TIMEOUT = 25.0
 
 
 def compute_prefix_key(body_bytes: bytes) -> str:
-    """Extracts canonical prefix hash for prompts > 4000 characters."""
+    """
+    Extracts canonical shared prefix hash for prompts >= 4000 bytes (~1000+ tokens).
+    Strips the trailing 256 characters of the final message so sibling requests sharing the same
+    codebase/context but asking different trailing questions map to the exact same prefix_key.
+    """
     if len(body_bytes) < 4000:
         return ""
     try:
@@ -77,21 +104,59 @@ def compute_prefix_key(body_bytes: bytes) -> str:
         messages = data.get("messages", [])
         if not messages:
             return ""
-        prefix_str = ""
-        for m in messages:
+        model_tag = str(data.get("model", ""))
+        parts: List[str] = [f"model:{model_tag}"]
+        total_chars = 0
+        num_msgs = len(messages)
+        for idx, m in enumerate(messages):
+            role = str(m.get("role", ""))
             content = m.get("content", "")
+            text_val = ""
             if isinstance(content, str):
-                prefix_str += content[:16384]
+                text_val = content
             elif isinstance(content, list):
+                sub_parts = []
                 for p in content:
-                    if p.get("type") == "text":
-                        prefix_str += p.get("text", "")[:16384]
-        if len(prefix_str) < 4000:
+                    if isinstance(p, dict) and p.get("type") == "text":
+                        sub_parts.append(str(p.get("text", "")))
+                text_val = "".join(sub_parts)
+            # Quantize the final message to a fixed 2048-char block boundary (excluding up to 512 trailing query chars)
+            # so sibling tasks with different-length trailing questions slice the exact same prefix length!
+            if idx == num_msgs - 1 and len(text_val) >= 4608:
+                safe_len = ((len(text_val) - 512) // 2048) * 2048
+                chunk = text_val[:min(16384, safe_len)]
+            else:
+                chunk = text_val[:16384]
+            parts.append(f"{role}:{chunk}")
+            total_chars += len(chunk)
+            if total_chars >= 32768:
+                break
+        if total_chars < 3500:
             return ""
-        import hashlib
-        return hashlib.sha256(prefix_str[:32768].encode()).hexdigest()[:16]
+        canonical = "\n".join(parts)[:32768]
+        return hashlib.sha256(canonical.encode("utf-8", errors="ignore")).hexdigest()[:16]
     except Exception:
         return ""
+
+
+async def _release_prefix(prefix_key: str, owner_id: int, committed: bool = False) -> None:
+    """
+    Idempotently releases Single-Flight ownership for `owner_id`.
+    If committed=True, records the prefix in `prefix_committed` so subsequent warm requests
+    do not serialize unnecessarily. If committed=False (e.g. 429, cancel, upstream error),
+    wakes any followers immediately without poisoning the key.
+    """
+    if not prefix_key or owner_id <= 0:
+        return
+    now = time.monotonic()
+    async with prefix_lock:
+        if committed:
+            prefix_committed[prefix_key] = now + PREFIX_COMMITTED_TTL_SECONDS
+        entry = prefix_inflight.get(prefix_key)
+        if entry is not None and entry.owner_id == owner_id:
+            entry.status = "READY" if committed else "FAILED"
+            entry.event.set()
+            del prefix_inflight[prefix_key]
 
 
 waiting_queue: deque[Waiter] = deque()
@@ -110,6 +175,7 @@ EXCLUDE_HEADERS = {
     "proxy-authorization",
     "te",
     "trailers",
+    "trailer",
     "upgrade",
 }
 
@@ -121,12 +187,15 @@ def load_config() -> None:
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             cfg = json.load(f)
             state["upstream_url"] = cfg.get("upstream_url", state["upstream_url"]).rstrip("/")
+            state["listen_host"] = cfg.get("listen_host", state["listen_host"])
+            state["listen_port"] = int(cfg.get("listen_port", state["listen_port"]))
             state["model_limits"] = cfg.get("model_limits", state["model_limits"])
-            state["default_limit"] = cfg.get("default_limit", state["default_limit"])
-            state["queue_buffer"] = cfg.get("queue_buffer", state["queue_buffer"])
+            state["default_limit"] = int(cfg.get("default_limit", state["default_limit"]))
+            state["queue_buffer"] = int(cfg.get("queue_buffer", state["queue_buffer"]))
+            state["background_max_slots"] = int(cfg.get("background_max_slots", state["background_max_slots"]))
             state["tiered_timeouts"] = [float(t) for t in cfg.get("tiered_timeouts", state["tiered_timeouts"])]
             state["extension_seconds"] = float(cfg.get("extension_seconds", state["extension_seconds"]))
-            state["poll_interval_seconds"] = cfg.get("poll_interval_seconds", state["poll_interval_seconds"])
+            state["poll_interval_seconds"] = float(cfg.get("poll_interval_seconds", state["poll_interval_seconds"]))
     except Exception as e:
         logger.warning(f"Failed to reload config: {e}")
 
@@ -158,223 +227,292 @@ def resolve_limit(model_ids: list[str]) -> tuple[str, int]:
     return first_model, default_lim
 
 
+def _can_run_priority_locked(priority: int) -> bool:
+    """
+    Checks whether a request with `priority` is eligible to take an active GPU slot.
+    Enforces both total concurrency limit AND background_max_slots ceiling (reserving at least
+    1 slot for foreground/normal requests when background_max_slots < current_limit).
+    """
+    limit = state["current_limit"]
+    if state["active_running"] >= limit:
+        return False
+    if priority >= 2:
+        bg_max = state.get("background_max_slots", 5)
+        if state["active_running"] >= bg_max or state["bg_running"] >= bg_max:
+            return False
+    return True
+
+
+def _wake_next_locked():
+    """Promote eligible waiting requests in priority order (0 > 1 > 2) while respecting background_max_slots."""
+    limit = state["current_limit"]
+    promoted_any = False
+    while state["active_running"] < limit and len(waiting_queue) > 0:
+        best_idx = -1
+        best_prio = 999
+        for i, w in enumerate(waiting_queue):
+            if not _can_run_priority_locked(w.priority):
+                continue
+            if w.priority < best_prio:
+                best_prio = w.priority
+                best_idx = i
+
+        if best_idx < 0:
+            break
+
+        promoted_waiter = waiting_queue[best_idx]
+        del waiting_queue[best_idx]
+
+        promoted_waiter.promoted = True
+        state["active_running"] += 1
+        if promoted_waiter.priority >= 2:
+            state["bg_running"] += 1
+        promoted_waiter.event.set()
+        promoted_any = True
+
+    if promoted_any:
+        for i, w in enumerate(waiting_queue):
+            if w.pos != i:
+                w.pos = i
+                w.extended = False  # fresh tier gets fresh extension rights
+                w.event.set()
+    state["waiting_in_queue"] = len(waiting_queue)
+
+
 async def monitor_upstream_model():
     """Background task to poll upstream /v1/models and detect active model & limits."""
     while True:
         try:
             load_config()
             url = f"{state['upstream_url']}/v1/models"
-            async with httpx.AsyncClient(timeout=4.0) as client:
-                resp = await client.get(url)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    model_list = [item["id"] for item in data.get("data", []) if "id" in item]
-                    matched_model, limit = resolve_limit(model_list)
-                    old_model = state["current_model"]
-                    old_limit = state["current_limit"]
+            if http_client is not None:
+                resp = await http_client.get(url, timeout=4.0)
+            else:
+                async with httpx.AsyncClient(timeout=4.0) as client:
+                    resp = await client.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                model_list = [item["id"] for item in data.get("data", []) if "id" in item]
+                matched_model, limit = resolve_limit(model_list)
+                old_model = state["current_model"]
+                old_limit = state["current_limit"]
 
-                    state["current_model"] = matched_model
-                    state["current_limit"] = limit
-                    state["upstream_healthy"] = True
+                state["current_model"] = matched_model
+                state["current_limit"] = limit
+                state["upstream_healthy"] = True
 
-                    if old_model != matched_model or old_limit != limit:
-                        logger.info(
-                            f"Detected upstream model: '{matched_model}' -> Concurrency limit set to {limit} "
-                            f"(was: {old_model} with limit {old_limit})"
-                        )
-                        async with queue_lock:
-                            _wake_next_locked()
-                else:
-                    state["upstream_healthy"] = False
+                if old_model != matched_model or old_limit != limit:
+                    logger.info(
+                        f"Detected upstream model: '{matched_model}' -> Concurrency limit set to {limit} "
+                        f"(was: {old_model} with limit {old_limit}, bg_max={state['background_max_slots']})"
+                    )
+                    async with queue_lock:
+                        _wake_next_locked()
+            else:
+                state["upstream_healthy"] = False
         except Exception:
             state["upstream_healthy"] = False
 
         await asyncio.sleep(state["poll_interval_seconds"])
 
 
-def _wake_next_locked():
-    """Promote waiting requests if active_running < current_limit, respecting priority order."""
-    limit = state["current_limit"]
-    while state["active_running"] < limit and len(waiting_queue) > 0:
-        # Find highest priority waiter (lowest priority integer: 0 > 1 > 2)
-        best_idx = 0
-        best_prio = waiting_queue[0].priority
-        for i, w in enumerate(waiting_queue):
-            if w.priority < best_prio:
-                best_prio = w.priority
-                best_idx = i
-
-        promoted_waiter = waiting_queue[best_idx]
-        del waiting_queue[best_idx]
-
-        promoted_waiter.promoted = True
-        promoted_waiter.event.set()
-        state["active_running"] += 1
-        # Advance everyone else in queue
-        for i, w in enumerate(waiting_queue):
-            w.pos = i
-            w.extended = False  # fresh tier gets fresh extension rights
-            w.event.set()
-    state["waiting_in_queue"] = len(waiting_queue)
-
-
-async def acquire_slot(priority: int = 1, prefix_key: str = "") -> Tuple[bool, str]:
+async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0) -> Tuple[bool, str]:
     """
     Acquire an execution slot with Tiered Dynamic Queue Management, Priority Scheduling, Anti-Herd Extension,
-    and Strata Single-Flight Prefix Coordination.
+    and Leak-Free Strata Single-Flight Prefix Coordination.
     priority: 0 = high/foreground, 1 = normal, 2 = background/batch.
-    Background requests (priority >= 2) cannot consume more than background_max_slots (default 3 of 4).
     """
-    # Single-Flight Check: if another identical prefix is currently building in prefill,
-    # wait for it to complete its KV prefill so we hit cache instead of duplicating prefill!
-    leader_event: Optional[asyncio.Event] = None
-    if prefix_key:
-        async with prefix_lock:
-            if prefix_key in prefix_inflight:
-                leader_event = prefix_inflight[prefix_key]
-            else:
-                prefix_inflight[prefix_key] = asyncio.Event()
+    leader_entry: Optional[SingleFlightEntry] = None
+    registered_as_leader = False
 
-    if leader_event:
+    if prefix_key:
+        now_mono = time.monotonic()
+        async with prefix_lock:
+            # Prune expired committed prefixes and stale inflight entries
+            expired_c = [k for k, exp in prefix_committed.items() if exp <= now_mono]
+            for k in expired_c:
+                del prefix_committed[k]
+            stale_if = [k for k, ent in prefix_inflight.items() if (now_mono - ent.created_at) > 45.0]
+            for k in stale_if:
+                ent = prefix_inflight.pop(k)
+                ent.status = "FAILED"
+                ent.event.set()
+
+            if prefix_key in prefix_committed:
+                # Prefix is already warm in engine RAM cache! Skip Single-Flight serialization.
+                pass
+            elif prefix_key in prefix_inflight:
+                ent = prefix_inflight[prefix_key]
+                if ent.waiters < MAX_SINGLEFLIGHT_WAITERS:
+                    ent.waiters += 1
+                    leader_entry = ent
+            else:
+                prefix_inflight[prefix_key] = SingleFlightEntry(owner_id=req_id)
+                registered_as_leader = True
+
+    if leader_entry is not None:
         logger.info(f"Single-Flight Delay-Hit Mitigation: Waiting for leader prefill [prefix: {prefix_key}]...")
         try:
-            # Wait up to 30s for leader prefill to finish and commit KV
-            await asyncio.wait_for(leader_event.wait(), timeout=30.0)
-            logger.info(f"Single-Flight Leader finished: Follower attached to cached prefix [prefix: {prefix_key}]")
+            await asyncio.wait_for(leader_entry.event.wait(), timeout=SINGLEFLIGHT_WAIT_TIMEOUT)
+            logger.info(
+                f"Single-Flight Leader finished (status={leader_entry.status}): "
+                f"Follower proceeding [prefix: {prefix_key}]"
+            )
         except asyncio.TimeoutError:
             logger.warning(f"Single-Flight Leader wait timed out for prefix {prefix_key}, falling back to normal acquire.")
+        finally:
+            async with prefix_lock:
+                leader_entry.waiters = max(0, leader_entry.waiters - 1)
 
-    async with queue_lock:
-        limit = state["current_limit"]
-        queue_max = state["queue_buffer"]
-        bg_max = state.get("background_max_slots", 3)
+    slot_acquired = False
+    try:
+        async with queue_lock:
+            limit = state["current_limit"]
+            queue_max = state["queue_buffer"]
+            bg_max = state.get("background_max_slots", 5)
 
-        # Background ceiling check: reserve at least 1 slot for interactive
-        if priority >= 2 and state["active_running"] >= bg_max:
-            # Check if queue has room
-            if len(waiting_queue) >= queue_max:
-                return False, "bg_limit_queue_full"
+            # Background ceiling check when queue is also full
+            if priority >= 2 and (state["active_running"] >= bg_max or state["bg_running"] >= bg_max):
+                if len(waiting_queue) >= queue_max:
+                    return False, "bg_limit_queue_full"
 
-        # 1. Direct GPU execution if slot free and nobody waiting ahead with higher priority
-        if state["active_running"] < limit:
-            has_higher_waiting = any(w.priority < priority for w in waiting_queue)
-            if not has_higher_waiting:
-                if not (priority >= 2 and state["active_running"] >= bg_max):
+            # 1. Direct GPU execution if eligible and nobody waiting ahead with higher priority
+            if _can_run_priority_locked(priority):
+                has_higher_waiting = any(
+                    w.priority < priority and _can_run_priority_locked(w.priority)
+                    for w in waiting_queue
+                )
+                if not has_higher_waiting:
                     state["active_running"] += 1
+                    if priority >= 2:
+                        state["bg_running"] += 1
+                    slot_acquired = True
                     logger.info(
-                        f"Direct GPU execution [running: {state['active_running']}/{limit}, prio: {priority}] (model: {state['current_model']})"
+                        f"Direct GPU execution [running: {state['active_running']}/{limit}, bg: {state['bg_running']}/{bg_max}, prio: {priority}] "
+                        f"(model: {state['current_model']})"
                     )
                     return True, "direct"
 
-        # 2. Check if queue is already full -> immediate fast-fail
-        if len(waiting_queue) >= queue_max:
-            return False, "queue_full"
+            # 2. Check if queue is already full -> immediate fast-fail
+            if len(waiting_queue) >= queue_max:
+                return False, "queue_full"
 
-        # 3. Enter tiered queue with priority
-        pos = len(waiting_queue)
-        waiter = Waiter(pos, priority=priority, prefix_key=prefix_key)
-        waiting_queue.append(waiter)
-        state["waiting_in_queue"] = len(waiting_queue)
-        initial_timeout = get_timeout(pos)
-        waiter.deadline = asyncio.get_event_loop().time() + initial_timeout
-        logger.info(
-            f"Entered standby queue at position {pos+1}/{queue_max} (prio={priority}, initial timeout={initial_timeout}s)"
-        )
+            # 3. Enter tiered queue with priority
+            pos = len(waiting_queue)
+            waiter = Waiter(pos, priority=priority, prefix_key=prefix_key)
+            waiting_queue.append(waiter)
+            state["waiting_in_queue"] = len(waiting_queue)
+            initial_timeout = get_timeout(pos)
+            waiter.deadline = asyncio.get_event_loop().time() + initial_timeout
+            logger.info(
+                f"Entered standby queue at position {pos+1}/{queue_max} (prio={priority}, initial timeout={initial_timeout}s)"
+            )
 
-    # Wait outside lock
-    try:
-        cur_timeout = initial_timeout
-        while True:
-            cur_pos = waiter.pos
-            waiter.deadline = asyncio.get_event_loop().time() + cur_timeout
-            try:
-                await asyncio.wait_for(waiter.event.wait(), timeout=cur_timeout)
-            except asyncio.TimeoutError:
-                # Timed out at current position without promotion or advance signal
-                async with queue_lock:
-                    if waiter.promoted:
-                        return True, "promoted"
+        # Wait outside lock
+        try:
+            cur_timeout = initial_timeout
+            while True:
+                cur_pos = waiter.pos
+                waiter.deadline = asyncio.get_event_loop().time() + cur_timeout
+                try:
+                    await asyncio.wait_for(waiter.event.wait(), timeout=cur_timeout)
+                except asyncio.TimeoutError:
+                    async with queue_lock:
+                        if waiter.promoted:
+                            slot_acquired = True
+                            return True, "promoted"
 
-                    # Anti-Herd Extension Check:
-                    # If not already extended at this tier, check if ANY waiter ahead has remaining time <= 5s
-                    can_extend = False
-                    if not waiter.extended:
-                        now = asyncio.get_event_loop().time()
-                        ext_threshold = state.get("extension_seconds", 5.0)
-                        for w in waiting_queue:
-                            if w.pos < waiter.pos:
-                                rem = w.deadline - now
-                                if rem <= ext_threshold:
-                                    can_extend = True
-                                    break
+                        # Anti-Herd Extension Check
+                        can_extend = False
+                        if not waiter.extended:
+                            now = asyncio.get_event_loop().time()
+                            ext_threshold = state.get("extension_seconds", 5.0)
+                            for w in waiting_queue:
+                                if w.pos < waiter.pos:
+                                    rem = w.deadline - now
+                                    if rem <= ext_threshold:
+                                        can_extend = True
+                                        break
 
-                    if can_extend:
-                        waiter.extended = True
-                        cur_timeout = state.get("extension_seconds", 5.0)
-                        waiter.deadline = asyncio.get_event_loop().time() + cur_timeout
-                        logger.info(
-                            f"Anti-herd extension: Waiter at pos {waiter.pos+1} EXTENDED by {cur_timeout}s "
-                            "(waiter ahead is about to exit/promote)"
-                        )
-                        continue
+                        if can_extend:
+                            waiter.extended = True
+                            cur_timeout = state.get("extension_seconds", 5.0)
+                            waiter.deadline = asyncio.get_event_loop().time() + cur_timeout
+                            logger.info(
+                                f"Anti-herd extension: Waiter at pos {waiter.pos+1} EXTENDED by {cur_timeout}s "
+                                "(waiter ahead is about to exit/promote)"
+                            )
+                            continue
 
-                    # Cannot extend or already extended once -> Dropout to 429
-                    if waiter in waiting_queue:
-                        idx = waiting_queue.index(waiter)
-                        del waiting_queue[idx]
-                        # Advance waiters behind this one
-                        for i in range(idx, len(waiting_queue)):
-                            w = waiting_queue[i]
+                        # Cannot extend or already extended once -> Dropout to 429
+                        if waiter in waiting_queue:
+                            idx = waiting_queue.index(waiter)
+                            del waiting_queue[idx]
+                            for i in range(idx, len(waiting_queue)):
+                                w = waiting_queue[i]
+                                if w.pos != i:
+                                    w.pos = i
+                                    w.extended = False
+                                    w.event.set()
+                            state["waiting_in_queue"] = len(waiting_queue)
+                    logger.warning(
+                        f"Tiered queue timeout at position {cur_pos+1} (extended={waiter.extended}) -> fast-fail 429"
+                    )
+                    return False, f"tiered_timeout_pos_{cur_pos+1}"
+
+                # Waiter was signaled
+                if waiter.promoted:
+                    slot_acquired = True
+                    logger.info(
+                        f"Promoted to GPU execution [running: {state['active_running']}/{state['current_limit']}, bg: {state['bg_running']}/{state['background_max_slots']}]"
+                    )
+                    return True, "promoted"
+
+                # Position advanced! Reset event, clear extension flag for new tier, and loop
+                waiter.event.clear()
+                waiter.extended = False
+                cur_timeout = get_timeout(waiter.pos)
+                logger.info(
+                    f"Queue position advanced to {waiter.pos+1}/{state['queue_buffer']}! Timeout reset to {cur_timeout}s"
+                )
+
+        except asyncio.CancelledError:
+            async with queue_lock:
+                if waiter.promoted:
+                    state["active_running"] = max(0, state["active_running"] - 1)
+                    if priority >= 2:
+                        state["bg_running"] = max(0, state["bg_running"] - 1)
+                    _wake_next_locked()
+                elif waiter in waiting_queue:
+                    idx = waiting_queue.index(waiter)
+                    del waiting_queue[idx]
+                    for i in range(idx, len(waiting_queue)):
+                        w = waiting_queue[i]
+                        if w.pos != i:
                             w.pos = i
                             w.extended = False
                             w.event.set()
-                        state["waiting_in_queue"] = len(waiting_queue)
-                logger.warning(
-                    f"Tiered queue timeout at position {cur_pos+1} (extended={waiter.extended}) -> fast-fail 429"
-                )
-                return False, f"tiered_timeout_pos_{cur_pos+1}"
-
-            # Waiter was signaled
-            if waiter.promoted:
-                logger.info(
-                    f"Promoted to GPU execution [running: {state['active_running']}/{state['current_limit']}]"
-                )
-                return True, "promoted"
-
-            # Position advanced! Reset event, clear extension flag for new tier, and loop
-            waiter.event.clear()
-            waiter.extended = False
-            cur_timeout = get_timeout(waiter.pos)
-            logger.info(
-                f"Queue position advanced to {waiter.pos+1}/{state['queue_buffer']}! Timeout reset to {cur_timeout}s"
-            )
-
-    except asyncio.CancelledError:
-        async with queue_lock:
-            if waiter.promoted:
-                state["active_running"] = max(0, state["active_running"] - 1)
-                _wake_next_locked()
-            elif waiter in waiting_queue:
-                idx = waiting_queue.index(waiter)
-                del waiting_queue[idx]
-                for i in range(idx, len(waiting_queue)):
-                    w = waiting_queue[i]
-                    w.pos = i
-                    w.extended = False
-                    w.event.set()
-                state["waiting_in_queue"] = len(waiting_queue)
-        raise
+                    state["waiting_in_queue"] = len(waiting_queue)
+            raise
+    finally:
+        # CRITICAL FIX (P0-1): If Leader failed to acquire a slot (429 or CancelledError),
+        # immediately release `prefix_inflight` so followers never hang for 30s on a dead leader!
+        if registered_as_leader and not slot_acquired:
+            await _release_prefix(prefix_key, req_id, committed=False)
 
 
-async def release_slot():
+async def release_slot(priority: int = 1):
     async with queue_lock:
         state["active_running"] = max(0, state["active_running"] - 1)
+        if priority >= 2:
+            state["bg_running"] = max(0, state["bg_running"] - 1)
         _wake_next_locked()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global http_client
+    load_config()
     limits = httpx.Limits(max_keepalive_connections=100, max_connections=200)
     http_client = httpx.AsyncClient(limits=limits, timeout=httpx.Timeout(600.0, connect=10.0))
     monitor_task = asyncio.create_task(monitor_upstream_model())
@@ -392,7 +530,8 @@ async def lifespan(app: FastAPI):
     sweep_task = asyncio.create_task(cold_kv_sweep_loop())
     logger.info(
         f"Starting proxy with upstream: {state['upstream_url']} "
-        f"(queue_buffer={state['queue_buffer']}, tiered_timeouts={state['tiered_timeouts']}, "
+        f"(limit={state['current_limit']}, bg_max={state['background_max_slots']}, "
+        f"queue_buffer={state['queue_buffer']}, tiered_timeouts={state['tiered_timeouts']}, "
         f"anti_herd_extension={state['extension_seconds']}s, cold_kv=enabled)"
     )
     yield
@@ -407,24 +546,33 @@ app = FastAPI(title="Spark Fast-Fail Concurrency Proxy with Anti-Herd Dynamic Qu
 
 @app.get("/proxy/status")
 async def get_proxy_status():
+    now_mono = time.monotonic()
     async with queue_lock:
         running = state["active_running"]
+        bg_running = state["bg_running"]
         waiting = len(waiting_queue)
         positions = [w.pos + 1 for w in waiting_queue]
         extended_flags = [w.extended for w in waiting_queue]
+    async with prefix_lock:
+        inflight_count = len(prefix_inflight)
+        committed_count = sum(1 for exp in prefix_committed.values() if exp > now_mono)
     return {
         "status": "ok",
         "upstream_healthy": state["upstream_healthy"],
         "upstream_url": state["upstream_url"],
         "current_model": state["current_model"],
         "concurrency_limit": state["current_limit"],
+        "background_max_slots": state["background_max_slots"],
         "queue_buffer": state["queue_buffer"],
         "tiered_timeouts": state["tiered_timeouts"],
         "extension_seconds": state["extension_seconds"],
         "active_running": running,
+        "bg_running": bg_running,
         "waiting_in_queue": waiting,
         "queue_positions": positions,
         "queue_extended": extended_flags,
+        "singleflight_inflight": inflight_count,
+        "singleflight_committed": committed_count,
         "model_limits_config": state["model_limits"],
         "default_limit": state["default_limit"],
         "cold_kv": cold_kv_mgr.get_stats(),
@@ -436,6 +584,7 @@ async def proxy_all(request: Request, path: str):
     is_completion = path.strip("/").endswith("chat/completions") or path.strip("/").endswith("completions")
 
     if is_completion and request.method == "POST":
+        req_id = next(_req_id_counter)
         body_bytes = await request.body()
         prefix_key = compute_prefix_key(body_bytes)
         if prefix_key:
@@ -451,7 +600,7 @@ async def proxy_all(request: Request, path: str):
             elif prio_lower in ["low", "background", "batch", "2"]:
                 priority = 2
 
-        acquired, reason = await acquire_slot(priority=priority, prefix_key=prefix_key)
+        acquired, reason = await acquire_slot(priority=priority, prefix_key=prefix_key, req_id=req_id)
         if not acquired:
             curr_model = state["current_model"]
             limit = state["current_limit"]
@@ -479,14 +628,18 @@ async def proxy_all(request: Request, path: str):
             )
 
         try:
-            return await handle_forward(request, path, release_on_close=True, cached_body=body_bytes, prefix_key=prefix_key)
-        except Exception:
-            await release_slot()
-            if prefix_key:
-                async with prefix_lock:
-                    if prefix_key in prefix_inflight:
-                        prefix_inflight[prefix_key].set()
-                        del prefix_inflight[prefix_key]
+            return await handle_forward(
+                request,
+                path,
+                release_on_close=True,
+                cached_body=body_bytes,
+                prefix_key=prefix_key,
+                priority=priority,
+                req_id=req_id,
+            )
+        except BaseException:
+            await release_slot(priority=priority)
+            await _release_prefix(prefix_key, req_id, committed=False)
             raise
     else:
         return await handle_forward(request, path, release_on_close=False)
@@ -498,6 +651,8 @@ async def handle_forward(
     release_on_close: bool = False,
     cached_body: Optional[bytes] = None,
     prefix_key: str = "",
+    priority: int = 1,
+    req_id: int = 0,
 ):
     upstream_url = f"{state['upstream_url']}/{path}"
     query = request.url.query
@@ -526,19 +681,21 @@ async def handle_forward(
             content=body,
         )
         upstream_resp = await http_client.send(upstream_req, stream=True)
-    except Exception as e:
+    except BaseException as e:
         if release_on_close:
-            await release_slot()
-        if prefix_key:
-            async with prefix_lock:
-                if prefix_key in prefix_inflight:
-                    prefix_inflight[prefix_key].set()
-                    del prefix_inflight[prefix_key]
+            await release_slot(priority=priority)
+        await _release_prefix(prefix_key, req_id, committed=False)
+        if isinstance(e, asyncio.CancelledError):
+            raise
         logger.error(f"Failed to connect to upstream {upstream_url}: {e}")
         return JSONResponse(
             status_code=502,
             content={"error": {"message": f"Bad Gateway to Spark backend: {e}", "type": "bad_gateway", "code": 502}},
         )
+
+    # If upstream returned an HTTP error (>= 400), release prefix immediately without marking committed
+    if upstream_resp.status_code >= 400 and prefix_key:
+        await _release_prefix(prefix_key, req_id, committed=False)
 
     resp_headers = {
         k: v for k, v in upstream_resp.headers.items() if k.lower() not in EXCLUDE_HEADERS
@@ -549,55 +706,62 @@ async def handle_forward(
             resp_headers["x-spark-compaction-advisory"] = "prompt_exceeds_250k_compaction_recommended"
 
     released = False
+    prefix_notified = False
+    resp_closed = False
 
-    async def cleanup_slot():
-        nonlocal released
+    async def cleanup_all():
+        nonlocal released, prefix_notified, resp_closed
         if not released and release_on_close:
             released = True
-            await release_slot()
+            await release_slot(priority=priority)
+        if prefix_key and not prefix_notified:
+            prefix_notified = True
+            await _release_prefix(prefix_key, req_id, committed=False)
+        if not resp_closed:
+            resp_closed = True
+            try:
+                await upstream_resp.aclose()
+            except Exception:
+                pass
 
     async def stream_body():
-        nonlocal released
-        prefix_notified = False
+        nonlocal prefix_notified
         try:
             async for chunk in upstream_resp.aiter_bytes():
-                # Notify single-flight waiters as soon as first chunk arrives (prefill finished!)
-                if prefix_key and not prefix_notified:
-                    prefix_notified = True
-                    async with prefix_lock:
-                        if prefix_key in prefix_inflight:
-                            ev = prefix_inflight[prefix_key]
-                            ev.set()
-                            del prefix_inflight[prefix_key]
+                # Notify single-flight waiters ONLY after prefill completes and first actual token chunk arrives
+                # (ignore pre-prefill `{"delta":{"role":"assistant"}}` header chunk and SSE `: ping` comments)
+                if prefix_key and not prefix_notified and upstream_resp.status_code == 200:
+                    if (
+                        b'"content":' in chunk
+                        or b'"reasoning_content":' in chunk
+                        or b'"tool_calls":' in chunk
+                        or b'"object":"chat.completion"' in chunk
+                        or b'"text":' in chunk
+                    ):
+                        prefix_notified = True
+                        await _release_prefix(prefix_key, req_id, committed=True)
                 yield chunk
         finally:
-            await cleanup_slot()
-            if prefix_key and not prefix_notified:
-                async with prefix_lock:
-                    if prefix_key in prefix_inflight:
-                        prefix_inflight[prefix_key].set()
-                        del prefix_inflight[prefix_key]
-            await upstream_resp.aclose()
-            # Asynchronously offload session to NVMe cold storage if it is a large conversation and memory under pressure
+            await cleanup_all()
+            # Asynchronously offload session to NVMe cold storage ONLY when memory drops below high-watermark
             if prefix_key and body and len(body) > 8000:
-                try:
-                    data = json.loads(body)
-                    msgs = data.get("messages", [])
-                    asyncio.create_task(cold_kv_mgr.offload_session(prefix_key, msgs, prompt_tokens=est_prompt_tokens))
-                except Exception:
-                    pass
+                asyncio.create_task(
+                    cold_kv_mgr.offload_raw_body(prefix_key, body, prompt_tokens=est_prompt_tokens)
+                )
 
     return StreamingResponse(
         stream_body(),
         status_code=upstream_resp.status_code,
         headers=resp_headers,
+        background=BackgroundTask(cleanup_all),
     )
 
+
+load_config()
 
 if __name__ == "__main__":
     import uvicorn
 
-    load_config()
     host = state.get("listen_host", "0.0.0.0")
     port = state.get("listen_port", 8889)
     uvicorn.run("proxy:app", host=host, port=port, log_level="info")
