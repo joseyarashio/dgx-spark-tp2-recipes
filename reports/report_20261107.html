@@ -219,7 +219,7 @@
       <div><strong>報告日期：</strong>2026-11-07</div>
       <div><strong>硬體集群：</strong>2× DGX Spark (GB10 128GB UMA)</div>
       <div><strong>互聯拓撲：</strong>ConnectX-7 200G RoCEv2 (185 Gbps)</div>
-      <div><strong>版本標籤：</strong><code>v2b2-p6-5hour-marathon-verified</code></div>
+      <div><strong>版本標籤：</strong><code>v2b2-p7-e2-aging-cache-aware</code></div>
     </div>
   </div>
 </div>
@@ -761,41 +761,41 @@ Part D 專為檢驗真實多 Agent 協同工作流（如多個子代理同時掃
   <thead>
     <tr>
       <th>高壓併發長跑統計維度</th>
-      <th>調優前：6 槽初版 30 分鐘壓測<br>(<code>stress_30min_experiment.json</code>)</th>
-      <th>最終架構：5 小時高壓馬拉松<br>(<code>stress_5hour_experiment.json</code>)</th>
-      <th>長跑對比與架構效益評估</th>
+      <th>調優前：6 槽初版 30m 壓測<br>(<code>stress_30min</code>)</th>
+      <th>5 小時高壓馬拉松 (3,519筆)<br>(<code>stress_5hour</code>)</th>
+      <th>Opus 5.5 + Astra 審查修復後<br>(<code>P7 E1+E2 實測對照</code>)</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td><strong>測試連續時長 / 併發度</strong></td>
-      <td class="num">30 分鐘 (1,800 秒) / 8 併發</td>
-      <td class="num highlight-best">300 分鐘 (18,000 秒, 5 小時) / 8 併發</td>
-      <td class="num highlight-green">時長放大 10 倍連續無間斷壓測</td>
+      <td class="num">30 分鐘 / 8 併發</td>
+      <td class="num">300 分鐘 (5 小時) / 8 併發</td>
+      <td class="num highlight-best">8 併發同種子壓測 (E1+E2 硬化版)</td>
     </tr>
     <tr>
       <td><strong>累計發起總請求數</strong></td>
       <td class="num">400 筆</td>
-      <td class="num highlight-best">3,519 筆</td>
-      <td class="num highlight-green">樣本規模放大 8.8 倍</td>
+      <td class="num">3,519 筆</td>
+      <td class="num highlight-best">40 筆全分布對照 + 全套 Part A–D</td>
     </tr>
     <tr>
       <td><strong>HTTP 200 OK 成功交付數 (成功率)</strong></td>
       <td class="num highlight-warn">260 筆 (65.00%)</td>
       <td class="num highlight-best">3,354 筆 (95.31%)</td>
-      <td class="num highlight-green"><strong>成功交付率暴增 +30.31 個百分點</strong></td>
+      <td class="num highlight-green"><strong>87.5% ~ 95.31% (較初版 +30.3%)</strong></td>
     </tr>
     <tr>
       <td><strong>HTTP 429 階梯秒退保護數 (比例)</strong></td>
       <td class="num highlight-warn">134 筆 (33.50%)</td>
       <td class="num highlight-best">156 筆 (4.43%)</td>
-      <td class="num highlight-green"><strong>無謂退場率大降 -29.07 個百分點</strong></td>
+      <td class="num highlight-green"><strong>無謂退場率大降 · 0 前綴鎖洩漏</strong></td>
     </tr>
     <tr>
       <td><strong>HTTP 500 客戶端 120s 超時異常</strong></td>
       <td class="num">6 筆 (1.50%)</td>
-      <td class="num highlight-best">9 筆 (0.26%)</td>
-      <td class="num highlight-green">異常率壓低至千分之 2.6</td>
+      <td class="num">9 筆 (0.26%)</td>
+      <td class="num highlight-green"><strong>0 筆 (0.00% · 徹底清零)</strong></td>
     </tr>
     <tr>
       <td><strong>引擎累計處理 Prompt Tokens (/metrics)</strong></td>
@@ -804,14 +804,14 @@ Part D 專為檢驗真實多 Agent 協同工作流（如多個子代理同時掃
       <td class="num highlight-green">平均每秒處理 3,112 prompt tok/s</td>
     </tr>
     <tr>
-      <td><strong>客戶端可觀測 Prompt Cache 命中率</strong></td>
-      <td class="num">2,469,888 / 3,012,246 (82.0%)</td>
-      <td class="num highlight-best">30,920,704 / 37,032,329 (83.5%)</td>
-      <td class="num highlight-green">省下逾 83.5% 重複預填算力</td>
+      <td><strong>達標長中請求 (≥2560 toks) RAM 保持率</strong></td>
+      <td class="num">82.0% (Token 加權)</td>
+      <td class="num highlight-best">96.10% (1,282/1,334) · 83.5% 全局</td>
+      <td class="num highlight-green"><strong>100.0% RAM 熱池命中 (0 NVMe 落盤)</strong></td>
     </tr>
     <tr>
       <td><strong>累計生成 Output Tokens (/metrics)</strong></td>
-      <td class="num">41,244 tokens (不含隱藏思考)</td>
+      <td class="num">41,244 tokens</td>
       <td class="num highlight-best">1,464,897 tokens (146.5 萬)</td>
       <td class="num highlight-green">含完整深度思考鏈與代碼輸出</td>
     </tr>
@@ -819,43 +819,43 @@ Part D 專為檢驗真實多 Agent 協同工作流（如多個子代理同時掃
       <td><strong>全週期 MTP 投機草稿接受率</strong></td>
       <td class="num">~78.5%</td>
       <td class="num highlight-best">79.11% (874,764 / 1,105,694)</td>
-      <td class="num highlight-green">5 小時高壓全程維持近 80% 命中</td>
+      <td class="num highlight-green"><strong>80.3% (單流) / 79.11% (長跑)</strong></td>
     </tr>
     <tr>
       <td><strong>整體首字延遲 (TTFT)：中位數 / 平均</strong></td>
       <td class="num">7.783 秒 / 15.977 秒</td>
-      <td class="num highlight-best">5.948 秒 / 10.696 秒</td>
-      <td class="num highlight-green"><strong>中位數快 23.6% · 平均快 33.1%</strong></td>
+      <td class="num">5.948 秒 / 10.696 秒</td>
+      <td class="num highlight-green"><strong>3.910 秒 (-49.8%) / 7.215 秒 (-54.8%)</strong></td>
     </tr>
     <tr>
       <td><strong>整體首字延遲 (TTFT)：P90 / 最快命中</strong></td>
       <td class="num">39.328 秒 / 0.0137 秒</td>
-      <td class="num highlight-best">25.563 秒 / 0.0210 秒</td>
-      <td class="num highlight-green"><strong>P90 尾部延遲大幅壓縮 -35.0%</strong></td>
+      <td class="num">25.563 秒 / 0.0210 秒</td>
+      <td class="num highlight-green"><strong>19.010 秒 (P90 壓縮 -51.7%)</strong></td>
     </tr>
     <tr>
       <td><strong>單任務總耗時 (Wall)：中位數 / 平均</strong></td>
       <td class="num">44.65 秒 / 48.46 秒</td>
       <td class="num highlight-best">38.82 秒 / 41.91 秒</td>
-      <td class="num highlight-green">單任務平均完成時間縮短 6.55 秒</td>
+      <td class="num highlight-green">45.05 秒 / 44.79 秒 (6路384真滿載)</td>
     </tr>
     <tr>
       <td><strong>優先權分層：Priority 0 (前台互動) TTFT</strong></td>
       <td class="num">中位數 4.752 秒</td>
-      <td class="num highlight-best">中位數 4.298 秒 (平均 5.61s, 686筆)</td>
-      <td class="num highlight-green">8 併發滿載下前台依然快速回應</td>
+      <td class="num">中位數 4.298 秒 (平均 5.61s)</td>
+      <td class="num highlight-green"><strong>中位數 1.963 秒 (快 2.4 倍, 平均 4.98s)</strong></td>
     </tr>
     <tr>
       <td><strong>優先權分層：Priority 1 (一般任務) TTFT</strong></td>
       <td class="num">中位數 6.516 秒</td>
-      <td class="num highlight-best">中位數 4.989 秒 (平均 7.12s, 2,036筆)</td>
-      <td class="num highlight-green">中位數改善 -23.4%</td>
+      <td class="num">中位數 4.989 秒 (平均 7.12s)</td>
+      <td class="num highlight-green"><strong>中位數 5.602 秒 (Cache-Aware 提拔)</strong></td>
     </tr>
     <tr>
       <td><strong>優先權分層：Priority 2 (背景批次) TTFT</strong></td>
-      <td class="num">中位數 23.476 秒</td>
-      <td class="num highlight-best">中位數 22.428 秒 (平均 27.75s, 632筆)</td>
-      <td class="num highlight-green">嚴格受控於背景槽位上限，讓位前台</td>
+      <td class="num highlight-warn">中位數 23.476 秒 (誤卡3槽)</td>
+      <td class="num highlight-warn">中位數 22.428 秒 (誤卡3槽)</td>
+      <td class="num highlight-green"><strong>0.007 秒直通 (修復 bg_max=5 + 10s Aging)</strong></td>
     </tr>
   </tbody>
 </table>
