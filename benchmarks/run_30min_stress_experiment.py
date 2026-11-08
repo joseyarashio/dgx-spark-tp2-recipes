@@ -5,10 +5,13 @@ import logging
 import os
 import random
 import string
+import struct
 import sys
 import time
 import urllib.request
 import urllib.error
+import zlib
+import base64
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List
@@ -18,6 +21,36 @@ STATUS_URL = "http://127.0.0.1:8889/proxy/status"
 DURATION_SECONDS = 1800  # 30 minutes
 MAX_CONCURRENCY = 8     # 6 active GPU slots + 2 standby queue (within 14 limit)
 OUTPUT_FILE = Path("/home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/results/stress_30min_experiment.json")
+
+def make_test_png(width=256, height=256, color_idx=0):
+    raw_data = bytearray()
+    colors = [
+        ((220, 30, 30), (30, 200, 30), (30, 60, 220), (230, 210, 30)),
+        ((30, 200, 30), (220, 30, 30), (230, 210, 30), (30, 60, 220)),
+        ((30, 60, 220), (230, 210, 30), (220, 30, 30), (30, 200, 30)),
+    ][color_idx % 3]
+    for y in range(height):
+        raw_data.append(0)
+        for x in range(width):
+            if x < width // 2 and y < height // 2:
+                raw_data.extend(colors[0])
+            elif x >= width // 2 and y < height // 2:
+                raw_data.extend(colors[1])
+            elif x < width // 2 and y >= height // 2:
+                raw_data.extend(colors[2])
+            else:
+                raw_data.extend(colors[3])
+    def png_chunk(chunk_type, data):
+        chunk = struct.pack(">I", len(data)) + chunk_type + data
+        crc = zlib.crc32(chunk_type + data) & 0xFFFFFFFF
+        return chunk + struct.pack(">I", crc)
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    idat = zlib.compress(bytes(raw_data), level=6)
+    png = b"\x89PNG\r\n\x1a\n" + png_chunk(b"IHDR", ihdr) + png_chunk(b"IDAT", idat) + png_chunk(b"IEND", b"")
+    return base64.b64encode(png).decode("ascii")
+
+print("Pre-generating synthetic multi-turn vision test images...")
+VISION_TEST_IMAGES = [make_test_png(256, 256, i) for i in range(3)]
 
 # Prepare shared prefix pools for High-Hit scenarios (up to 20K~25K tokens)
 def generate_codebase_corpus(num_tokens: int, seed_str: str) -> str:
@@ -76,6 +109,7 @@ def send_chat_completion(messages: List[Dict[str, str]], max_tokens: int = 384, 
     cached_tokens = 0
     status_code = 0
     error_msg = None
+    content_text = []
 
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
@@ -96,6 +130,9 @@ def send_chat_completion(messages: List[Dict[str, str]], max_tokens: int = 384, 
                     choices = chunk.get("choices", [])
                     if choices:
                         delta = choices[0].get("delta", {})
+                        c = delta.get("content")
+                        if isinstance(c, str) and c:
+                            content_text.append(c)
                         has_tok = bool(
                             (isinstance(delta.get("content"), str) and len(delta["content"]) > 0)
                             or (isinstance(delta.get("reasoning_content"), str) and len(delta["reasoning_content"]) > 0)
@@ -134,13 +171,56 @@ def send_chat_completion(messages: List[Dict[str, str]], max_tokens: int = 384, 
         "ttft_seconds": ttft,
         "tokens": usage_completion_tokens or total_tokens,
         "cached_tokens": cached_tokens,
+        "content": "".join(content_text),
         "error": error_msg
     }
 
 def worker_job(job_id: int) -> Dict[str, Any]:
-    # Random scenario: High-Hit (60%) vs Low-Hit/Unique (40%)
-    is_high_hit = random.random() < 0.60
-    # Length tiers: Short (<2K, 30%), Medium (2K-8K, 40%), Long (10K-25K, 30%)
+    task_choice = random.choices(["HIGH_HIT", "LOW_HIT", "MULTITURN_VISION"], weights=[0.45, 0.35, 0.20])[0]
+
+    if task_choice == "MULTITURN_VISION":
+        img_b64 = random.choice(VISION_TEST_IMAGES)
+        priority = random.choice([0, 1, 1, 2])
+        t_start = time.time()
+        # Turn 1
+        p1 = [
+            {"role": "user", "content": [
+                {"type": "text", "text": f"Task {job_id} [Turn 1]: Describe the color quadrants in this image."},
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_b64}"}}
+            ]}
+        ]
+        res1 = send_chat_completion(p1, max_tokens=128, priority=priority, enable_thinking=False)
+        res1.update({
+            "job_id": job_id,
+            "mode": "VISION_TURN1",
+            "len_tier": "vision",
+            "prompt_tokens_approx": 1024,
+            "priority": priority,
+            "timestamp": t_start
+        })
+        if res1.get("status_code") == 200:
+            # Turn 2: Followup with cached image context
+            ans1 = res1.get("content", "Analyzed image quadrants.")
+            p2 = p1 + [
+                {"role": "assistant", "content": ans1},
+                {"role": "user", "content": f"Task {job_id} [Turn 2]: In the same image, what color is in the bottom-right corner?"}
+            ]
+            res2 = send_chat_completion(p2, max_tokens=128, priority=priority, enable_thinking=False)
+            res2.update({
+                "job_id": f"{job_id}_t2",
+                "mode": "VISION_TURN2_CACHED",
+                "len_tier": "vision_cached",
+                "prompt_tokens_approx": 1100,
+                "priority": priority,
+                "timestamp": time.time(),
+                "turn1_ttft": res1.get("ttft_seconds"),
+                "turn2_cached_tokens": res2.get("cached_tokens", 0)
+            })
+            return res2
+        return res1
+
+    # Text tasks
+    is_high_hit = (task_choice == "HIGH_HIT")
     len_tier = random.choices(["short", "medium", "long"], weights=[0.35, 0.40, 0.25])[0]
 
     if is_high_hit:
@@ -191,7 +271,7 @@ def worker_job(job_id: int) -> Dict[str, Any]:
     return res
 
 def main():
-    print(f"=== Starting 30-Minute Random Concurrency Experiment (Duration: {DURATION_SECONDS}s, Concurrency: {MAX_CONCURRENCY}) ===")
+    print(f"=== Starting Random Concurrency Experiment (Duration: {DURATION_SECONDS}s / {DURATION_SECONDS/60:.1f}m, Concurrency: {MAX_CONCURRENCY}) ===")
     t_end = time.time() + DURATION_SECONDS
     job_counter = 0
     all_results = []
@@ -243,14 +323,14 @@ def main():
                 except Exception:
                     pass
 
-                print(f"  [Progress {elapsed_min:.1f}/30.0 min] Total requests completed: {len(all_results)} | Recent 100 Status: {sc_counts} | Cold KV count: {cold_info.get('cold_sessions_count')}, {cold_info.get('total_cold_mb')} MB")
+                print(f"  [Progress {elapsed_min:.1f}/{DURATION_SECONDS/60:.1f} min] Total requests completed: {len(all_results)} | Recent 100 Status: {sc_counts} | Cold KV count: {cold_info.get('cold_sessions_count')}, {cold_info.get('total_cold_mb')} MB")
                 minute_samples.append({
                     "elapsed_minutes": round(elapsed_min, 2),
                     "total_completed": len(all_results),
                     "cold_kv": cold_info
                 })
 
-    print(f"\n=== 30-Minute Experiment Finished! Total requests: {len(all_results)} ===")
+    print(f"\n=== {DURATION_SECONDS/60:.1f}-Minute Experiment Finished! Total requests: {len(all_results)} ===")
     
     # Save full results
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -264,6 +344,7 @@ def main():
     with open(OUTPUT_FILE, "w") as f:
         json.dump(summary_data, f)
     print(f"Results saved to {OUTPUT_FILE}")
+    return summary_data
 
 if __name__ == "__main__":
     main()
