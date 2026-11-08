@@ -64,9 +64,10 @@ def _sync_cluster_shm():
         limit = state.get("current_limit", 8)
         now_ms = int(time.time() * 1000)
         content = f"{active},{waiting},{limit},{now_ms}\n"
-        with open("/dev/shm/dgx_cluster_state.tmp", "w") as f:
+        tmp_path = f"/dev/shm/dgx_cluster_state.{os.getpid()}_{time.time_ns()}.tmp"
+        with open(tmp_path, "w") as f:
             f.write(content)
-        os.replace("/dev/shm/dgx_cluster_state.tmp", "/dev/shm/dgx_cluster_state")
+        os.replace(tmp_path, "/dev/shm/dgx_cluster_state")
     except Exception:
         pass
 
@@ -230,16 +231,11 @@ def load_config() -> None:
 
 
 def get_timeout(pos: int, priority: int = 1) -> float:
-    # Priority-aware fast-fail timeouts:
-    # Priority 0 (interactive / tool call): max wait 3.0s (stepping down by 0.3s per queue pos)
-    # Priority 1 (normal / multi-turn follow-up): max wait 5.0s (stepping down by 0.4s per queue pos)
-    # Priority 2 (background batch): max wait 8.0s (stepping down by 0.5s per queue pos)
+    timeouts = state.get("tiered_timeouts", [25.0, 22.0, 19.0, 16.0, 13.0, 10.0, 7.0, 4.0])
+    base_t = timeouts[pos] if pos < len(timeouts) else (timeouts[-1] if timeouts else 5.0)
     if priority == 0:
-        return max(1.0, 3.0 - pos * 0.3)
-    elif priority == 1:
-        return max(1.5, 5.0 - pos * 0.4)
-    else:
-        return max(2.0, 8.0 - pos * 0.5)
+        return min(base_t, 10.0)
+    return base_t
 
 
 def resolve_limit(model_ids: list[str]) -> tuple[str, int]:
@@ -431,10 +427,11 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0)
             queue_max = state["queue_buffer"]
             bg_max = state.get("background_max_slots", 5)
 
-            # Background ceiling check when queue is also full
-            if priority >= 2 and (state["active_running"] >= bg_max or state["bg_running"] >= bg_max):
-                if len(waiting_queue) >= queue_max:
-                    return False, "bg_limit_queue_full"
+            # Background queue buffer partition:
+            # Low-priority background tasks (prio >= 2) cannot consume more than queue_max - 2 spots!
+            # Always preserve at least 2 queue spots for interactive P0 / normal P1!
+            if priority >= 2 and len(waiting_queue) >= max(1, queue_max - 2):
+                return False, "bg_queue_capacity_reached"
 
             # 1. Direct GPU execution if eligible and nobody waiting ahead with better unified score
             if _can_run_priority_locked(priority):
@@ -659,7 +656,7 @@ async def proxy_all(request: Request, path: str):
             if tc is not None and tc != "auto" and tc != "none":
                 logger.info(f"DSML Interceptor: rewriting tool_choice={tc} to 'auto' for DeepSeek compatibility")
                 body_json["tool_choice"] = "auto"
-                body_bytes = json.dumps(body_json).encode("utf-8")
+                body_bytes = json.dumps(body_json, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         except Exception:
             pass
         prefix_key = compute_prefix_key(body_bytes)

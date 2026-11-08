@@ -16,9 +16,9 @@ MIN_CLK = int(os.environ.get("MIN_CLK", "1800"))
 MAX_CLK = int(os.environ.get("MAX_CLK", "2500"))
 STEP = int(os.environ.get("STEP", "150"))
 ZONE_PANIC = float(os.environ.get("ZONE_PANIC", "89.0"))
-ZONE_HI = float(os.environ.get("ZONE_HI", "84.0"))
-ZONE_SWEET = float(os.environ.get("ZONE_SWEET", "80.0"))
-ZONE_COOL = float(os.environ.get("ZONE_COOL", "75.0"))
+ZONE_HI = float(os.environ.get("ZONE_HI", "86.0"))
+ZONE_SWEET = float(os.environ.get("ZONE_SWEET", "84.0"))
+ZONE_COOL = float(os.environ.get("ZONE_COOL", "78.0"))
 INTERVAL = float(os.environ.get("INTERVAL", "0.5"))
 STANDBY_CLK = int(os.environ.get("STANDBY_CLK", "2400"))
 
@@ -60,21 +60,35 @@ def read_cluster_state() -> tuple[int, int, int]:
     return 0, 0, 8
 
 def apply_clocks(clk: int):
-    def _apply_node1():
-        subprocess.run(["sudo", "-n", "nvidia-smi", "-lgc", f"0,{clk}"],
+    node2_ok = True
+    def _apply_node1(target_clk: int):
+        subprocess.run(["sudo", "-n", "nvidia-smi", "-lgc", f"0,{target_clk}"],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    def _apply_node2():
-        subprocess.run(["ssh", "-o", "BatchMode=yes", f"joseyarashio@{NODE2_IP}",
-                        f"sudo -n nvidia-smi -lgc 0,{clk}"],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    def _apply_node2(target_clk: int):
+        nonlocal node2_ok
+        ret = subprocess.run([
+            "ssh", "-o", "BatchMode=yes",
+            "-o", "ConnectTimeout=1",
+            "-o", "ControlMaster=auto",
+            "-o", "ControlPath=/dev/shm/ssh_mux_%h_%p_%r",
+            "-o", "ControlPersist=600s",
+            f"joseyarashio@{NODE2_IP}",
+            f"sudo -n nvidia-smi -lgc 0,{target_clk}"
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if ret.returncode != 0:
+            node2_ok = False
 
-    t1 = threading.Thread(target=_apply_node1)
-    t2 = threading.Thread(target=_apply_node2)
+    t1 = threading.Thread(target=_apply_node1, args=(clk,))
+    t2 = threading.Thread(target=_apply_node2, args=(clk,))
     t1.start()
     t2.start()
-    t1.join(timeout=3.0)
-    t2.join(timeout=3.0)
+    t1.join(timeout=0.6)
+    t2.join(timeout=0.6)
+
+    # Symmetric Frequency Safety: If Node 2 failed or timed out, clamp Node 1 to STANDBY_CLK
+    if not node2_ok and clk > STANDBY_CLK:
+        _apply_node1(STANDBY_CLK)
 
 def main():
     print(f"[{time.strftime('%X')}] Starting MS-DTC Governor: range=[{MIN_CLK}, {MAX_CLK}]MHz step={STEP}MHz sync=[Node1, Node2]")
@@ -116,13 +130,8 @@ def main():
             reason = f"PANIC_OVERHEAT (T={board_t:.1f}C >= {ZONE_PANIC}C)"
         elif active_streams == 0 and waiting == 0:
             # Standby mode: 2400 MHz (consumes only ~9.4W, ready for instant burst)
-            # If board is hot (> 72C), drop to 1800 MHz to accelerate cooling
-            if board_t > 72.0:
-                target_clk = MIN_CLK
-                reason = f"HOT_IDLE_COOLDOWN (T={board_t:.1f}C > 72C)"
-            else:
-                target_clk = STANDBY_CLK
-                reason = f"STANDBY_READY (T={board_t:.1f}C, cap={STANDBY_CLK}MHz)"
+            target_clk = STANDBY_CLK
+            reason = f"STANDBY_READY (T={board_t:.1f}C, cap={STANDBY_CLK}MHz)"
         else:
             # Active load with active_streams >= 1 or waiting > 0
             # Mechanism 1: Concurrency Saturation Ratio (Scale-Invariant with dynamic limit c)
