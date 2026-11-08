@@ -94,11 +94,13 @@ SINGLEFLIGHT_WAIT_TIMEOUT = 25.0
 
 def compute_prefix_key(body_bytes: bytes) -> str:
     """
-    Extracts canonical shared prefix hash for prompts >= 4000 bytes (~1000+ tokens).
-    Strips the trailing 256 characters of the final message so sibling requests sharing the same
-    codebase/context but asking different trailing questions map to the exact same prefix_key.
+    Extracts canonical shared prefix hash for prompts.
+    Supports both text codebases (>=4000 bytes) and multi-turn vision inputs (with image hashing).
+    Strips trailing 256+ characters of final message for codebases so sibling requests
+    map to the exact same prefix_key; and maps multi-turn vision dialogs on the same image
+    to an image-bound prefix key so Turn 2+ requests benefit from Cache-Aware Promotion.
     """
-    if len(body_bytes) < 4000:
+    if len(body_bytes) < 100:
         return ""
     try:
         data = json.loads(body_bytes)
@@ -106,6 +108,21 @@ def compute_prefix_key(body_bytes: bytes) -> str:
         if not messages:
             return ""
         model_tag = str(data.get("model", ""))
+
+        # Check for image parts across all messages
+        for m in messages:
+            content = m.get("content", "")
+            if isinstance(content, list):
+                for p in content:
+                    if isinstance(p, dict) and p.get("type") == "image_url":
+                        img_obj = p.get("image_url", {})
+                        url_str = str(img_obj.get("url", "")) if isinstance(img_obj, dict) else str(img_obj)
+                        h_img = hashlib.sha256(url_str.encode("utf-8", errors="ignore")).hexdigest()[:16]
+                        return f"img:{model_tag}:{h_img}"
+
+        # Pure text codebase handling
+        if len(body_bytes) < 4000:
+            return ""
         parts: List[str] = [f"model:{model_tag}"]
         total_chars = 0
         num_msgs = len(messages)
