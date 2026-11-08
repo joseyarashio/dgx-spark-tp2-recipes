@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>DGX Spark TP=2 架構升級全量對比與 2M 緩存池 1 小時馬拉松實測報告</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 10mm 13mm 10mm 13mm;
+  }
+  @media print {
+    body {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  }
+
+  body {
+    font-family: "Noto Sans CJK TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    color: #1e293b;
+    line-height: 1.38;
+    font-size: 8.7pt;
+    margin: 0;
+    padding: 0;
+  }
+
+  .header {
+    border-bottom: 2.5px solid #1d4ed8;
+    padding-bottom: 7px;
+    margin-bottom: 9px;
+  }
+  .title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 12px;
+  }
+  h1 {
+    font-size: 13.5pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 3px 0;
+    letter-spacing: -0.3px;
+    white-space: nowrap;
+  }
+  .subtitle {
+    font-size: 8.3pt;
+    color: #475569;
+    font-weight: 500;
+    margin: 0;
+    white-space: nowrap;
+  }
+  .meta-box {
+    text-align: right;
+    font-size: 7.5pt;
+    color: #475569;
+    line-height: 1.32;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  h2 {
+    font-size: 10.4pt;
+    font-weight: 700;
+    color: #1e3a8a;
+    border-left: 4px solid #2563eb;
+    padding-left: 7px;
+    margin: 9px 0 5px 0;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 9.2pt;
+    font-weight: 600;
+    color: #334155;
+    margin: 7px 0 3px 0;
+    page-break-after: avoid;
+  }
+
+  p {
+    margin: 0 0 5px 0;
+    text-align: justify;
+  }
+
+  .callout {
+    background-color: #f8fafc;
+    border-left: 3.5px solid #0284c7;
+    padding: 6px 10px;
+    margin: 5px 0 8px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 8.3pt;
+  }
+  .callout strong {
+    color: #0369a1;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 7.6pt;
+    margin: 6px 0 9px 0;
+    page-break-inside: avoid;
+  }
+  th, td {
+    padding: 3.8px 5.5px;
+    border: 1px solid #cbd5e1;
+    text-align: left;
+    vertical-align: middle;
+  }
+  th {
+    background-color: #f1f5f9;
+    font-weight: 600;
+    color: #0f172a;
+    border-bottom: 2px solid #94a3b8;
+  }
+  tr:nth-child(even) td {
+    background-color: #f8fafc;
+  }
+  .num {
+    font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+    text-align: right;
+  }
+  .highlight-best {
+    background-color: #dbeafe !important;
+    font-weight: 700;
+    color: #1e40af;
+  }
+  .highlight-green {
+    color: #15803d;
+    font-weight: 600;
+  }
+  .highlight-warn {
+    color: #b45309;
+    font-weight: 600;
+  }
+
+  .metric-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 7px;
+    margin: 7px 0 9px 0;
+    page-break-inside: avoid;
+  }
+  .card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-top: 3px solid #2563eb;
+    border-radius: 5px;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .card-title {
+    font-size: 7.2pt;
+    color: #64748b;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .card-value {
+    font-size: 13.2pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 2px 0 1px 0;
+    font-family: "JetBrains Mono", "SF Mono", monospace;
+  }
+  .card-sub {
+    font-size: 7.0pt;
+    color: #16a34a;
+    font-weight: 500;
+  }
+
+  .page-break {
+    page-break-before: always;
+  }
+
+  .footer-note {
+    font-size: 7.2pt;
+    color: #64748b;
+    margin-top: 10px;
+    border-top: 1px solid #cbd5e1;
+    padding-top: 5px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== PAGE 1 ==================== -->
+<div class="header">
+  <div class="title-row">
+    <div>
+      <h1>DGX Spark TP=2 架構升級全量對比與 2M 緩存池實測報告</h1>
+      <p class="subtitle">4 槽基線 vs P6/P8 NVMe 冷池 vs P10 2M 共享緩存池與 1 小時多輪讀圖高壓長跑實測</p>
+    </div>
+    <div class="meta-box">
+      <div><strong>報告日期：</strong>2026-11-08</div>
+      <div><strong>硬體集群：</strong>2× DGX Spark (GB10 128GB UMA)</div>
+      <div><strong>互聯拓撲：</strong>ConnectX-7 200G RoCEv2 (185 Gbps)</div>
+      <div><strong>最新標籤：</strong><code>v2b2-p10-1hour-vision-principal-verified</code></div>
+    </div>
+  </div>
+</div>
+
+<h2>一、執行摘要與核心突破總覽</h2>
+<p>
+本報告完整記錄雙節點 NVIDIA DGX Spark（<code>spark-9e5c</code> + <code>spark-7579</code>）運行 <strong>DeepSeek-V4.1-Flash-1017-TF（Plus-Ten 2.9bpw + 6-bit Head/MTP + 官方 43 層 FP32 偏置）</strong> 在 <strong>Stage 2B-2 P10（2M 共享 KV 快取池解耦升級）</strong> 與先前歷史階段之全量 A/B 實測對比，以及剛完賽的 <strong>連續 1 小時（3,646 秒）高壓隨機混流馬拉松（含 140 筆多輪讀圖測試）</strong> 完整評測數據。
+</p>
+
+<div class="metric-cards">
+  <div class="card">
+    <div class="card-title">共享 KV 緩存池擴展</div>
+    <div class="card-value">2,097,152 <span style="font-size:8pt;font-weight:400">toks</span></div>
+    <div class="card-sub">翻倍 (+100%) · 解耦單請求 1M 視窗</div>
+  </div>
+  <div class="card">
+    <div class="card-title">1 小時馬拉松 200 OK 交付</div>
+    <div class="card-value">100.0% <span style="font-size:8pt;font-weight:400">(783/783)</span></div>
+    <div class="card-sub">0 錯誤 · 0 秒退 (429) · 0 OOM 崩潰</div>
+  </div>
+  <div class="card">
+    <div class="card-title">多輪讀圖 Turn 2 加速</div>
+    <div class="card-value">-20.1% <span style="font-size:8pt;font-weight:400">TTFT</span></div>
+    <div class="card-sub">Turn 1 4.10s → Turn 2 3.28s (140/140 通過)</div>
+  </div>
+  <div class="card">
+    <div class="card-title">高壓長跑後可用顯存</div>
+    <div class="card-value">3.7 GiB <span style="font-size:8pt;font-weight:400">(Node 1)</span></div>
+    <div class="card-sub">穩守 3.5G 水位線 · Node 2 剩 6.1G</div>
+  </div>
+</div>
+
+<div class="callout">
+  <strong>P10 2M 共享緩存池與 1 小時多輪讀圖四大關鍵實證：</strong>
+  <br>1. <strong>單請求 Context 與共享 Pool 成功解耦（Patch 0063）：</strong> 原生引擎先前將 <code>--context</code> 與 <code>.pool</code> 硬綁定，導致直接給 <code>--context 2097152</code> 被 <code>error.PastNative</code> 攔截。本次透過補齊 <code>native.zig</code> 的 <code>TF_DS_WINDOW</code> 環境變數解析，使單請求上下文維持在 1,048,576 tokens，而 8 個併發 Stream 共享的實體 KV 池翻倍至 <strong>2,097,152 tokens</strong>。
+  <br>2. <strong>2M 專屬 RoPE 表格離線生成與雙機同步：</strong> 透過容器調用 <code>ops.rope_cs</code> 在 CPU 耗時 11.4 秒生成 2,162,688 rows 的 4 份二進位表（每份 264 MB），前 1.11M rows 與官方 1M 表格位元級 100% 一致，透過 200G RoCE 同步至 <code>/home/joseyarashio/dsv41-2m-kit</code>。
+  <br>3. <strong>1 小時全維度馬拉松 100% 成功交付（783/783 筆）：</strong> 連續 60.8 分鐘 8 槽位高壓混流（C8）完成 783 筆任務，達成 <strong>100% 200 OK 成功率</strong>（429 秒退 0 筆、500 異常 0 筆），累計產出 24.8 萬 tokens、命中 <strong>5,640,192 個快取 tokens</strong>。
+  <br>4. <strong>多輪讀圖高壓長測驗證零洩漏：</strong> 隨機注入 140 筆多輪圖像問答（佔比 17.9%），Turn 1 圖片編碼 TTFT 平均 4.107 秒，Turn 2 圖片快取復用（Vision Tower Skip）TTFT 平均降至 <strong>3.280 秒（加速 20.1%）</strong>，證實 Scratch Arena 在連續高壓讀圖下完全無顯存洩漏。
+</div>
+
+<h2>二、更動架構前後：系統與引擎核心配置全對照</h2>
+<table>
+  <thead>
+    <tr>
+      <th>架構維度 / 子系統</th>
+      <th>初始未修補基線<br>(<code>v0-baseline-1012</code>)</th>
+      <th>更動架構前：4 槽標準基線<br>(<code>v2b2-p4h-strata-baseline</code>)</th>
+      <th>更動架構後：P8 NVMe 冷池<br>(<code>v2b2-p8-nvme-cold-pool</code>)</th>
+      <th>最新 P10：2M 共享池 + C8 槽位<br>(<code>v2b2-p10-1hour-vision-verified</code>)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>GPU 活躍併發槽位</strong></td>
+      <td>4 槽 (<code>--parallel 4</code>)</td>
+      <td>4 槽 (<code>--parallel 4</code>)</td>
+      <td>6 槽 (<code>--parallel 6</code>)</td>
+      <td class="highlight-best">8 槽 (<code>--parallel 8</code>, <code>TF_DS_STREAMS=8</code>)</td>
+    </tr>
+    <tr>
+      <td><strong>實體 KV Cache 緩衝池容量</strong></td>
+      <td>1,048,576 tokens (1M)</td>
+      <td>1,048,576 tokens (1M)</td>
+      <td>1,048,576 tokens (1M)</td>
+      <td class="highlight-best">2,097,152 tokens (2M, TF_DS_WINDOW)</td>
+    </tr>
+    <tr>
+      <td><strong>單一請求 Context 視窗</strong></td>
+      <td>1,048,576 tokens (1M)</td>
+      <td>1,048,576 tokens (1M)</td>
+      <td>1,048,576 tokens (1M)</td>
+      <td class="highlight-best">1,048,576 tokens (1M, 硬邊界對齊)</td>
+    </tr>
+    <tr>
+      <td><strong>RoPE 旋轉位置編碼表格</strong></td>
+      <td>1,114,112 rows (544 MB)</td>
+      <td>1,114,112 rows (544 MB)</td>
+      <td>1,114,112 rows (544 MB)</td>
+      <td class="highlight-best">2,162,688 rows (1,056 MB, 專屬二進位)</td>
+    </tr>
+    <tr>
+      <td><strong>算子解碼窗口與核心庫</strong></td>
+      <td>48-row (198 cubins)</td>
+      <td>48-row (198 cubins)</td>
+      <td>64-row (214 cubins, v0.7.5 S5)</td>
+      <td class="highlight-best">64-row (214 cubins, 支援 32-stream)</td>
+    </tr>
+    <tr>
+      <td><strong>思維鏈過濾與防自我模仿</strong></td>
+      <td>未啟用 (易死循環)</td>
+      <td>未啟用</td>
+      <td><code>--drop-reasoning-history --keep 2</code></td>
+      <td class="highlight-best"><code>--drop-reasoning-history --keep 2</code></td>
+    </tr>
+    <tr>
+      <td><strong>多輪看圖暫存管理</strong></td>
+      <td>原生靜態分配 (~0.71G)</td>
+      <td>原生靜態分配</td>
+      <td>PR #112 Scratch Arena (0.23G)</td>
+      <td class="highlight-best">Scratch Arena + Vision Tower Skip</td>
+    </tr>
+    <tr>
+      <td><strong>前綴快取協同與網關</strong></td>
+      <td>無前綴協同</td>
+      <td>Strata Single-Flight 初版</td>
+      <td>Single-Flight 狀態機 + 10s Aging</td>
+      <td class="highlight-best">Single-Flight + 15s 硬反飢餓 + TTFE</td>
+    </tr>
+    <tr>
+      <td><strong>多級快取層次結構</strong></td>
+      <td>RAM 熱池 2.0 GiB</td>
+      <td>RAM 熱池 3.0 GiB</td>
+      <td>3.0G RAM + 32G NVMe Imprint</td>
+      <td class="highlight-best">2M Pool (RAM) + 32G NVMe Imprint</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ==================== PAGE 2 ==================== -->
+<div class="page-break"></div>
+
+<div class="header">
+  <div class="title-row">
+    <div>
+      <h1>二、全維度標準客觀題庫與單流 / 併發性能對照</h1>
+      <p class="subtitle">30 題標準五維度、單流極限速度、預填插隊延遲與 C1~C6 併發擴展數據</p>
+    </div>
+    <div class="meta-box">
+      <div><strong>評測腳本：</strong><code>benchmarks/run_full_eval.py</code></div>
+      <div><strong>測試環境：</strong>雙機 Port 8889 實機端到端實測</div>
+    </div>
+  </div>
+</div>
+
+<h2>一、30 題五維度標準題庫評測對比（品質零退步）</h2>
+<table>
+  <thead>
+    <tr>
+      <th>評測維度 / 題型</th>
+      <th>Step 1 基線<br>(<code>v1-step1-zig</code>)</th>
+      <th>Stage 2B-2 P1<br>(<code>v2b2-p1-verified</code>)</th>
+      <th>Stage 2B-2 P7<br>(<code>v2b2-p7-e2</code>)</th>
+      <th>Stage 2B-2 P10 (2M Pool)<br>(<code>v2b2-p10-2m-shared-pool</code>)</th>
+      <th>品質判定與實測細節</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>題庫總答對率 (30 題)</strong></td>
+      <td class="num">28 / 30 (93.3%)</td>
+      <td class="num">28 / 30 (93.3%)</td>
+      <td class="num highlight-best">28 / 30 (93.3%)</td>
+      <td class="num highlight-best">28 / 30 (93.3%)</td>
+      <td class="highlight-green">歷經 5 代配方升級，客觀能力 100% 守住最高線</td>
+    </tr>
+    <tr>
+      <td><strong>數學推理 (GSM8K/Comb 5題)</strong></td>
+      <td class="num">4 / 5</td>
+      <td class="num">4 / 5</td>
+      <td class="num">4 / 5</td>
+      <td class="num highlight-best">4 / 5</td>
+      <td class="highlight-green">組合計數、機率、代數全部秒回 (102~123 tok/s)</td>
+    </tr>
+    <tr>
+      <td><strong>MMLU-Pro 專業知識 (10題)</strong></td>
+      <td class="num">9 / 10</td>
+      <td class="num">9 / 10</td>
+      <td class="num">9 / 10</td>
+      <td class="num highlight-best">9 / 10</td>
+      <td class="highlight-green">涵蓋計算機架構、化學、物理、熱力、線性代數</td>
+    </tr>
+    <tr>
+      <td><strong>Python 程式碼 (Assert 5題)</strong></td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num highlight-best">5 / 5 (100%)</td>
+      <td class="highlight-green">Dijkstra、區間合併、Edit Distance 全通過直譯</td>
+    </tr>
+    <tr>
+      <td><strong>IFEval 嚴格指令約束 (5題)</strong></td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num highlight-best">5 / 5 (100%)</td>
+      <td class="highlight-green">純 JSON、禁用指定字母、精確項目計數全部守住</td>
+    </tr>
+    <tr>
+      <td><strong>Agent 工具調用與看圖 (5題)</strong></td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num">5 / 5 (100%)</td>
+      <td class="num highlight-best">5 / 5 (100%)</td>
+      <td class="highlight-green">含 11K tokens 圖像四象限問答與快取命中 (TTFT 0.74s)</td>
+    </tr>
+    <tr>
+      <td><strong>合成視覺探針 (<code>vision_probe.py</code>)</strong></td>
+      <td class="num">未支援</td>
+      <td class="num">4 / 4 PASS</td>
+      <td class="num">4 / 4 PASS</td>
+      <td class="num highlight-best">4 / 4 PASS</td>
+      <td class="highlight-green">紅圓/綠方幾何、象限計數、OCR INVOICE-8899 滿分</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>二、單流解碼速度、冷預填吞吐與增量插隊延遲對照</h2>
+<table>
+  <thead>
+    <tr>
+      <th>性能維度 / 負載條件</th>
+      <th>Step 1 基線</th>
+      <th>Stage 2B-2 P1</th>
+      <th>Stage 2B-2 P7</th>
+      <th>Stage 2B-2 P10 (2M Pool)</th>
+      <th>增益幅度與實測備註</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>單流極限代碼 (temp=0.00)</strong></td>
+      <td class="num">88.30 tok/s</td>
+      <td class="num">95.52 tok/s</td>
+      <td class="num">93.29 tok/s</td>
+      <td class="num highlight-best">92.28 tok/s</td>
+      <td class="num highlight-green">MTP 接受率 80.3% · 每輪 3.76 tokens</td>
+    </tr>
+    <tr>
+      <td><strong>日常代碼生成 (temp=0.30)</strong></td>
+      <td class="num">74.00 tok/s</td>
+      <td class="num">90.20 tok/s</td>
+      <td class="num">80.06 tok/s</td>
+      <td class="num highlight-best">79.00 tok/s</td>
+      <td class="num highlight-green">MTP 接受率 74.1% · 每輪 3.07 tokens</td>
+    </tr>
+    <tr>
+      <td><strong>結構化 JSON 輸出 (temp=0.00)</strong></td>
+      <td class="num">94.20 tok/s</td>
+      <td class="num">103.80 tok/s</td>
+      <td class="num">106.86 tok/s</td>
+      <td class="num highlight-best">105.54 tok/s</td>
+      <td class="num highlight-green">MTP 接受率 87.4% · 每輪 4.86 tokens</td>
+    </tr>
+    <tr>
+      <td><strong>冷預填吞吐 (8K tokens)</strong></td>
+      <td class="num">1,890 tok/s</td>
+      <td class="num">2,243 tok/s</td>
+      <td class="num">2,192 tok/s</td>
+      <td class="num highlight-best">2,231 tok/s</td>
+      <td class="num highlight-green">Cortex-X925 超大核綁定維持極速 (2.56s)</td>
+    </tr>
+    <tr>
+      <td><strong>冷預填吞吐 (32K tokens)</strong></td>
+      <td class="num">1,620 tok/s</td>
+      <td class="num">2,020 tok/s</td>
+      <td class="num">2,070 tok/s</td>
+      <td class="num highlight-best">2,030 tok/s</td>
+      <td class="num highlight-green">61,308 tokens 冷預填耗時 30.19 秒</td>
+    </tr>
+    <tr>
+      <td><strong>長預填期間短問插隊 (Cut-In TTFT)</strong></td>
+      <td class="num">31.70 秒</td>
+      <td class="num">1.52 秒</td>
+      <td class="num">1.02 秒</td>
+      <td class="num highlight-best">1.16 秒</td>
+      <td class="num highlight-green">TF_FILL_CUT_IN=8192 生效，短請求秒進</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>三、併發擴展聚合吞吐對照（Port 8889 實機量測）</h2>
+<table>
+  <thead>
+    <tr>
+      <th>併發層級 (Concurrency)</th>
+      <th>Step 1 基線</th>
+      <th>4 槽基準 (P4)</th>
+      <th>6 槽基準 (P7)</th>
+      <th>8 槽 2M 池 (P10)</th>
+      <th>吞吐增長趨勢與實測表現</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>C1 獨占吞吐</strong></td>
+      <td class="num">75.60 tok/s</td>
+      <td class="num">82.10 tok/s</td>
+      <td class="num">77.14 tok/s</td>
+      <td class="num highlight-best">76.30 tok/s</td>
+      <td class="num">單流受限於顯存頻寬與通訊往返</td>
+    </tr>
+    <tr>
+      <td><strong>C2 併發吞吐</strong></td>
+      <td class="num">86.00 tok/s</td>
+      <td class="num">90.20 tok/s</td>
+      <td class="num">88.91 tok/s</td>
+      <td class="num highlight-best">88.43 tok/s</td>
+      <td class="num">+15.9% 擴展，多流計算掩蓋通信延遲</td>
+    </tr>
+    <tr>
+      <td><strong>C4 併發吞吐</strong></td>
+      <td class="num">112.20 tok/s</td>
+      <td class="num">116.31 tok/s</td>
+      <td class="num">114.14 tok/s</td>
+      <td class="num highlight-best">113.20 tok/s</td>
+      <td class="num">+48.3% 擴展，4 槽位穩定飽和</td>
+    </tr>
+    <tr>
+      <td><strong>C6 併發吞吐</strong></td>
+      <td class="num">不支援 (4 槽)</td>
+      <td class="num">不支援 (4 槽)</td>
+      <td class="num">128.91 tok/s</td>
+      <td class="num highlight-best">126.24 tok/s</td>
+      <td class="num highlight-green">+65.4% 擴展，64-row cubin 算子全開</td>
+    </tr>
+    <tr>
+      <td><strong>C14 突發壓力測試 (16路並發)</strong></td>
+      <td class="num">未測試</td>
+      <td class="num">第 9 路秒退</td>
+      <td class="num">16/16 正常</td>
+      <td class="num highlight-best">16/16 全數 200 OK</td>
+      <td class="num highlight-green">8 活躍槽 + 隊列平穩消化，零崩潰</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ==================== PAGE 3 ==================== -->
+<div class="page-break"></div>
+
+<div class="header">
+  <div class="title-row">
+    <div>
+      <h1>三、1 小時多輪讀圖高壓混流馬拉松深度對比</h1>
+      <p class="subtitle">P6 5 小時馬拉松 vs P10 1 小時馬拉松（含 140 筆多輪讀圖）全量對照</p>
+    </div>
+    <div class="meta-box">
+      <div><strong>最新測試檔案：</strong><code>omni_eval_1hour_vision_2m_pool.json</code></div>
+      <div><strong>總運行秒數：</strong>3,646.71 秒 (60.8 分鐘)</div>
+    </div>
+  </div>
+</div>
+
+<h2>一、高壓馬拉松長跑關鍵指標全景對照</h2>
+<table>
+  <thead>
+    <tr>
+      <th>指標類別 / 關鍵參數</th>
+      <th>初期 30 分鐘壓測<br>(<code>phase9c-baseline</code>)</th>
+      <th>P6 5 小時馬拉松<br>(<code>stress_5hour</code>)</th>
+      <th>P10 1 小時馬拉松<br>(<code>omni_eval_1hour_vision</code>)</th>
+      <th>調優突破與實測結論</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>持續測試時長</strong></td>
+      <td class="num">1,800 秒 (30 分鐘)</td>
+      <td class="num">18,046 秒 (5.01 小時)</td>
+      <td class="num highlight-best">3,646 秒 (1.01 小時)</td>
+      <td class="num">嚴格依照標準長跑時長滿載執行</td>
+    </tr>
+    <tr>
+      <td><strong>測試並發架構</strong></td>
+      <td class="num">6 槽位閉環 (C6)</td>
+      <td class="num">8 槽位閉環 (C8)</td>
+      <td class="num highlight-best">8 槽位 (C8) + 2M 共享池</td>
+      <td class="highlight-green">2M 共享 KV 池提供更充裕並發空間</td>
+    </tr>
+    <tr>
+      <td><strong>總完成請求數</strong></td>
+      <td class="num">381 筆</td>
+      <td class="num">3,519 筆</td>
+      <td class="num highlight-best">783 筆</td>
+      <td class="num">每小時完成量維持在 780~800 筆之飽和上限</td>
+    </tr>
+    <tr>
+      <td><strong>成功交付率 (HTTP 200 OK)</strong></td>
+      <td class="num">99.21% (378 筆)</td>
+      <td class="num">95.31% (3,354 筆)</td>
+      <td class="num highlight-best">100.0% (783 筆)</td>
+      <td class="num highlight-green"><strong>全場 100% 成功交付，零丟失</strong></td>
+    </tr>
+    <tr>
+      <td><strong>429 降級秒退次數 / 比例</strong></td>
+      <td class="num">3 筆 (0.79%)</td>
+      <td class="num">165 筆 (4.69%)</td>
+      <td class="num highlight-best">0 筆 (0.0%)</td>
+      <td class="num highlight-green"><strong>零 429 秒退，隊列排程與槽位完全自洽</strong></td>
+    </tr>
+    <tr>
+      <td><strong>500 異常 / OOM 崩潰 / 死鎖</strong></td>
+      <td class="num">0 筆 (0.0%)</td>
+      <td class="num">0 筆 (0.0%)</td>
+      <td class="num highlight-best">0 筆 (0.0%)</td>
+      <td class="num highlight-green">零錯誤保持記錄，底層穩定性堅如磐石</td>
+    </tr>
+    <tr>
+      <td><strong>多輪讀圖任務 (Vision Tasks)</strong></td>
+      <td class="num">0 筆 (未注入)</td>
+      <td class="num">0 筆 (未注入)</td>
+      <td class="num highlight-best">140 筆 (17.9% 流量)</td>
+      <td class="num highlight-green"><strong>首度成功將多輪圖像問答混入高壓長跑</strong></td>
+    </tr>
+    <tr>
+      <td><strong>多輪讀圖成功率</strong></td>
+      <td class="num">N/A</td>
+      <td class="num">N/A</td>
+      <td class="num highlight-best">140 / 140 (100.0%)</td>
+      <td class="num highlight-green">包含 Turn 1 載入與 Turn 2 上下文復用</td>
+    </tr>
+    <tr>
+      <td><strong>讀圖 Turn 1 首字延遲 (TTFT)</strong></td>
+      <td class="num">N/A</td>
+      <td class="num">N/A</td>
+      <td class="num highlight-best">平均 4.107 秒</td>
+      <td class="num">圖片上傳、預處理與 Vision Tower 編碼</td>
+    </tr>
+    <tr>
+      <td><strong>讀圖 Turn 2 快取復用延遲 (TTFT)</strong></td>
+      <td class="num">N/A</td>
+      <td class="num">N/A</td>
+      <td class="num highlight-best">平均 3.280 秒</td>
+      <td class="num highlight-green"><strong>加速 20.1% (最快 0.565 秒秒回)</strong></td>
+    </tr>
+    <tr>
+      <td><strong>累計命中 Prompt Cache Tokens</strong></td>
+      <td class="num">1,820,416</td>
+      <td class="num">30,920,704</td>
+      <td class="num highlight-best">5,640,192 (5.64M)</td>
+      <td class="num highlight-green">平均每筆請求命中 7,203 快取 tokens</td>
+    </tr>
+    <tr>
+      <td><strong>累計生成 Tokens 數量</strong></td>
+      <td class="num">146,720</td>
+      <td class="num">1,465,210</td>
+      <td class="num highlight-best">248,621 (24.8萬)</td>
+      <td class="num">穩定輸出高密度代碼與結構化推理</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>二、多輪讀圖（Multi-Turn Vision）在 2M 緩存池下的架構行為審計</h2>
+<div class="callout">
+  <strong>多輪讀圖長測實測機理與亮點：</strong>
+  <br>1. <strong>Vision Tower Skip 零重複計算：</strong>在 Turn 1 階段，模型需呼叫 Vision Tower 將 256x256 圖像解析為視覺嵌入 tokens（單次約需 0.5~1.0 秒）；在 Turn 2 中，因前序圖像與提問已存在於 2M 共享池中，直接命中快取跳過 Vision Tower 計算，平均首字延遲自 4.107 秒驟降至 3.280 秒（最快達 0.565 秒）。
+  <br>2. <strong>Scratch Arena 顯存安全回收：</strong>先前未修補版本在多輪看圖時，每張圖片會殘留約 0.48 GiB 的中間暫存；本次實測 140 輪連續讀圖，Scratch Arena 在每個請求結束後精準歸還顯存，Node 1 實體顯存全程未出現爬坡累積現象。
+</div>
+
+<!-- ==================== PAGE 4 ==================== -->
+<div class="page-break"></div>
+
+<div class="header">
+  <div class="title-row">
+    <div>
+      <h1>四、實體顯存帳本、外部審查結論與 Phase 11 調優路線圖</h1>
+      <p class="subtitle">雙節點顯存下限水位、Opus 5.5 + Astra 6 批判結論與嚴格「逐項推進」計畫</p>
+    </div>
+    <div class="meta-box">
+      <div><strong>審查模型：</strong>Claude Opus 5.5 + GPT-6 Astra</div>
+      <div><strong>生產依據：</strong>「逐項推進、不進則退」原則</div>
+    </div>
+  </div>
+</div>
+
+<h2>一、雙節點實體顯存／記憶體成分帳本（最重壓力長跑後）</h2>
+<table>
+  <thead>
+    <tr>
+      <th>記憶體成分項目</th>
+      <th>P6 5小時長跑後<br>(1M 池基準)</th>
+      <th>P10 1小時長跑後<br>(2M 共享池基準)</th>
+      <th>顯存佔比與安全屬性</th>
+      <th>架構意義與邊界分析</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>模型靜態權重工作集</strong></td>
+      <td class="num">99.2 GiB</td>
+      <td class="num highlight-best">99.2 GiB</td>
+      <td class="num">82.0% (常駐)</td>
+      <td>Plus-Ten 2.9bpw 骨幹 + 43層 FP32 偏置</td>
+    </tr>
+    <tr>
+      <td><strong>實體 KV Cache 緩衝池</strong></td>
+      <td class="num">6.44 GiB (1M 池)</td>
+      <td class="num highlight-best">7.78 GiB (2M 池)</td>
+      <td class="num">6.4% (靜態鎖定)</td>
+      <td class="highlight-green">MLA 壓縮 890 B/token，淨增僅 1.34 GiB</td>
+    </tr>
+    <tr>
+      <td><strong>RoPE 旋轉編碼表 (DeviceBuffer)</strong></td>
+      <td class="num">0.53 GiB</td>
+      <td class="num highlight-best">1.00 GiB</td>
+      <td class="num">0.8% (靜態鎖定)</td>
+      <td>由 1.11M rows 擴增至 2.16M rows 表格</td>
+    </tr>
+    <tr>
+      <td><strong>主機 Prompt Cache 快照池</strong></td>
+      <td class="num">3.0 GiB</td>
+      <td class="num highlight-best">3.0 GiB</td>
+      <td class="num">2.5% (上限鎖定)</td>
+      <td>存放不可變 chunk-end 快照，消除重複預填</td>
+    </tr>
+    <tr>
+      <td><strong>CUDA Graph 靜態記憶體</strong></td>
+      <td class="num">0.65 GiB (128 graphs)</td>
+      <td class="num highlight-best">0.65 GiB (128 graphs)</td>
+      <td class="num">0.5% (靜態鎖定)</td>
+      <td>PR #119 隔離保護，零 capture cascade</td>
+    </tr>
+    <tr>
+      <td><strong>Node 1 (<code>spark-9e5c</code>) 實體可用 RAM</strong></td>
+      <td class="num">3,952 MiB (3.86 GiB)</td>
+      <td class="num highlight-best">3,788 MiB (3.70 GiB)</td>
+      <td class="num highlight-green">3.1% (動態餘裕)</td>
+      <td class="highlight-green"><strong>穩守 High-Watermark (3.5 GiB) 警戒線之上</strong></td>
+    </tr>
+    <tr>
+      <td><strong>Node 2 (<code>spark-7579</code>) 實體可用 RAM</strong></td>
+      <td class="num">5,921 MiB (5.78 GiB)</td>
+      <td class="num highlight-best">6,246 MiB (6.10 GiB)</td>
+      <td class="num highlight-green">5.0% (動態餘裕)</td>
+      <td class="highlight-green">Worker 節點餘裕充裕，Swap 維持 0 MB</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>二、外部雙代理（Claude Opus 5.5 + GPT-6 Astra）批判審查結論</h2>
+<div class="callout">
+  <strong>外部專家評審共識：</strong>
+  <br>1. <strong>[對 2M 緩存池定調：正向且達標]：</strong> 2M 共享池成功透過 <code>TF_DS_WINDOW</code> 解耦單請求 context，在 8 槽位高壓長跑下達成了 100% 200 OK，且 140 筆多輪讀圖全數通過。MLA 的 890 B/token 壓縮架構將 2M 實體顯存代價精確控制在 +1.34 GiB，是目前 DGX Spark UMA 記憶體下的最佳甜蜜點。
+  <br>2. <strong>[Node 1 顯存餘量 3.7 GiB 之邊界警示]：</strong> 審查指出 3.7 GiB 距離 3.5 GiB High-Watermark 僅剩約 200 MiB 裕度。若遭遇極端突發（例如多路同時發送 4K+ 超高解析度圖片或 4K+ 長輸出），Linux 內核可能短暫觸發 Swap 換頁。建議維持當前 2M 上限，<strong>絕對禁止盲目推進至上游激進的 7.34M KV 池</strong>。
+  <br>3. <strong>[讀圖 Turn 2 加速瓶頸揭秘]：</strong> Turn 2 TTFT（3.28s）雖比 Turn 1（4.10s）加速 20.1%，但未如純文本般達到亞秒級（0.5s），主因是當前在 8 併發滿載下，多個請求正在同時爭搶 GPU 解碼輪次與隊列排程；在單流獨占測試下，讀圖快取命中實測 TTFT 實為 0.74 秒。
+</div>
+
+<h2>三、Phase 11 逐項推進調優路線圖（嚴格「逐項推進、不進則退」）</h2>
+<table>
+  <thead>
+    <tr>
+      <th>階段代號</th>
+      <th>調優目標與具體內容</th>
+      <th>預期效益</th>
+      <th>全量回歸檢驗閘門 (Pass / Fail Criteria)</th>
+      <th>回退機制</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Phase 11A</strong></td>
+      <td><strong>合入 MiaAI-Lab Patch 0048 (DSML 工具調用即時串流)</strong><br>在 <code>tool_stream.zig</code> 實裝 DSML 狀態機，使工具名稱與參數隨 token 解碼即時送出</td>
+      <td>徹底消除 Agent 長參數等待 1~4 秒無事件之停頓感，大幅提升 OpenCodex / Hermes 體感流暢度</td>
+      <td><strong>閘門：</strong>30 題標準題庫 Agent 5/5 項通過；OpenCodex 工具調用 TTFT 保持 ≤ 0.5s；首字不得洩漏內部標記</td>
+      <td>若工具解析語法錯誤或無法串流，立即回退至現有 <code>tool_parse.zig</code> 整句解析</td>
+    </tr>
+    <tr>
+      <td><strong>Phase 11B</strong></td>
+      <td><strong>讀圖優先權隊列微調 (Vision Fast-Path)</strong><br>在 Port 8889 Proxy 針對多輪讀圖之 Turn 2 請求賦予暫時性高優先提拔，縮減滿載時的排隊等待</td>
+      <td>將高壓混流下的多輪讀圖 Turn 2 TTFT 由 3.28 秒進一步壓低至 1.5 秒以內</td>
+      <td><strong>閘門：</strong>Turn 2 TTFT 改善 ≥ 30%；且不得引起普通文本 P0 請求之延遲反轉（P0 TTFT ≤ 2.0s）</td>
+      <td>若文本任務出現飢餓延遲，立即復原隊列調度權重</td>
+    </tr>
+    <tr>
+      <td><strong>Phase 11C</strong></td>
+      <td><strong>動態高水位主動預警 (Adaptive Memory Cushion)</strong><br>當 Node 1 可用 RAM 短暫跌破 3.6 GiB 時，自動限制第 8 槽位進入，保留 2 槽作為突發圖文安全緩衝</td>
+      <td>根絕極端高壓下的 Swap 抖動與 OOM 風險，將可用顯存硬防線拉升至 4.0 GiB+</td>
+      <td><strong>閘門：</strong>C14 突發與多圖併發壓測下，Node 1 可用顯存全程 ≥ 3.8 GiB，且總吞吐不降低 > 5%</td>
+      <td>若動態限制導致吞吐大幅下降，回退至靜態 8 槽位設定</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="footer-note">
+  <strong>報告檔案路徑：</strong><code>/home/joseyarashio/dgx-spark-tp2-recipes/reports/DGX_Spark_TP2_2M_Pool_Comprehensive_Benchmark_Report_20261108.pdf</code><br>
+  <strong>可重現驗證與原始數據：</strong><code>/home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/results/</code> · GitHub: <code>https://github.com/joseyarashio/dgx-spark-tp2-recipes</code> (Tag: <code>v2b2-p10-1hour-vision-principal-verified</code>, Commit: <code>a46e1a4</code>)
+</div>
+
+</body>
+</html>
