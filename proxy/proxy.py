@@ -16,7 +16,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.background import BackgroundTask
 
-from cold_kv import ColdKVManager
+from cold_kv import ColdKVManager, get_host_free_memory_gib
 
 # Setup logging
 logging.basicConfig(
@@ -51,6 +51,7 @@ state: Dict[str, Any] = {
     "current_limit": 6,
     "active_running": 0,
     "bg_running": 0,
+    "active_large_prefills": 0,
     "waiting_in_queue": 0,
     "upstream_healthy": False,
 }
@@ -73,10 +74,11 @@ def _sync_cluster_shm():
 
 
 class Waiter:
-    def __init__(self, pos: int, priority: int = 1, prefix_key: str = ""):
+    def __init__(self, pos: int, priority: int = 1, prefix_key: str = "", est_tokens: int = 0):
         self.pos = pos
         self.priority = priority  # 0: interactive/foreground, 1: normal, 2: background/batch
         self.prefix_key = prefix_key
+        self.est_tokens = est_tokens
         self.promoted = False
         self.extended = False
         self.deadline = 0.0
@@ -258,11 +260,12 @@ def resolve_limit(model_ids: list[str]) -> tuple[str, int]:
     return first_model, default_lim
 
 
-def _can_run_priority_locked(priority: int) -> bool:
+def _can_run_priority_locked(priority: int, est_tokens: int = 0) -> bool:
     """
     Checks whether a request with `priority` is eligible to take an active GPU slot.
     Enforces total concurrency limit AND reserves at least 2 slots for Priority 0/1 (interactive & normal).
     Background tasks (Priority >= 2) can take at most `limit - 2` slots (min 1).
+    Proactive Prefill Admission Barrier: Throttles large prefills (>16K) if free RAM < 4.0G or 2+ large prefills running.
     """
     limit = state["current_limit"]
     if state["active_running"] >= limit:
@@ -270,6 +273,10 @@ def _can_run_priority_locked(priority: int) -> bool:
     if priority >= 2:
         bg_max = max(1, limit - 2)
         if state["bg_running"] >= bg_max or state["active_running"] >= bg_max:
+            return False
+    if est_tokens > 16000:
+        free_ram = get_host_free_memory_gib()
+        if free_ram < 4.0 or state.get("active_large_prefills", 0) >= 2:
             return False
     return True
 
@@ -304,7 +311,7 @@ def _wake_next_locked():
         best_idx = -1
         best_score = (999, 999, float("inf"))
         for i, w in enumerate(waiting_queue):
-            if not _can_run_priority_locked(w.priority):
+            if not _can_run_priority_locked(w.priority, w.est_tokens):
                 continue
             score = _compute_waiter_score(w.priority, w.prefix_key, w.enqueued_at, now_mono)
             if score < best_score:
@@ -321,6 +328,8 @@ def _wake_next_locked():
         state["active_running"] += 1
         if promoted_waiter.priority >= 2:
             state["bg_running"] += 1
+        if promoted_waiter.est_tokens > 16000:
+            state["active_large_prefills"] = state.get("active_large_prefills", 0) + 1
         promoted_waiter.event.set()
         promoted_any = True
 
@@ -372,7 +381,7 @@ async def monitor_upstream_model():
         await asyncio.sleep(state["poll_interval_seconds"])
 
 
-async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0) -> Tuple[bool, str]:
+async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0, est_tokens: int = 0) -> Tuple[bool, str]:
     """
     Acquire an execution slot with Tiered Dynamic Queue Management, Priority Scheduling, Anti-Herd Extension,
     and Leak-Free Strata Single-Flight Prefix Coordination.
@@ -408,8 +417,10 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0)
 
     if leader_entry is not None:
         logger.info(f"Single-Flight Delay-Hit Mitigation: Waiting for leader prefill [prefix: {prefix_key}]...")
+        # For Priority 0 interactive requests, wait at most 3.0s on leader
+        sf_timeout = min(SINGLEFLIGHT_WAIT_TIMEOUT, 3.0 if priority == 0 else 8.0)
         try:
-            await asyncio.wait_for(leader_entry.event.wait(), timeout=SINGLEFLIGHT_WAIT_TIMEOUT)
+            await asyncio.wait_for(leader_entry.event.wait(), timeout=sf_timeout)
             logger.info(
                 f"Single-Flight Leader finished (status={leader_entry.status}): "
                 f"Follower proceeding [prefix: {prefix_key}]"
@@ -434,11 +445,11 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0)
                 return False, "bg_queue_capacity_reached"
 
             # 1. Direct GPU execution if eligible and nobody waiting ahead with better unified score
-            if _can_run_priority_locked(priority):
+            if _can_run_priority_locked(priority, est_tokens):
                 now_m = time.monotonic()
                 incoming_score = _compute_waiter_score(priority, prefix_key, now_m, now_m)
                 has_better_waiting = any(
-                    _can_run_priority_locked(w.priority)
+                    _can_run_priority_locked(w.priority, w.est_tokens)
                     and _compute_waiter_score(w.priority, w.prefix_key, w.enqueued_at, now_m) <= incoming_score
                     for w in waiting_queue
                 )
@@ -446,10 +457,12 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0)
                     state["active_running"] += 1
                     if priority >= 2:
                         state["bg_running"] += 1
+                    if est_tokens > 16000:
+                        state["active_large_prefills"] = state.get("active_large_prefills", 0) + 1
                     slot_acquired = True
                     _sync_cluster_shm()
                     logger.info(
-                        f"Direct GPU execution [running: {state['active_running']}/{limit}, bg: {state['bg_running']}/{bg_max}, prio: {priority}] "
+                        f"Direct GPU execution [running: {state['active_running']}/{limit}, bg: {state['bg_running']}/{bg_max}, prio: {priority}, est_tok: {est_tokens}] "
                         f"(model: {state['current_model']})"
                     )
                     return True, "direct"
@@ -460,7 +473,7 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0)
 
             # 3. Enter tiered queue with priority
             pos = len(waiting_queue)
-            waiter = Waiter(pos, priority=priority, prefix_key=prefix_key)
+            waiter = Waiter(pos, priority=priority, prefix_key=prefix_key, est_tokens=est_tokens)
             waiting_queue.append(waiter)
             state["waiting_in_queue"] = len(waiting_queue)
             _sync_cluster_shm()
@@ -563,11 +576,13 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0)
             await _release_prefix(prefix_key, req_id, committed=False)
 
 
-async def release_slot(priority: int = 1):
+async def release_slot(priority: int = 1, est_tokens: int = 0):
     async with queue_lock:
         state["active_running"] = max(0, state["active_running"] - 1)
         if priority >= 2:
             state["bg_running"] = max(0, state["bg_running"] - 1)
+        if est_tokens > 16000:
+            state["active_large_prefills"] = max(0, state.get("active_large_prefills", 1) - 1)
         _wake_next_locked()
 
 
@@ -673,7 +688,8 @@ async def proxy_all(request: Request, path: str):
             elif prio_lower in ["low", "background", "batch", "2"]:
                 priority = 2
 
-        acquired, reason = await acquire_slot(priority=priority, prefix_key=prefix_key, req_id=req_id)
+        est_prompt_tokens = len(body_bytes) // 3 if len(body_bytes) > 1024 else 0
+        acquired, reason = await acquire_slot(priority=priority, prefix_key=prefix_key, req_id=req_id, est_tokens=est_prompt_tokens)
         if not acquired:
             curr_model = state["current_model"]
             limit = state["current_limit"]
@@ -710,9 +726,10 @@ async def proxy_all(request: Request, path: str):
                 priority=priority,
                 req_id=req_id,
                 req_start_t=req_start_t,
+                est_tokens=est_prompt_tokens,
             )
         except BaseException:
-            await release_slot(priority=priority)
+            await release_slot(priority=priority, est_tokens=est_prompt_tokens)
             await _release_prefix(prefix_key, req_id, committed=False)
             raise
     else:
@@ -728,6 +745,7 @@ async def handle_forward(
     priority: int = 1,
     req_id: int = 0,
     req_start_t: float = 0.0,
+    est_tokens: int = 0,
 ):
     upstream_url = f"{state['upstream_url']}/{path}"
     query = request.url.query
@@ -784,13 +802,18 @@ async def handle_forward(
 
     released = False
     prefix_notified = False
+    prefill_notified = False
     resp_closed = False
 
     async def cleanup_all():
-        nonlocal released, prefix_notified, resp_closed
+        nonlocal released, prefix_notified, prefill_notified, resp_closed
         if not released and release_on_close:
             released = True
-            await release_slot(priority=priority)
+            if est_tokens > 16000 and not prefill_notified:
+                prefill_notified = True
+                async with queue_lock:
+                    state["active_large_prefills"] = max(0, state.get("active_large_prefills", 1) - 1)
+            await release_slot(priority=priority, est_tokens=est_tokens)
         if prefix_key and not prefix_notified:
             prefix_notified = True
             await _release_prefix(prefix_key, req_id, committed=False)
@@ -830,7 +853,7 @@ async def handle_forward(
         return False
 
     async def stream_body():
-        nonlocal prefix_notified
+        nonlocal prefix_notified, prefill_notified
         sse_rem = ""
         try:
             async for chunk in upstream_resp.aiter_bytes():
@@ -846,6 +869,11 @@ async def handle_forward(
                             prefix_notified = True
                             sse_rem = ""
                             await _release_prefix(prefix_key, req_id, committed=True)
+                            if est_tokens > 16000 and not prefill_notified:
+                                prefill_notified = True
+                                async with queue_lock:
+                                    state["active_large_prefills"] = max(0, state.get("active_large_prefills", 1) - 1)
+                                    _wake_next_locked()
                 yield chunk
         finally:
             await cleanup_all()
