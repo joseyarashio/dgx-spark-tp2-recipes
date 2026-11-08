@@ -20,7 +20,7 @@ API_URL = "http://127.0.0.1:8889/v1/chat/completions"
 STATUS_URL = "http://127.0.0.1:8889/proxy/status"
 DURATION_SECONDS = 1800  # 30 minutes
 MAX_CONCURRENCY = 8     # 6 active GPU slots + 2 standby queue (within 14 limit)
-OUTPUT_FILE = Path("/home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/results/stress_30min_experiment.json")
+OUTPUT_FILE = Path(os.environ.get("OUTPUT_FILE", "/home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/results/stress_30min_ms_dtc_experiment.json"))
 
 def make_test_png(width=256, height=256, color_idx=0):
     raw_data = bytearray()
@@ -51,6 +51,7 @@ def make_test_png(width=256, height=256, color_idx=0):
 
 print("Pre-generating synthetic multi-turn vision test images...")
 VISION_TEST_IMAGES = [make_test_png(256, 256, i) for i in range(3)]
+SHARED_VISION_CONTEXT = " ".join([f"cluster_telemetry_metric_{i}" for i in range(1200)])
 
 # Prepare shared prefix pools for High-Hit scenarios (up to 20K~25K tokens)
 def generate_codebase_corpus(num_tokens: int, seed_str: str) -> str:
@@ -185,16 +186,16 @@ def worker_job(job_id: int) -> Dict[str, Any]:
         # Turn 1
         p1 = [
             {"role": "user", "content": [
-                {"type": "text", "text": f"Task {job_id} [Turn 1]: Describe the color quadrants in this image."},
+                {"type": "text", "text": f"[Diagnostic Log: {SHARED_VISION_CONTEXT}]\nTask {job_id} [Turn 1]: Describe the color quadrants in this image in detail."},
                 {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_b64}"}}
             ]}
         ]
-        res1 = send_chat_completion(p1, max_tokens=128, priority=priority, enable_thinking=False)
+        res1 = send_chat_completion(p1, max_tokens=256, priority=priority, enable_thinking=False)
         res1.update({
             "job_id": job_id,
             "mode": "VISION_TURN1",
             "len_tier": "vision",
-            "prompt_tokens_approx": 1024,
+            "prompt_tokens_approx": 7600,
             "priority": priority,
             "timestamp": t_start
         })
@@ -203,14 +204,14 @@ def worker_job(job_id: int) -> Dict[str, Any]:
             ans1 = res1.get("content", "Analyzed image quadrants.")
             p2 = p1 + [
                 {"role": "assistant", "content": ans1},
-                {"role": "user", "content": f"Task {job_id} [Turn 2]: In the same image, what color is in the bottom-right corner?"}
+                {"role": "user", "content": f"Task {job_id} [Turn 2]: In the same image, describe the bottom-right corner and identify any geometric pattern in detail."}
             ]
             res2 = send_chat_completion(p2, max_tokens=128, priority=priority, enable_thinking=False)
             res2.update({
                 "job_id": f"{job_id}_t2",
                 "mode": "VISION_TURN2_CACHED",
                 "len_tier": "vision_cached",
-                "prompt_tokens_approx": 1100,
+                "prompt_tokens_approx": 7800,
                 "priority": priority,
                 "timestamp": time.time(),
                 "turn1_ttft": res1.get("ttft_seconds"),

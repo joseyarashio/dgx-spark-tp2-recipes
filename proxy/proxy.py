@@ -57,6 +57,18 @@ state: Dict[str, Any] = {
 
 _req_id_counter = itertools.count(1)
 
+def _sync_cluster_shm():
+    try:
+        active = state.get("active_running", 0)
+        waiting = state.get("waiting_in_queue", 0)
+        now_ms = int(time.time() * 1000)
+        content = f"{active},{waiting},{now_ms}\n"
+        with open("/dev/shm/dgx_cluster_state.tmp", "w") as f:
+            f.write(content)
+        os.replace("/dev/shm/dgx_cluster_state.tmp", "/dev/shm/dgx_cluster_state")
+    except Exception:
+        pass
+
 
 class Waiter:
     def __init__(self, pos: int, priority: int = 1, prefix_key: str = ""):
@@ -317,6 +329,7 @@ def _wake_next_locked():
                 w.extended = False  # fresh tier gets fresh extension rights
                 w.event.set()
     state["waiting_in_queue"] = len(waiting_queue)
+    _sync_cluster_shm()
 
 
 async def monitor_upstream_model():
@@ -430,6 +443,7 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0)
                     if priority >= 2:
                         state["bg_running"] += 1
                     slot_acquired = True
+                    _sync_cluster_shm()
                     logger.info(
                         f"Direct GPU execution [running: {state['active_running']}/{limit}, bg: {state['bg_running']}/{bg_max}, prio: {priority}] "
                         f"(model: {state['current_model']})"
@@ -445,6 +459,7 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0)
             waiter = Waiter(pos, priority=priority, prefix_key=prefix_key)
             waiting_queue.append(waiter)
             state["waiting_in_queue"] = len(waiting_queue)
+            _sync_cluster_shm()
             initial_timeout = get_timeout(pos)
             waiter.deadline = asyncio.get_event_loop().time() + initial_timeout
             logger.info(
