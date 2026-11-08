@@ -237,6 +237,8 @@ def get_timeout(pos: int, priority: int = 1) -> float:
     base_t = timeouts[pos] if pos < len(timeouts) else (timeouts[-1] if timeouts else 5.0)
     if priority == 0:
         return min(base_t, 10.0)
+    if priority >= 2:
+        return min(base_t, 12.0)
     return base_t
 
 
@@ -263,21 +265,51 @@ def resolve_limit(model_ids: list[str]) -> tuple[str, int]:
 def _can_run_priority_locked(priority: int, est_tokens: int = 0) -> bool:
     """
     Checks whether a request with `priority` is eligible to take an active GPU slot.
-    Enforces total concurrency limit AND reserves at least 2 slots for Priority 0/1 (interactive & normal).
-    Background tasks (Priority >= 2) can take at most `limit - 2` slots (min 1).
-    Proactive Prefill Admission Barrier: Throttles large prefills (>16K) if free RAM < 4.0G or 2+ large prefills running.
+    Enforces total concurrency limit (8 slots).
+    Safe Work Stealing architecture (Opus 5.5 + Astra consensus):
+      - Slots 1~6: Standard pool for all priorities (P0, P1, P2).
+      - Slot 7: Borrowable by P2 IF AND ONLY IF no P0/P1 waiter in queue AND short task (est_tokens <= 4096).
+      - Slot 8: Absolute Sacred Reservation for P0/P1. P2 NEVER allowed into Slot 8.
+    Dynamic Prefill Admission Barrier:
+      - Memory ladder: >= 4.4 GiB free -> allow 3 large prefills; >= 3.8 GiB -> allow 2; < 3.8 GiB -> allow 1.
+      - P0 is exempt from prefill barrier if free RAM >= 3.8 GiB to protect interactive SLA.
     """
     limit = state["current_limit"]
-    if state["active_running"] >= limit:
+    active = state["active_running"]
+    bg_active = state["bg_running"]
+
+    if active >= limit:
         return False
+
     if priority >= 2:
-        bg_max = max(1, limit - 2)
-        if state["bg_running"] >= bg_max or state["active_running"] >= bg_max:
+        # Standard background limit: up to 6 background tasks
+        if bg_active >= 6:
             return False
+        # If total active requests reached 6 (Slot 7 is next):
+        if active == 6:
+            # Safe Work Stealing Gate for Slot 7:
+            # 1. Must be NO urgent waiters (P0 or P1) in the queue
+            has_urgent_waiter = any(w.priority < 2 for w in waiting_queue)
+            if has_urgent_waiter:
+                return False
+            # 2. Must be a short task to prevent non-preemptible slot lockup
+            if est_tokens > 4096:
+                return False
+        elif active >= 7:
+            # Slot 8 is the sacred reservation for P0/P1. P2 can never take Slot 8!
+            return False
+
+    # Dynamic Prefill Admission Barrier
     if est_tokens > 16000:
         free_ram = get_host_free_memory_gib()
-        if free_ram < 4.0 or state.get("active_large_prefills", 0) >= 2:
-            return False
+        max_large = 3 if free_ram >= 4.4 else (2 if free_ram >= 3.8 else 1)
+        if priority > 0:
+            if free_ram < 3.8 or state.get("active_large_prefills", 0) >= max_large:
+                return False
+        else:
+            if free_ram < 3.8:
+                return False
+
     return True
 
 
@@ -438,11 +470,13 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0,
             queue_max = state["queue_buffer"]
             bg_max = state.get("background_max_slots", 5)
 
-            # Background queue buffer partition:
+            # Background queue buffer partition & preemptive shedding (Little's Law):
             # Low-priority background tasks (prio >= 2) cannot consume more than queue_max - 2 spots!
             # Always preserve at least 2 queue spots for interactive P0 / normal P1!
-            if priority >= 2 and len(waiting_queue) >= max(1, queue_max - 2):
-                return False, "bg_queue_capacity_reached"
+            if priority >= 2:
+                est_wait = len(waiting_queue) * 1.8
+                if len(waiting_queue) >= max(1, queue_max - 2) or est_wait > 8.0:
+                    return False, "preemptive_capacity_shed"
 
             # 1. Direct GPU execution if eligible and nobody waiting ahead with better unified score
             if _can_run_priority_locked(priority, est_tokens):
