@@ -73,6 +73,9 @@ def _sync_cluster_shm():
         pass
 
 
+LARGE_PREFILL_TOKEN_THRESHOLD = 20000
+
+
 class Waiter:
     def __init__(self, pos: int, priority: int = 1, prefix_key: str = "", est_tokens: int = 0):
         self.pos = pos
@@ -294,15 +297,17 @@ def _can_run_priority_locked(priority: int, est_tokens: int = 0) -> bool:
             if has_urgent_waiter:
                 return False
 
-    # Dynamic Prefill Admission Barrier (aligned with 3.0 GiB safety watermark)
-    if est_tokens > 16000:
+    # Dynamic Prefill Admission Barrier (aligned with 3.3 GiB steady-state watermark)
+    # Threshold at 20,000 tokens prevents 12K code prompts from being blocked
+    if est_tokens > LARGE_PREFILL_TOKEN_THRESHOLD:
         free_ram = get_host_free_memory_gib()
-        max_large = 3 if free_ram >= 3.8 else (2 if free_ram >= 3.0 else 1)
+        # Memory ladder: >= 3.3 GiB permits 3 large prefills; >= 2.8 GiB permits 2; < 2.8 GiB permits 1
+        max_large = 3 if free_ram >= 3.3 else (2 if free_ram >= 2.8 else 1)
         if priority > 0:
-            if free_ram < 3.0 or state.get("active_large_prefills", 0) >= max_large:
+            if free_ram < 2.8 or state.get("active_large_prefills", 0) >= max_large:
                 return False
         else:
-            if free_ram < 3.0:
+            if free_ram < 2.8:
                 return False
 
     return True
@@ -313,8 +318,10 @@ def _compute_waiter_score(priority: int, prefix_key: str, enqueued_at: float, no
     Unified scheduling score used by both Direct Path and `_wake_next_locked`:
       1. Hard Anti-Starvation Ceiling: Any request waiting >= 15s gets elevated to top priority 0
          and `is_cold = 0` to prevent Head-of-Line inversion from newer short tasks.
-      2. Effective priority: P2 ages to priority 1 after 8s (P0=0 always stays strictly highest).
-      3. Cache-Aware tie-breaker: warm committed prefix gets `is_cold = 0`.
+      2. Cache-Aware Priority Elevation (Astra recommendation):
+         Requests matching a warm committed prefix in engine RAM get a 1-tier priority bonus
+         to ensure they are dispatched before the LRU cache window expires.
+      3. Effective priority: P2 ages to priority 1 after 8s (P0=0 always stays strictly highest).
       4. Monotonic enqueue timestamp (FIFO).
     """
     wait_s = max(0.0, now_mono - enqueued_at)
@@ -322,9 +329,14 @@ def _compute_waiter_score(priority: int, prefix_key: str, enqueued_at: float, no
         # Anti-Starvation Ceiling reached: elevate to highest rank
         return (0, 0, enqueued_at)
 
-    eff_prio = max(1, priority - int(wait_s // 8.0)) if priority >= 2 else priority
-    is_cold = 0 if (prefix_key and prefix_committed.get(prefix_key, 0.0) > now_mono) else 1
-    return (eff_prio, is_cold, enqueued_at)
+    is_warm = 0 if (prefix_key and prefix_committed.get(prefix_key, 0.0) > now_mono) else 1
+    eff_prio = priority
+    # Warm cache promotion: promote by one priority tier to service within LRU cache lifetime
+    if is_warm == 0 and eff_prio > 0:
+        eff_prio -= 1
+
+    eff_prio = max(1, eff_prio - int(wait_s // 8.0)) if eff_prio >= 2 else eff_prio
+    return (eff_prio, is_warm, enqueued_at)
 
 
 def _wake_next_locked():
@@ -355,7 +367,7 @@ def _wake_next_locked():
         state["active_running"] += 1
         if promoted_waiter.priority >= 2:
             state["bg_running"] += 1
-        if promoted_waiter.est_tokens > 16000:
+        if promoted_waiter.est_tokens > LARGE_PREFILL_TOKEN_THRESHOLD:
             state["active_large_prefills"] = state.get("active_large_prefills", 0) + 1
         promoted_waiter.event.set()
         promoted_any = True
@@ -484,7 +496,7 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0,
                     state["active_running"] += 1
                     if priority >= 2:
                         state["bg_running"] += 1
-                    if est_tokens > 16000:
+                    if est_tokens > LARGE_PREFILL_TOKEN_THRESHOLD:
                         state["active_large_prefills"] = state.get("active_large_prefills", 0) + 1
                     slot_acquired = True
                     _sync_cluster_shm()
@@ -538,10 +550,11 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0,
 
                         if can_extend:
                             waiter.extended = True
-                            cur_timeout = state.get("extension_seconds", 5.0)
+                            # Grant extra breathing room (+8.0s) for heavy root prompts (>12K) to prevent decapitation
+                            cur_timeout = 8.0 if (waiter.est_tokens > 12000 and waiter.pos <= 2) else state.get("extension_seconds", 5.0)
                             waiter.deadline = asyncio.get_event_loop().time() + cur_timeout
                             logger.info(
-                                f"Anti-herd extension: Waiter at pos {waiter.pos+1} (prio={priority}) EXTENDED by {cur_timeout:.1f}s "
+                                f"Anti-herd extension: Waiter at pos {waiter.pos+1} (prio={priority}, est={waiter.est_tokens}) EXTENDED by {cur_timeout:.1f}s "
                                 "(waiter ahead is about to exit/promote)"
                             )
                             continue
@@ -608,7 +621,7 @@ async def release_slot(priority: int = 1, est_tokens: int = 0):
         state["active_running"] = max(0, state["active_running"] - 1)
         if priority >= 2:
             state["bg_running"] = max(0, state["bg_running"] - 1)
-        if est_tokens > 16000:
+        if est_tokens > LARGE_PREFILL_TOKEN_THRESHOLD:
             state["active_large_prefills"] = max(0, state.get("active_large_prefills", 1) - 1)
         _wake_next_locked()
 
@@ -691,6 +704,7 @@ async def proxy_all(request: Request, path: str):
     if is_completion and request.method == "POST":
         req_id = next(_req_id_counter)
         body_bytes = await request.body()
+        body_json: dict = {}
         # DSML Interceptor: rewrite non-standard tool_choice to "auto" for DeepSeek-V4.1
         try:
             body_json = json.loads(body_bytes)
@@ -715,8 +729,32 @@ async def proxy_all(request: Request, path: str):
             elif prio_lower in ["low", "background", "batch", "2"]:
                 priority = 2
 
-        est_prompt_tokens = len(body_bytes) // 3 if len(body_bytes) > 1024 else 0
-        acquired, reason = await acquire_slot(priority=priority, prefix_key=prefix_key, req_id=req_id, est_tokens=est_prompt_tokens)
+        # Accurate token estimation: compute token length on pure text content, excluding base64 image strings
+        est_prompt_tokens = 0
+        try:
+            if isinstance(body_json.get("messages"), list):
+                text_bytes_len = 0
+                for m in body_json["messages"]:
+                    content = m.get("content")
+                    if isinstance(content, str):
+                        text_bytes_len += len(content)
+                    elif isinstance(content, list):
+                        for part in content:
+                            if isinstance(part, dict) and part.get("type") == "text":
+                                text_bytes_len += len(part.get("text", ""))
+                est_prompt_tokens = text_bytes_len // 4 if text_bytes_len > 1024 else 0
+            else:
+                est_prompt_tokens = len(body_bytes) // 4 if len(body_bytes) > 1024 else 0
+        except Exception:
+            est_prompt_tokens = len(body_bytes) // 4 if len(body_bytes) > 1024 else 0
+
+        # Cache-Aware barrier exemption (Astra / Opus 5.5 recommendation):
+        # If prefix is already warm and committed in RAM, cold prefill workspace is tiny (<512 tokens)
+        now_mono = time.monotonic()
+        is_warm_cache = prefix_key and (prefix_committed.get(prefix_key, 0.0) > now_mono)
+        barrier_est_tokens = 512 if is_warm_cache else est_prompt_tokens
+
+        acquired, reason = await acquire_slot(priority=priority, prefix_key=prefix_key, req_id=req_id, est_tokens=barrier_est_tokens)
         if not acquired:
             curr_model = state["current_model"]
             limit = state["current_limit"]
@@ -753,10 +791,10 @@ async def proxy_all(request: Request, path: str):
                 priority=priority,
                 req_id=req_id,
                 req_start_t=req_start_t,
-                est_tokens=est_prompt_tokens,
+                est_tokens=barrier_est_tokens,
             )
         except BaseException:
-            await release_slot(priority=priority, est_tokens=est_prompt_tokens)
+            await release_slot(priority=priority, est_tokens=barrier_est_tokens)
             await _release_prefix(prefix_key, req_id, committed=False)
             raise
     else:
@@ -836,7 +874,7 @@ async def handle_forward(
         nonlocal released, prefix_notified, prefill_notified, resp_closed
         if not released and release_on_close:
             released = True
-            if est_tokens > 16000 and not prefill_notified:
+            if est_tokens > LARGE_PREFILL_TOKEN_THRESHOLD and not prefill_notified:
                 prefill_notified = True
                 async with queue_lock:
                     state["active_large_prefills"] = max(0, state.get("active_large_prefills", 1) - 1)
@@ -896,7 +934,7 @@ async def handle_forward(
                             prefix_notified = True
                             sse_rem = ""
                             await _release_prefix(prefix_key, req_id, committed=True)
-                            if est_tokens > 16000 and not prefill_notified:
+                            if est_tokens > LARGE_PREFILL_TOKEN_THRESHOLD and not prefill_notified:
                                 prefill_notified = True
                                 async with queue_lock:
                                     state["active_large_prefills"] = max(0, state.get("active_large_prefills", 1) - 1)

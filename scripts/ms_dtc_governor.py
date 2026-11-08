@@ -14,7 +14,7 @@ import time
 
 MIN_CLK = int(os.environ.get("MIN_CLK", "1800"))
 MAX_CLK = int(os.environ.get("MAX_CLK", "2500"))
-STEP = int(os.environ.get("STEP", "150"))
+STEP = int(os.environ.get("STEP", "50"))
 ZONE_PANIC = float(os.environ.get("ZONE_PANIC", "89.0"))
 ZONE_HI = float(os.environ.get("ZONE_HI", "86.0"))
 ZONE_SWEET = float(os.environ.get("ZONE_SWEET", "84.0"))
@@ -126,8 +126,8 @@ def main():
         rho = 0.0
 
         if board_t >= ZONE_PANIC:
-            target_clk = MIN_CLK
-            reason = f"PANIC_OVERHEAT (T={board_t:.1f}C >= {ZONE_PANIC}C)"
+            target_clk = 2200  # Soft clamp to 2200 MHz instead of collapsing to 1800 MHz (Astra / Opus 5.5 recommendation)
+            reason = f"PANIC_SOFT_CLAMP (T={board_t:.1f}C >= {ZONE_PANIC}C)"
         elif active_streams == 0 and waiting == 0:
             # Standby mode: 2400 MHz (consumes only ~9.4W, ready for instant burst)
             target_clk = STANDBY_CLK
