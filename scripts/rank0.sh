@@ -19,6 +19,6 @@ exec /home/joseyarashio/TensorFold-dsv41-zig/out/native/bin/tensorfold-native se
   --alias current \
   --context 1048576 --parallel 8 --thinking --max-tokens 32768 \
   $DROP_REASONING_FLAG \
-  --prompt-cache-gib 3.0 \
+  --prompt-cache-gib 2.5 \
   --learn --learn-dir /home/joseyarashio/.cache/dsv41-nvme-imprint --learn-gib 32 \
   --temperature 0.30 --top-p 0.95 --top-k 20 --backend cuda
