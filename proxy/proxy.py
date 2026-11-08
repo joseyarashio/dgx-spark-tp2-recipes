@@ -287,15 +287,13 @@ def _can_run_priority_locked(priority: int, est_tokens: int = 0) -> bool:
         return False
 
     if priority >= 2:
-        bg_max = state.get("background_max_slots", 6)
-        if bg_active >= bg_max:
-            return False
-        # Slot 8 is sacred for P0/P1: if active >= 7, P2 can never take Slot 8!
+        # Total cluster limit is 8. Slot 8 is sacred for P0/P1.
+        # P2 is allowed up to 7 slots total (Slots 1-6 standard, Slot 7 borrowable).
         if active >= 7:
             return False
-        # If active == 6 (Slot 7 is next):
-        # Safe Work Stealing: P2 can take Slot 7 as long as NO RUNNABLE P0/P1 waiter is in queue!
-        # (Crucial fix: if P1 is waiting on the prefill barrier, it cannot run anyway; don't block P2!)
+
+        # Safe Work Stealing on Slot 7 (active == 6):
+        # P2 can borrow Slot 7 if and only if NO runnable urgent waiter (P0/P1) is waiting in queue.
         if active == 6:
             has_runnable_urgent = any(
                 w.priority < 2 and _can_run_priority_locked(w.priority, w.est_tokens)
@@ -303,6 +301,11 @@ def _can_run_priority_locked(priority: int, est_tokens: int = 0) -> bool:
             )
             if has_runnable_urgent:
                 return False
+
+        # Enforce ceiling on total background concurrency (up to 7)
+        bg_max = state.get("background_max_slots", 7)
+        if bg_active >= bg_max:
+            return False
 
     # Dynamic Prefill Admission Barrier (aligned with 3.05 GiB steady-state watermark)
     # Threshold at 20,000 tokens prevents 12K code prompts from being blocked
@@ -409,7 +412,7 @@ async def monitor_upstream_model():
 
                 state["current_model"] = matched_model
                 state["current_limit"] = limit
-                state["background_max_slots"] = state.get("background_max_slots", 6)
+                state["background_max_slots"] = 7
                 state["upstream_healthy"] = True
 
                 if old_model != matched_model or old_limit != limit:

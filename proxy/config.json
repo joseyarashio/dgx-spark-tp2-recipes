@@ -12,7 +12,7 @@
   },
   "default_limit": 8,
   "queue_buffer": 8,
-  "background_max_slots": 6,
+  "background_max_slots": 7,
   "tiered_timeouts": [25.0, 22.0, 19.0, 16.0, 13.0, 10.0, 7.0, 4.0],
   "extension_seconds": 5.0,
   "poll_interval_seconds": 3
