@@ -61,8 +61,9 @@ def _sync_cluster_shm():
     try:
         active = state.get("active_running", 0)
         waiting = state.get("waiting_in_queue", 0)
+        limit = state.get("current_limit", 8)
         now_ms = int(time.time() * 1000)
-        content = f"{active},{waiting},{now_ms}\n"
+        content = f"{active},{waiting},{limit},{now_ms}\n"
         with open("/dev/shm/dgx_cluster_state.tmp", "w") as f:
             f.write(content)
         os.replace("/dev/shm/dgx_cluster_state.tmp", "/dev/shm/dgx_cluster_state")

@@ -37,22 +37,27 @@ def read_board_temp() -> float:
             pass
     return float(hi)
 
-def read_cluster_state() -> tuple[int, int]:
-    """Returns (active_streams, waiting_in_queue)."""
+def read_cluster_state() -> tuple[int, int, int]:
+    """Returns (active_streams, waiting_in_queue, max_concurrency)."""
     try:
         if os.path.exists(SHM_STATE_FILE):
             with open(SHM_STATE_FILE) as f:
                 parts = f.read().strip().split(",")
-                if len(parts) >= 3:
+                if len(parts) >= 4:
                     active = int(parts[0])
                     waiting = int(parts[1])
-                    ts_ms = int(parts[2])
+                    limit = max(1, int(parts[2]))
+                    ts_ms = int(parts[3])
                     # If updated within last 8 seconds, it is valid
                     if time.time() * 1000 - ts_ms < 8000:
-                        return active, waiting
+                        return active, waiting, limit
+                elif len(parts) >= 3:
+                    active = int(parts[0])
+                    waiting = int(parts[1])
+                    return active, waiting, 8
     except Exception:
         pass
-    return 0, 0
+    return 0, 0, 8
 
 def apply_clocks(clk: int):
     def _apply_node1():
@@ -92,7 +97,7 @@ def main():
         prev_temp = board_t
         prev_time = now
 
-        active_streams, waiting = read_cluster_state()
+        active_streams, waiting, limit = read_cluster_state()
 
         # Track idle duration
         if active_streams == 0 and waiting == 0:
@@ -104,6 +109,7 @@ def main():
         # Decision Logic (MS-DTC Core)
         reason = "HOLD"
         target_clk = cur_clk
+        rho = 0.0
 
         if board_t >= ZONE_PANIC:
             target_clk = MIN_CLK
@@ -119,13 +125,16 @@ def main():
                 reason = f"STANDBY_READY (T={board_t:.1f}C, cap={STANDBY_CLK}MHz)"
         else:
             # Active load with active_streams >= 1 or waiting > 0
-            # Mechanism 1: Concurrency-Aware Base Floor
-            f_floor = MIN_CLK + min(active_streams * 75, 600)  # N=1: 1875, N=2: 1950, N=4: 2100, N>=8: 2400
+            # Mechanism 1: Concurrency Saturation Ratio (Scale-Invariant with dynamic limit c)
+            eff_active = min(float(limit), active_streams + 0.5 * waiting)
+            rho = min(1.0, max(0.0, eff_active / limit))
+            # Dynamic scale-invariant floor: rho=0 -> 1800MHz, rho=1.0 -> 2400MHz
+            f_floor = int(MIN_CLK + round(rho * (MAX_CLK - 100 - MIN_CLK) / 50.0) * 50)
             
             if board_t < ZONE_SWEET:
                 # Cold or sweet zone: uncap to full speed
                 target_clk = MAX_CLK
-                reason = f"SWEET_ZONE_BURST (T={board_t:.1f}C < {ZONE_SWEET}C, N={active_streams})"
+                reason = f"SWEET_ZONE_BURST (T={board_t:.1f}C < {ZONE_SWEET}C, N={active_streams}/{limit})"
             elif board_t < ZONE_HI:
                 # 80C <= T < 84C
                 # Mechanism 3: Derivative Damping
@@ -151,12 +160,12 @@ def main():
         target_clk = max(MIN_CLK, min(MAX_CLK, target_clk))
 
         if target_clk != cur_clk:
-            print(f"[{time.strftime('%X')}] CLK CHANGE: {cur_clk}MHz -> {target_clk}MHz | Reason: {reason} | T={board_t:.1f}C (dT/dt={t_dot:+.2f}C/s) N={active_streams}")
+            print(f"[{time.strftime('%X')}] CLK CHANGE: {cur_clk}MHz -> {target_clk}MHz | Reason: {reason} | T={board_t:.1f}C (dT/dt={t_dot:+.2f}C/s) N={active_streams}/{limit} (rho={rho:.2f})")
             sys.stdout.flush()
             cur_clk = target_clk
             apply_clocks(cur_clk)
         elif now - last_heartbeat >= 30.0:
-            print(f"[{time.strftime('%X')}] STEADY: cap={cur_clk}MHz T={board_t:.1f}C (dT/dt={t_dot:+.2f}C/s) streams={active_streams} wait={waiting}")
+            print(f"[{time.strftime('%X')}] STEADY: cap={cur_clk}MHz T={board_t:.1f}C (dT/dt={t_dot:+.2f}C/s) streams={active_streams}/{limit} wait={waiting}")
             sys.stdout.flush()
             last_heartbeat = now
 
