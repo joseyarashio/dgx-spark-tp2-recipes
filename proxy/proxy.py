@@ -299,15 +299,15 @@ def _can_run_priority_locked(priority: int, est_tokens: int = 0) -> bool:
             # Slot 8 is the sacred reservation for P0/P1. P2 can never take Slot 8!
             return False
 
-    # Dynamic Prefill Admission Barrier
+    # Dynamic Prefill Admission Barrier (aligned with 3.0 GiB safety watermark)
     if est_tokens > 16000:
         free_ram = get_host_free_memory_gib()
-        max_large = 3 if free_ram >= 4.4 else (2 if free_ram >= 3.8 else 1)
+        max_large = 3 if free_ram >= 3.8 else (2 if free_ram >= 3.0 else 1)
         if priority > 0:
-            if free_ram < 3.8 or state.get("active_large_prefills", 0) >= max_large:
+            if free_ram < 3.0 or state.get("active_large_prefills", 0) >= max_large:
                 return False
         else:
-            if free_ram < 3.8:
+            if free_ram < 3.0:
                 return False
 
     return True

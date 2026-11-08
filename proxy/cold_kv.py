@@ -15,7 +15,7 @@ COLD_KV_DIR = Path("/home/joseyarashio/.cache/dgx_cold_kv")
 TIER1_IDLE_TTL_SECONDS = 600             # 10 minutes idle -> prune from active_sessions tracking
 TIER2_PURGE_TTL_SECONDS = 86400          # 24 hours unaccessed -> purge from NVMe archive
 MAX_COLD_STORAGE_BYTES = 50 * (1024 ** 3)  # 50 GB maximum cold storage quota
-HIGH_WATERMARK_FREE_MEM_GIB = 4.0        # Only trigger cold offload when free memory drops below 4.0 GiB
+HIGH_WATERMARK_FREE_MEM_GIB = 3.0        # Only trigger cold offload when free memory drops below 3.0 GiB
 
 
 def get_host_free_memory_gib() -> float:
