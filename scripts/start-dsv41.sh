@@ -9,7 +9,7 @@ TF_PORT="29620"
 IMAGE="tensorfold-glm53:v0.6.0"
 MODEL_DIR="/home/joseyarashio/models/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw"
 ENGRAM_DIR="/home/joseyarashio/dsv41-engram-1017"
-KIT_DIR="/home/joseyarashio/dsv41-1017-kit"
+KIT_DIR="/home/joseyarashio/dsv41-2m-kit"
 TOKEN_MAP="$KIT_DIR/dsv41_token_map.json"
 
 if [ ! -f "$KIT_DIR/vision/gate_bias_vl.safetensors" ]; then
@@ -76,6 +76,7 @@ ssh -o BatchMode=yes joseyarashio@"$WORKER_IP" "
     --cap-add IPC_LOCK --device /dev/infiniband \
     -v /home/joseyarashio:/home/joseyarashio \
     -e TF_DS_REPLAY_FLOOR=1 \
+    -e TF_DS_STREAMS=8 \
     -e NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1 \
     -e NCCL_IB_GID_INDEX=3 \
     -e NCCL_SOCKET_IFNAME=enp1s0f1np1 \
@@ -94,6 +95,7 @@ docker run -d --restart unless-stopped --name dsv41-rank0 \
   --cap-add IPC_LOCK --device /dev/infiniband \
   -v /home/joseyarashio:/home/joseyarashio \
   -e TF_DS_REPLAY_FLOOR=1 \
+  -e TF_DS_STREAMS=8 \
   -e TF_TP_WORLD=2 \
   -e TF_TP_MASTER=$HEAD_IP \
   -e TF_TP_PORT=$TF_PORT \
