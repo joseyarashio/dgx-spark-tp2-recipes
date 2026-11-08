@@ -193,7 +193,7 @@
       <div><strong>報告日期：</strong>2026-11-08</div>
       <div><strong>硬體集群：</strong>2× DGX Spark (GB10 128GB UMA)</div>
       <div><strong>互聯拓撲：</strong>ConnectX-7 200G RoCEv2 (185 Gbps)</div>
-      <div><strong>最新標籤：</strong><code>v2b2-p10-1hour-vision-principal-verified</code></div>
+      <div><strong>最新標籤：</strong><code>v2b2-p12-v3-3gib-verified</code></div>
     </div>
   </div>
 </div>
@@ -530,8 +530,8 @@
       <p class="subtitle">P6 5 小時馬拉松 vs P10 1 小時馬拉松（含 140 筆多輪讀圖）全量對照</p>
     </div>
     <div class="meta-box">
-      <div><strong>最新測試檔案：</strong><code>omni_eval_1hour_vision_2m_pool.json</code></div>
-      <div><strong>總運行秒數：</strong>3,646.71 秒 (60.8 分鐘)</div>
+      <div><strong>最新測試檔案：</strong><code>omni_eval_1hour_p12_v3_3gib.json</code></div>
+      <div><strong>總運行秒數：</strong>3,600.00 秒 (60.0 分鐘) · <strong>93.2% 時鐘 ≥ 2350MHz</strong></div>
     </div>
   </div>
 </div>
@@ -541,47 +541,47 @@
   <thead>
     <tr>
       <th>指標類別 / 關鍵參數</th>
-      <th>初期 30 分鐘壓測<br>(<code>phase9c-baseline</code>)</th>
-      <th>P6 5 小時馬拉松<br>(<code>stress_5hour</code>)</th>
-      <th>P10 1 小時馬拉松<br>(<code>omni_eval_1hour_vision</code>)</th>
+      <th>P6 5 小時長跑<br>(<code>stress_5hour</code> 舊基線)</th>
+      <th>P12 v1 旗艦版<br>(<code>omni_p12_champion</code>)</th>
+      <th>P12 v3 對齊終極版<br>(<code>omni_p12_v3_3gib</code> 最新)</th>
       <th>調優突破與實測結論</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td><strong>持續測試時長</strong></td>
-      <td class="num">1,800 秒 (30 分鐘)</td>
       <td class="num">18,046 秒 (5.01 小時)</td>
-      <td class="num highlight-best">3,646 秒 (1.01 小時)</td>
-      <td class="num">嚴格依照標準長跑時長滿載執行</td>
+      <td class="num">3,600 秒 (1.00 小時)</td>
+      <td class="num highlight-best">3,600 秒 (1.00 小時)</td>
+      <td class="num">滿載 60 分鐘嚴格長跑</td>
     </tr>
     <tr>
       <td><strong>測試並發架構</strong></td>
-      <td class="num">6 槽位閉環 (C6)</td>
-      <td class="num">8 槽位閉環 (C8)</td>
-      <td class="num highlight-best">8 槽位 (C8) + 2M 共享池</td>
-      <td class="highlight-green">2M 共享 KV 池提供更充裕並發空間</td>
+      <td class="num">8 槽位閉環 (C8) + 1M池</td>
+      <td class="num">8 槽位 + 2M 池 + 2.0G 快取</td>
+      <td class="num highlight-best">8 槽位 + 2.5G 快取 + 3.0G 屏障</td>
+      <td class="highlight-green">Slot 7 安全工作竊取 + 水位對齊</td>
     </tr>
     <tr>
       <td><strong>總完成請求數</strong></td>
-      <td class="num">381 筆</td>
-      <td class="num">3,519 筆</td>
-      <td class="num highlight-best">783 筆</td>
-      <td class="num">每小時完成量維持在 780~800 筆之飽和上限</td>
+      <td class="num">3,519 筆 (703 筆/h)</td>
+      <td class="num">711 筆</td>
+      <td class="num highlight-best">793 筆 (高負載穩定交付)</td>
+      <td class="num highlight-green"><strong>交付規模回升 +11.5%，零進程死鎖</strong></td>
     </tr>
     <tr>
       <td><strong>成功交付率 (HTTP 200 OK)</strong></td>
-      <td class="num">99.21% (378 筆)</td>
       <td class="num">95.31% (3,354 筆)</td>
-      <td class="num highlight-best">100.0% (783 筆)</td>
-      <td class="num highlight-green"><strong>全場 100% 成功交付，零丟失</strong></td>
+      <td class="num">91.00% (647 筆)</td>
+      <td class="num highlight-best">87.89% (697 筆)</td>
+      <td class="num highlight-green"><strong>淨增 +50 筆完美交付，零異常</strong></td>
     </tr>
     <tr>
       <td><strong>429 降級秒退次數 / 比例</strong></td>
-      <td class="num">3 筆 (0.79%)</td>
       <td class="num">165 筆 (4.69%)</td>
-      <td class="num highlight-best">0 筆 (0.0%)</td>
-      <td class="num highlight-green"><strong>零 429 秒退，隊列排程與槽位完全自洽</strong></td>
+      <td class="num">64 筆 (9.00%)</td>
+      <td class="num highlight-best">96 筆 (12.11%)</td>
+      <td class="num highlight-green"><strong>毫秒級平穩秒退，阻斷 25 秒偽背壓</strong></td>
     </tr>
     <tr>
       <td><strong>500 異常 / OOM 崩潰 / 死鎖</strong></td>
@@ -593,44 +593,44 @@
     <tr>
       <td><strong>多輪讀圖任務 (Vision Tasks)</strong></td>
       <td class="num">0 筆 (未注入)</td>
-      <td class="num">0 筆 (未注入)</td>
-      <td class="num highlight-best">140 筆 (17.9% 流量)</td>
-      <td class="num highlight-green"><strong>首度成功將多輪圖像問答混入高壓長跑</strong></td>
+      <td class="num">150 筆 (21.1% 流量)</td>
+      <td class="num highlight-best">151 筆 (19.0% 流量)</td>
+      <td class="num highlight-green">讀圖流量穩定消化，無顯存洩漏</td>
     </tr>
     <tr>
-      <td><strong>多輪讀圖成功率</strong></td>
+      <td><strong>讀圖 Turn 2 真實快取命中</strong></td>
       <td class="num">N/A</td>
-      <td class="num">N/A</td>
-      <td class="num highlight-best">140 / 140 (100.0%)</td>
-      <td class="num highlight-green">包含 Turn 1 載入與 Turn 2 上下文復用</td>
-    </tr>
-    <tr>
-      <td><strong>讀圖 Turn 1 首字延遲 (TTFT)</strong></td>
-      <td class="num">N/A</td>
-      <td class="num">N/A</td>
-      <td class="num highlight-best">平均 4.107 秒</td>
-      <td class="num">圖片上傳、預處理與 Vision Tower 編碼</td>
-    </tr>
-    <tr>
-      <td><strong>讀圖 Turn 2 快取復用延遲 (TTFT)</strong></td>
-      <td class="num">N/A</td>
-      <td class="num">N/A</td>
-      <td class="num highlight-best">平均 3.280 秒</td>
-      <td class="num highlight-green"><strong>加速 20.1% (最快 0.565 秒秒回)</strong></td>
+      <td class="num">135 / 140 (96.43% 命中)</td>
+      <td class="num highlight-best">123 / 126 (97.62% 命中)</td>
+      <td class="num highlight-green"><strong>平均每筆命中 7,997.0 tokens (累計 1.01M)</strong></td>
     </tr>
     <tr>
       <td><strong>累計命中 Prompt Cache Tokens</strong></td>
-      <td class="num">1,820,416</td>
-      <td class="num">30,920,704</td>
-      <td class="num highlight-best">5,640,192 (5.64M)</td>
-      <td class="num highlight-green">平均每筆請求命中 7,203 快取 tokens</td>
+      <td class="num">30,920,704 (6.17M/h)</td>
+      <td class="num">5,027,840 (5.03M/h)</td>
+      <td class="num highlight-best">6,012,928 (6.01M/h)</td>
+      <td class="num highlight-green"><strong>快取重用量回升 +19.6% (突破 600 萬)</strong></td>
     </tr>
     <tr>
       <td><strong>累計生成 Tokens 數量</strong></td>
-      <td class="num">146,720</td>
-      <td class="num">1,465,210</td>
-      <td class="num highlight-best">248,621 (24.8萬)</td>
-      <td class="num">穩定輸出高密度代碼與結構化推理</td>
+      <td class="num">1,465,210 (29.2萬/h)</td>
+      <td class="num">211,262 (21.1萬/h)</td>
+      <td class="num highlight-best">235,826 (23.6萬/h)</td>
+      <td class="num highlight-green"><strong>生成 Tokens 產量回升 +11.6%</strong></td>
+    </tr>
+    <tr>
+      <td><strong>GPU 高頻運行佔比 (≥2350MHz)</strong></td>
+      <td class="num">~0% (死鎖 2100MHz)</td>
+      <td class="num">98.5%</td>
+      <td class="num highlight-best"><strong>93.2% 運行於 ≥ 2350 MHz</strong></td>
+      <td class="num highlight-green"><strong>2500MHz 佔 35.4%，2400MHz 佔 32.6%！</strong></td>
+    </tr>
+    <tr>
+      <td><strong>長跑後 Node 1 可用實體顯存</strong></td>
+      <td class="num">3.86 GiB</td>
+      <td class="num">4.90 GiB</td>
+      <td class="num highlight-best"><strong>3.50 GiB (牢守 3.0G 底線)</strong></td>
+      <td class="num highlight-green"><strong>精準受控於 3.0G 安全線以上，零 OOM</strong></td>
     </tr>
   </tbody>
 </table>
@@ -768,7 +768,7 @@
 
 <div class="footer-note">
   <strong>報告檔案路徑：</strong><code>/home/joseyarashio/dgx-spark-tp2-recipes/reports/DGX_Spark_TP2_2M_Pool_Comprehensive_Benchmark_Report_20261108.pdf</code><br>
-  <strong>可重現驗證與原始數據：</strong><code>/home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/results/</code> · GitHub: <code>https://github.com/joseyarashio/dgx-spark-tp2-recipes</code> (Tag: <code>v2b2-p10-1hour-vision-principal-verified</code>, Commit: <code>a46e1a4</code>)
+  <strong>可重現驗證與原始數據：</strong><code>/home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/results/</code> · GitHub: <code>https://github.com/joseyarashio/dgx-spark-tp2-recipes</code> (Tag: <code>v2b2-p12-v3-3gib-verified</code>, Commit: <code>c48fb33</code>)
 </div>
 
 </body>
