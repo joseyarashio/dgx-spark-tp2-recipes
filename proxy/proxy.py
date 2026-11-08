@@ -229,11 +229,17 @@ def load_config() -> None:
         logger.warning(f"Failed to reload config: {e}")
 
 
-def get_timeout(pos: int) -> float:
-    timeouts = state["tiered_timeouts"]
-    if pos < len(timeouts):
-        return timeouts[pos]
-    return timeouts[-1] if timeouts else 5.0
+def get_timeout(pos: int, priority: int = 1) -> float:
+    # Priority-aware fast-fail timeouts:
+    # Priority 0 (interactive / tool call): max wait 3.0s (stepping down by 0.3s per queue pos)
+    # Priority 1 (normal / multi-turn follow-up): max wait 5.0s (stepping down by 0.4s per queue pos)
+    # Priority 2 (background batch): max wait 8.0s (stepping down by 0.5s per queue pos)
+    if priority == 0:
+        return max(1.0, 3.0 - pos * 0.3)
+    elif priority == 1:
+        return max(1.5, 5.0 - pos * 0.4)
+    else:
+        return max(2.0, 8.0 - pos * 0.5)
 
 
 def resolve_limit(model_ids: list[str]) -> tuple[str, int]:
@@ -259,16 +265,15 @@ def resolve_limit(model_ids: list[str]) -> tuple[str, int]:
 def _can_run_priority_locked(priority: int) -> bool:
     """
     Checks whether a request with `priority` is eligible to take an active GPU slot.
-    Enforces both total concurrency limit AND background_max_slots ceiling (reserving at least
-    `limit - bg_max` slots for foreground/normal requests when background_max_slots < current_limit).
+    Enforces total concurrency limit AND reserves at least 2 slots for Priority 0/1 (interactive & normal).
+    Background tasks (Priority >= 2) can take at most `limit - 2` slots (min 1).
     """
     limit = state["current_limit"]
     if state["active_running"] >= limit:
         return False
     if priority >= 2:
-        bg_max = state.get("background_max_slots", 5)
-        reserved_fg = max(1, limit - bg_max) if bg_max < limit else 0
-        if state["bg_running"] >= bg_max or state["active_running"] >= max(1, limit - reserved_fg):
+        bg_max = max(1, limit - 2)
+        if state["bg_running"] >= bg_max or state["active_running"] >= bg_max:
             return False
     return True
 
@@ -353,6 +358,7 @@ async def monitor_upstream_model():
 
                 state["current_model"] = matched_model
                 state["current_limit"] = limit
+                state["background_max_slots"] = max(1, limit - 2)
                 state["upstream_healthy"] = True
 
                 if old_model != matched_model or old_limit != limit:
@@ -461,10 +467,10 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0)
             waiting_queue.append(waiter)
             state["waiting_in_queue"] = len(waiting_queue)
             _sync_cluster_shm()
-            initial_timeout = get_timeout(pos)
+            initial_timeout = get_timeout(pos, priority)
             waiter.deadline = asyncio.get_event_loop().time() + initial_timeout
             logger.info(
-                f"Entered standby queue at position {pos+1}/{queue_max} (prio={priority}, initial timeout={initial_timeout}s)"
+                f"Entered standby queue at position {pos+1}/{queue_max} (prio={priority}, initial timeout={initial_timeout:.1f}s)"
             )
 
         # Wait outside lock
@@ -481,11 +487,11 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0)
                             slot_acquired = True
                             return True, "promoted"
 
-                        # Anti-Herd Extension Check
+                        # Anti-Herd Extension Check (tightened for real fast-fail)
                         can_extend = False
                         if not waiter.extended:
                             now = asyncio.get_event_loop().time()
-                            ext_threshold = state.get("extension_seconds", 5.0)
+                            ext_threshold = 1.5 if priority <= 1 else 3.0
                             for w in waiting_queue:
                                 if w.pos < waiter.pos:
                                     rem = w.deadline - now
@@ -495,10 +501,10 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0)
 
                         if can_extend:
                             waiter.extended = True
-                            cur_timeout = state.get("extension_seconds", 5.0)
+                            cur_timeout = 1.5 if priority <= 1 else 3.0
                             waiter.deadline = asyncio.get_event_loop().time() + cur_timeout
                             logger.info(
-                                f"Anti-herd extension: Waiter at pos {waiter.pos+1} EXTENDED by {cur_timeout}s "
+                                f"Anti-herd extension: Waiter at pos {waiter.pos+1} (prio={priority}) EXTENDED by {cur_timeout:.1f}s "
                                 "(waiter ahead is about to exit/promote)"
                             )
                             continue
@@ -530,7 +536,7 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0)
                 # Position advanced! Reset event, clear extension flag for new tier, and loop
                 waiter.event.clear()
                 waiter.extended = False
-                cur_timeout = get_timeout(waiter.pos)
+                cur_timeout = get_timeout(waiter.pos, waiter.priority)
                 logger.info(
                     f"Queue position advanced to {waiter.pos+1}/{state['queue_buffer']}! Timeout reset to {cur_timeout}s"
                 )
@@ -646,6 +652,16 @@ async def proxy_all(request: Request, path: str):
     if is_completion and request.method == "POST":
         req_id = next(_req_id_counter)
         body_bytes = await request.body()
+        # DSML Interceptor: rewrite non-standard tool_choice to "auto" for DeepSeek-V4.1
+        try:
+            body_json = json.loads(body_bytes)
+            tc = body_json.get("tool_choice")
+            if tc is not None and tc != "auto" and tc != "none":
+                logger.info(f"DSML Interceptor: rewriting tool_choice={tc} to 'auto' for DeepSeek compatibility")
+                body_json["tool_choice"] = "auto"
+                body_bytes = json.dumps(body_json).encode("utf-8")
+        except Exception:
+            pass
         prefix_key = compute_prefix_key(body_bytes)
         if prefix_key:
             await cold_kv_mgr.touch_session(prefix_key)
