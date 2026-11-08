@@ -237,8 +237,7 @@ def get_timeout(pos: int, priority: int = 1) -> float:
     base_t = timeouts[pos] if pos < len(timeouts) else (timeouts[-1] if timeouts else 5.0)
     if priority == 0:
         return min(base_t, 10.0)
-    if priority >= 2:
-        return min(base_t, 12.0)
+    # Background tasks get the full tiered timeout matrix (matching P11 baseline, up to 25.0s)
     return base_t
 
 
@@ -266,13 +265,12 @@ def _can_run_priority_locked(priority: int, est_tokens: int = 0) -> bool:
     """
     Checks whether a request with `priority` is eligible to take an active GPU slot.
     Enforces total concurrency limit (8 slots).
-    Safe Work Stealing architecture (Opus 5.5 + Astra consensus):
-      - Slots 1~6: Standard pool for all priorities (P0, P1, P2).
-      - Slot 7: Borrowable by P2 IF AND ONLY IF no P0/P1 waiter in queue AND short task (est_tokens <= 4096).
+    Optimal Erlang-Pooling Safe Work Stealing (Opus 5.5 + Astra consensus):
+      - Slots 1~7: Available for P0, P1, and P2 (P2 can use up to 7 slots when no P0/P1 waiting in queue).
       - Slot 8: Absolute Sacred Reservation for P0/P1. P2 NEVER allowed into Slot 8.
-    Dynamic Prefill Admission Barrier:
-      - Memory ladder: >= 4.4 GiB free -> allow 3 large prefills; >= 3.8 GiB -> allow 2; < 3.8 GiB -> allow 1.
-      - P0 is exempt from prefill barrier if free RAM >= 3.8 GiB to protect interactive SLA.
+    Dynamic Prefill Admission Barrier (aligned with 3.0 GiB safety watermark):
+      - Memory ladder: >= 3.8 GiB free -> allow 3 large prefills; >= 3.0 GiB -> allow 2; < 3.0 GiB -> allow 1.
+      - P0 is exempt from prefill barrier if free RAM >= 3.0 GiB to protect interactive SLA.
     """
     limit = state["current_limit"]
     active = state["active_running"]
@@ -282,22 +280,19 @@ def _can_run_priority_locked(priority: int, est_tokens: int = 0) -> bool:
         return False
 
     if priority >= 2:
-        # Standard background limit: up to 6 background tasks
-        if bg_active >= 6:
+        # P2 can use up to 7 slots (matching P11 baseline)
+        bg_max = state.get("background_max_slots", 7)
+        if bg_active >= bg_max:
             return False
-        # If total active requests reached 6 (Slot 7 is next):
+        # Slot 8 is sacred for P0/P1: if active >= 7, P2 can never take Slot 8!
+        if active >= 7:
+            return False
+        # If active == 6 (Slot 7 is next):
+        # Safe Work Stealing: P2 can take Slot 7 as long as NO P0/P1 waiter is in queue!
         if active == 6:
-            # Safe Work Stealing Gate for Slot 7:
-            # 1. Must be NO urgent waiters (P0 or P1) in the queue
             has_urgent_waiter = any(w.priority < 2 for w in waiting_queue)
             if has_urgent_waiter:
                 return False
-            # 2. Must be a short task to prevent non-preemptible slot lockup
-            if est_tokens > 4096:
-                return False
-        elif active >= 7:
-            # Slot 8 is the sacred reservation for P0/P1. P2 can never take Slot 8!
-            return False
 
     # Dynamic Prefill Admission Barrier (aligned with 3.0 GiB safety watermark)
     if est_tokens > 16000:
@@ -395,7 +390,7 @@ async def monitor_upstream_model():
 
                 state["current_model"] = matched_model
                 state["current_limit"] = limit
-                state["background_max_slots"] = max(1, limit - 2)
+                state["background_max_slots"] = max(1, limit - 1)
                 state["upstream_healthy"] = True
 
                 if old_model != matched_model or old_limit != limit:
@@ -470,13 +465,11 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0,
             queue_max = state["queue_buffer"]
             bg_max = state.get("background_max_slots", 5)
 
-            # Background queue buffer partition & preemptive shedding (Little's Law):
-            # Low-priority background tasks (prio >= 2) cannot consume more than queue_max - 2 spots!
-            # Always preserve at least 2 queue spots for interactive P0 / normal P1!
-            if priority >= 2:
-                est_wait = len(waiting_queue) * 1.8
-                if len(waiting_queue) >= max(1, queue_max - 2) or est_wait > 8.0:
-                    return False, "preemptive_capacity_shed"
+            # Background queue buffer partition:
+            # Low-priority background tasks (prio >= 2) cannot consume more than queue_max - 1 spots!
+            # Always preserve at least 1 queue spot for interactive P0 / normal P1!
+            if priority >= 2 and len(waiting_queue) >= max(1, queue_max - 1):
+                return False, "bg_queue_capacity_reached"
 
             # 1. Direct GPU execution if eligible and nobody waiting ahead with better unified score
             if _can_run_priority_locked(priority, est_tokens):
@@ -531,11 +524,11 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0,
                             slot_acquired = True
                             return True, "promoted"
 
-                        # Anti-Herd Extension Check (tightened for real fast-fail)
+                        # Anti-Herd Extension Check (restored to 5.0s P11 baseline)
                         can_extend = False
                         if not waiter.extended:
                             now = asyncio.get_event_loop().time()
-                            ext_threshold = 1.5 if priority <= 1 else 3.0
+                            ext_threshold = state.get("extension_seconds", 5.0)
                             for w in waiting_queue:
                                 if w.pos < waiter.pos:
                                     rem = w.deadline - now
@@ -545,7 +538,7 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0,
 
                         if can_extend:
                             waiter.extended = True
-                            cur_timeout = 1.5 if priority <= 1 else 3.0
+                            cur_timeout = state.get("extension_seconds", 5.0)
                             waiter.deadline = asyncio.get_event_loop().time() + cur_timeout
                             logger.info(
                                 f"Anti-herd extension: Waiter at pos {waiter.pos+1} (prio={priority}) EXTENDED by {cur_timeout:.1f}s "
