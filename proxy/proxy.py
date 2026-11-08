@@ -239,7 +239,10 @@ def get_timeout(pos: int, priority: int = 1) -> float:
     timeouts = state.get("tiered_timeouts", [25.0, 22.0, 19.0, 16.0, 13.0, 10.0, 7.0, 4.0])
     base_t = timeouts[pos] if pos < len(timeouts) else (timeouts[-1] if timeouts else 5.0)
     if priority == 0:
-        return min(base_t, 10.0)
+        # Adaptive P0 timeout (Astra & Opus 5.5 recommendation):
+        # Allow up to 16.0s at queue head (never clamped below 14.0s) so interactive/Turn 2 requests
+        # can cross the 12-15s GPU batch cycle without premature decapitation!
+        return max(14.0, min(base_t, 16.0))
     # Background tasks get the full tiered timeout matrix (matching P11 baseline, up to 25.0s)
     return base_t
 
@@ -269,11 +272,12 @@ def _can_run_priority_locked(priority: int, est_tokens: int = 0) -> bool:
     Checks whether a request with `priority` is eligible to take an active GPU slot.
     Enforces total concurrency limit (8 slots).
     Optimal Erlang-Pooling Safe Work Stealing (Opus 5.5 + Astra consensus):
-      - Slots 1~7: Available for P0, P1, and P2 (P2 can use up to 7 slots when no P0/P1 waiting in queue).
+      - Slots 1~6: Standard pool for all priorities (P0, P1, P2).
+      - Slot 7: Borrowable by P2 if no RUNNABLE urgent waiter is in queue (prevents prefill deadlock).
       - Slot 8: Absolute Sacred Reservation for P0/P1. P2 NEVER allowed into Slot 8.
-    Dynamic Prefill Admission Barrier (aligned with 3.0 GiB safety watermark):
-      - Memory ladder: >= 3.8 GiB free -> allow 3 large prefills; >= 3.0 GiB -> allow 2; < 3.0 GiB -> allow 1.
-      - P0 is exempt from prefill barrier if free RAM >= 3.0 GiB to protect interactive SLA.
+    Dynamic Prefill Admission Barrier (aligned with 3.05 GiB steady-state watermark):
+      - Memory ladder: >= 3.05 GiB -> allow 3 large prefills; >= 2.65 GiB -> allow 2; < 2.65 GiB -> allow 1.
+      - P0 is exempt from prefill barrier if free RAM >= 2.65 GiB to protect interactive SLA.
     """
     limit = state["current_limit"]
     active = state["active_running"]
@@ -283,31 +287,34 @@ def _can_run_priority_locked(priority: int, est_tokens: int = 0) -> bool:
         return False
 
     if priority >= 2:
-        # P2 can use up to 7 slots (matching P11 baseline)
-        bg_max = state.get("background_max_slots", 7)
+        bg_max = state.get("background_max_slots", 6)
         if bg_active >= bg_max:
             return False
         # Slot 8 is sacred for P0/P1: if active >= 7, P2 can never take Slot 8!
         if active >= 7:
             return False
         # If active == 6 (Slot 7 is next):
-        # Safe Work Stealing: P2 can take Slot 7 as long as NO P0/P1 waiter is in queue!
+        # Safe Work Stealing: P2 can take Slot 7 as long as NO RUNNABLE P0/P1 waiter is in queue!
+        # (Crucial fix: if P1 is waiting on the prefill barrier, it cannot run anyway; don't block P2!)
         if active == 6:
-            has_urgent_waiter = any(w.priority < 2 for w in waiting_queue)
-            if has_urgent_waiter:
+            has_runnable_urgent = any(
+                w.priority < 2 and _can_run_priority_locked(w.priority, w.est_tokens)
+                for w in waiting_queue
+            )
+            if has_runnable_urgent:
                 return False
 
-    # Dynamic Prefill Admission Barrier (aligned with 3.3 GiB steady-state watermark)
+    # Dynamic Prefill Admission Barrier (aligned with 3.05 GiB steady-state watermark)
     # Threshold at 20,000 tokens prevents 12K code prompts from being blocked
     if est_tokens > LARGE_PREFILL_TOKEN_THRESHOLD:
         free_ram = get_host_free_memory_gib()
-        # Memory ladder: >= 3.3 GiB permits 3 large prefills; >= 2.8 GiB permits 2; < 2.8 GiB permits 1
-        max_large = 3 if free_ram >= 3.3 else (2 if free_ram >= 2.8 else 1)
+        # Memory ladder: >= 3.05 GiB permits 3 large prefills; >= 2.65 GiB permits 2; < 2.65 GiB permits 1
+        max_large = 3 if free_ram >= 3.05 else (2 if free_ram >= 2.65 else 1)
         if priority > 0:
-            if free_ram < 2.8 or state.get("active_large_prefills", 0) >= max_large:
+            if free_ram < 2.65 or state.get("active_large_prefills", 0) >= max_large:
                 return False
         else:
-            if free_ram < 2.8:
+            if free_ram < 2.65:
                 return False
 
     return True
@@ -402,7 +409,7 @@ async def monitor_upstream_model():
 
                 state["current_model"] = matched_model
                 state["current_limit"] = limit
-                state["background_max_slots"] = max(1, limit - 1)
+                state["background_max_slots"] = state.get("background_max_slots", 6)
                 state["upstream_healthy"] = True
 
                 if old_model != matched_model or old_limit != limit:

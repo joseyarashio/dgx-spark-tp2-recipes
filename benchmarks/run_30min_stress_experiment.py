@@ -19,7 +19,7 @@ from typing import Dict, Any, List
 API_URL = "http://127.0.0.1:8889/v1/chat/completions"
 STATUS_URL = "http://127.0.0.1:8889/proxy/status"
 DURATION_SECONDS = 1800  # 30 minutes
-MAX_CONCURRENCY = 8     # 6 active GPU slots + 2 standby queue (within 14 limit)
+MAX_CONCURRENCY = int(os.environ.get("MAX_CONCURRENCY", "10"))  # 8 active GPU slots + 2 standby queue (within 16 limit)
 OUTPUT_FILE = Path(os.environ.get("OUTPUT_FILE", "/home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/results/stress_30min_ms_dtc_experiment.json"))
 
 def make_test_png(width=256, height=256, color_idx=0):
