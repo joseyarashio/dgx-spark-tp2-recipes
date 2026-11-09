@@ -1,55 +1,37 @@
 {
-  "manifest_version": "2.16.0",
-  "active_milestone": "v2b2-p16-hardened",
+  "manifest_version": "1.0.0",
   "cluster_topology": {
     "nodes": 2,
-    "head_node": "spark-9e5c (192.168.10.148, 100.70.199.89)",
-    "worker_node": "spark-7579 (192.168.10.149, 100.121.64.103)",
     "interconnect": "ConnectX-7 200Gbps RoCEv2 dual-rail direct",
     "measured_bandwidth_gbps": 185.0,
-    "allreduce_ring_latency_us": 11.8,
-    "host_memory_per_node_gib": 128.0,
+    "host_memory_per_node_gib": 121.0,
     "gpu_microarchitecture": "NVIDIA Grace-Blackwell SM121 (GB10)",
     "cpu_microarchitecture": "MediaTek 10x Cortex-X925 (3.9GHz) + 10x Cortex-A725 (2.8GHz)",
     "cpu_pinning": "5-9,15-19 (10x Cortex-X925 Super-Cores)"
   },
   "cryptographic_hashes": {
-    "recipe_commit": "c90ba716",
-    "tag": "v2b2-p15-transcending-champion",
-    "engine_binary": "out.p16 (TensorFold Native Zig + Patches 0064 & 0065)",
-    "weights": "Plus-Ten EXL3 2.9bpw + Engram + 43-Layer F32 Gate Bias"
+    "recipe_commit": "b5eba0ecc7d006f00d2f076e3cf8921c4a577033",
+    "engine_commit": "12822967d8707f894b42c04497732b1a72fb0c27",
+    "patchset_sha256": "ed98863d757cd11ece3251029cc0aeeef58781297e4db7dbd066b0a7a8dc962b",
+    "kernel_manifest_sha256": "ae370ac9aef8cfd937319037b850a825748085c8c54e9e0bbd8421bb5565ddf5",
+    "launch_config_sha256": "003fc7bac64fae084541e357ab7a80e4e223cb3a9f9c26cd03455a185a032ae1",
+    "proxy_sha256": "421079a34f61482df269b02a90639ef80cf74cf66201c3131789170bdcae1679"
+  },
+  "engine_binaries": {
+    "rank0_tensorfold_native_sha256": "31b3f59bef7ca3f5bc4d3d105706ec83f09db2a8b3d4f0d4ed69d76a4e9d3894",
+    "rank1_tf_dsv41_lanes_sha256": "c35d6a8342a80b3c836065f115df659f8858113f727ed2db7515ea7367290aed",
+    "node2_tf_dsv41_lanes_sha256": "c35d6a8342a80b3c836065f115df659f8858113f727ed2db7515ea7367290aed",
+    "rank1_binary_synced": true
   },
   "memory_audit_ledger": {
-    "rank0_device_working_set_gib": 106.3,
-    "rank1_device_working_set_gib": 106.3,
+    "measured_at": "2026-11-09 17:24:27 +0800",
+    "rank0_engine_active_gib": 105.47,
+    "parallel_slots": 8,
     "kv_pool_allocated_tokens": 2097152,
-    "kv_pool_footprint_gib": 1.74,
     "host_prompt_cache_budget_gib": 2.5,
-    "strata_l2_nvme_learn_gib": 32.0,
-    "strata_l2_snapshot_store_gb": 126.9,
-    "strata_l2_active_chunk_files": 3433,
-    "strata_l3_cold_quota_gb": 50.0,
-    "node1_available_memory_gib": 3.50,
-    "node2_available_memory_gib": 5.80,
-    "node1_swap_gib": 0.46,
-    "node2_swap_gib": 0.0,
-    "status": "Safe Watermark Maintained (> 2.80G Safety Floor · Zero Swap Activity · Zero OOM)"
-  },
-  "verified_production_benchmark": {
-    "duration_seconds": 3674.9,
-    "total_requests": 833,
-    "http_200_count": 833,
-    "http_200_rate_percent": 100.00,
-    "http_429_count": 0,
-    "http_429_rate_percent": 0.00,
-    "prompt_cache_tokens_reused": 9566208,
-    "completion_tokens_generated": 279583,
-    "mean_wall_duration_seconds": 30.63,
-    "single_stream_greedy_decode_tok_s": 92.14,
-    "dspark_speculative_acceptance_rate_percent": 81.7,
-    "multi_stream_c8_aggregate_tok_s": 175.0,
-    "cold_8k_prefill_rate_tok_s": 2221.0,
-    "total_ingestion_velocity_tok_s": 2735.0,
-    "objective_evaluation_score": "28/30 (93.3%)"
+    "cuda_graph_lru_cap": 128,
+    "node1_available_memory_gib": 4.99,
+    "node2_available_memory_gib": 7.85,
+    "engram_mode": "O_DIRECT Linux AIO from local NVMe (203 GB tables)"
   }
 }
