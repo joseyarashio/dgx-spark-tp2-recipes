@@ -8,6 +8,7 @@ export TF_FILL_FIRST=2
 export TF_FILL_CUT_IN=8192
 export TF_DS_STREAMS=8
 export TF_DS_WINDOW=2097152
+export TF_LEARN_TTL_S=86400
 DROP_REASONING_FLAG=""
 if [ "${DROP_REASONING_HISTORY:-1}" = "1" ]; then
     DROP_REASONING_FLAG="--drop-reasoning-history --keep-last-n-reasoning 2"
@@ -20,5 +21,5 @@ exec /home/joseyarashio/TensorFold-dsv41-zig/out/native/bin/tensorfold-native se
   --context 1048576 --parallel 8 --thinking --max-tokens 32768 \
   $DROP_REASONING_FLAG \
   --prompt-cache-gib 2.5 \
-  --learn --learn-dir /home/joseyarashio/.cache/dsv41-nvme-imprint --learn-gib 32 \
+  --learn --learn-dir /home/joseyarashio/.cache/dsv41-nvme-imprint --learn-gib 186.26 \
   --temperature 0.30 --top-p 0.95 --top-k 20 --backend cuda

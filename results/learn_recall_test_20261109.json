@@ -1,0 +1,29 @@
+{
+ "seed": 1794236606,
+ "cold": {
+  "ttft_s": 20.85,
+  "total_s": 20.944,
+  "text": "1833"
+ },
+ "learned_lines": [
+  "info: prompt cache: learned 43008 tokens to disk (/home/joseyarashio/.cache/dsv41-nvme-imprint/00000000564b5344/1779248ae7e4e081, 44965888 bytes)",
+  "info: prompt cache: learned 45056 tokens to disk (/home/joseyarashio/.cache/dsv41-nvme-imprint/00000000564b5344/7a356c485a5dca34, 46788608 bytes)"
+ ],
+ "phase2": {
+  "seed": 1794236606,
+  "cold": {
+   "ttft_s": 20.85,
+   "total_s": 20.944,
+   "text": "1833"
+  },
+  "recall": {
+   "ttft_s": 1.039,
+   "total_s": 1.086,
+   "text": "upsilon"
+  },
+  "recall_lines": [
+   "info: prompt cache: read 45056 learned tokens from disk"
+  ],
+  "speedup_ttft": 20.07
+ }
+}

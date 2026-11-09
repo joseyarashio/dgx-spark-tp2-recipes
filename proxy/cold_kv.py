@@ -94,6 +94,9 @@ class ColdKVManager:
         """
         if not session_key or not body_bytes:
             return
+        # The engine's --learn imprint holds the KV on NVMe; a raw body here is never read back (COLD_KV_WRITE=1 re-enables).
+        if not force and os.environ.get("COLD_KV_WRITE", "0") != "1":
+            return
 
         free_mem = get_host_free_memory_gib()
         if not force and free_mem >= HIGH_WATERMARK_FREE_MEM_GIB:
