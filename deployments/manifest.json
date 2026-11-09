@@ -1,6 +1,6 @@
 {
-  "manifest_version": "2.15.0",
-  "active_milestone": "v2b2-p15-transcending-champion",
+  "manifest_version": "2.16.0",
+  "active_milestone": "v2b2-p16-hardened",
   "cluster_topology": {
     "nodes": 2,
     "head_node": "spark-9e5c (192.168.10.148, 100.70.199.89)",
@@ -16,7 +16,7 @@
   "cryptographic_hashes": {
     "recipe_commit": "c90ba716",
     "tag": "v2b2-p15-transcending-champion",
-    "engine_binary": "out.p11b / out.2m (TensorFold Native Zig)",
+    "engine_binary": "out.p16 (TensorFold Native Zig + Patches 0064 & 0065)",
     "weights": "Plus-Ten EXL3 2.9bpw + Engram + 43-Layer F32 Gate Bias"
   },
   "memory_audit_ledger": {
