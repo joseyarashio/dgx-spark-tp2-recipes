@@ -1,5 +1,33 @@
 [
  {
+  "file": "omni_eval_1hour_p16_ttl0cap.json",
+  "start": "2026-11-10 03:22:20",
+  "quality_pass": "4/4",
+  "tools_pass": true,
+  "prefill_8k_cold_tok_s": 2314.2,
+  "prefill_8k_cached_ttft_s": 0.8847,
+  "greedy_tok_s": 94.89,
+  "mtp_accept": 0.8029,
+  "sampling_tok_s": 57.36,
+  "c1": 75.54,
+  "c2": 101.3,
+  "c4": 130.83,
+  "cut_in_32k_s": 0.6664,
+  "marathon_requests": 993,
+  "ok_200": 993,
+  "ok_rate_pct": 100.0,
+  "status_codes": {
+   "200": 993
+  },
+  "gen_tokens": 322238,
+  "cached_tokens": 11554816,
+  "ttft_p50_s": 9.392,
+  "ttft_p95_s": 20.131,
+  "wall_mean_s": 26.48,
+  "wall_p95_s": 43.27,
+  "mem_after_gib": null
+ },
+ {
   "file": "omni_eval_1hour_p16_learnfix_warm.json",
   "start": "2026-11-10 01:19:56",
   "quality_pass": "4/4",
