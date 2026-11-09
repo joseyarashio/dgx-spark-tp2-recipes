@@ -4,9 +4,10 @@
 
 [![語言：繁體中文](https://img.shields.io/badge/%E8%AA%9E%E8%A8%80-%E7%B9%81%E9%AB%94%E4%B8%AD%E6%96%87-059669?style=for-the-badge)](README.zh-TW.md)
 [![Language: English](https://img.shields.io/badge/Language-English-2563eb?style=for-the-badge)](README.md)
-[![Engine: TensorFold Native Zig](https://img.shields.io/badge/Engine-TensorFold_Native_Zig-0891b2?style=for-the-badge)](https://github.com/bertholomus/TensorFold)
-[![Weights: Plus-Ten 2.9bpw](https://img.shields.io/badge/Weights-Plus--Ten_2.9bpw_6--bit_MTP-d97706?style=for-the-badge)](https://huggingface.co/Plus-Ten/DeepSeek-V4.1-Flash-1017-TensorFold-EXL3-2.9bpw)
-[![PDF Report](https://img.shields.io/badge/PDF-4%E9%A0%81%E5%AE%8C%E6%95%B4%E5%AF%A6%E6%B8%AC%E5%A0%B1%E5%91%8A-dc2626?style=for-the-badge)](reports/DGX_Spark_TP2_Comprehensive_Benchmark_Report_20261027.pdf)
+[![發行版本：超越級生產冠軍 P15](https://img.shields.io/badge/%E7%94%9F%E7%94%A2%E5%86%A0%E8%BB%9D-v2b2--p15--transcending--champion-10b981?style=for-the-badge)](https://github.com/bertholomus/TensorFold)
+[![推論引擎：TensorFold Native Zig](https://img.shields.io/badge/Engine-TensorFold_Native_Zig-0891b2?style=for-the-badge)](https://github.com/bertholomus/TensorFold)
+[![模型權重：Plus-Ten 2.9bpw](https://img.shields.io/badge/Weights-Plus--Ten_2.9bpw_6--bit_MTP-d97706?style=for-the-badge)](https://huggingface.co/Plus-Ten/DeepSeek-V4.1-Flash-1017-TensorFold-EXL3-2.9bpw)
+[![PDF 報告](https://img.shields.io/badge/PDF-%E7%94%9F%E7%94%A2%E5%86%A0%E8%BB%9D%E9%87%8C%E7%A8%8B%E7%A2%91%E5%A0%B1%E5%91%8A-dc2626?style=for-the-badge)](reports/DGX_Spark_TP2_Production_Champion_Milestone_Report_20261109.pdf)
 
 </div>
 
@@ -20,143 +21,110 @@
 
 ## 專案概述
 
-本儲存庫為 **雙節點 NVIDIA DGX Spark（GB10，2× 128 GB Unified Memory）** 透過 **ConnectX-7 200G RoCEv2 雙軌直連（185 Gbps）** 部署 **DeepSeek-V4.1-Flash-1017（763B MoE，1M Context）** 的完整生產級配方、引擎修補（`patches/`）、啟動與切換腳本（`scripts/`）、Port 8889 優先權與階梯式 429 排程網關（`proxy/`）以及六階段 A/B 實測報告（`reports/`、`benchmarks/results/`）。
+本儲存庫記錄了在 **兩台 NVIDIA DGX Spark（GB10，2× 128 GB Unified LPDDR5X Memory）** 透過 **ConnectX-7 200G RoCEv2 雙軌直連（實測 185 Gbps）** 叢集架構下，將 **DeepSeek-V4.1-Flash-1017（763B MoE，1M Context）** 調優至全面超越早期基準的 **超越級生產冠軍配方（`v2b2-p15-transcending-champion`）**。
 
-我們的生產主力配置（**`v2b2-production-champion`**）結合了五大核心工程突破：
-1. **TensorFold Native Zig 原生引擎（`fbbc9713` + 記憶體與排程修補）**：針對 Grace Neoverse-V2 原生 CPU（`ReleaseFast`）編譯，啟用 `TF_DS_PROMPT_ALIAS=1`（省 1.63 GiB 預填暫存）、`TF_FILL_CUT_IN=4096`（長預填下短請求 **0.94 秒**插隊）與 **Vision Cache Tower Skip（多輪看圖跳過已快取圖片重算，TTFT 僅 0.73 秒，提前免疫社群 Issue #90 / PR #93）**。
-2. **Plus-Ten 2.9bpw 512K 序列校準骨幹 + 6-bit LM Head & 6-bit MTP 草稿頭**：透過 `scripts/apply_plusten_backbone.py` 直接在預切分之 `rank0of2` / `rank1of2` 二進位快取上植入 4,944 個高精度骨幹與草稿張量。
-3. **43 層官方 FP32 路由偏置修復（`zz-gate-bias-f32-1017.safetensors`）**：徹底消除社群量化將 40 層 MoE + 3 層 MTP 的路由偏置截斷為 FP16 導致 **95.1% 相鄰專家平手與排序反轉** 的物理缺陷，使日常 `temp=0.30` 代碼解碼自 `74.0` 暴增至 **`90.2 tok/s (+21.4%)`**，確定性 `temp=0.00` 代碼達 **`95.5 tok/s`**（MTP 草稿接受率達 **80.3%**）。
-4. **Serving 層 Agent 工具對話完整性修補（`Patch 0027` & `Patch 0028`）**：
-   - `0027-tool-call-prose.patch`：修復非串流 Tool-Call 丟失思考規劃文字（`content: null`）以及串流多出 `\n\n` 導致下一輪 Prompt Cache 前綴錯位脫靶的重大問題。
-   - `0028-plain-request-text.patch`：在渲染模板前以 `U+FDD0` 遮罩請求與工具結果中的 `<｜User｜>`、`</think>`、`<｜DSML｜` 字樣，杜絕日誌或程式碼文字被誤編碼為控制 Token。
-5. **Port 8889 優先權排程與階梯式秒退 429 網關（`proxy/proxy.py`）**：
-   - 支援 `X-Priority` 優先權佇列（`0: 前景互動`、`1: 一般`、`2: 背景批次`）與背景槽位上限（`background_max_slots = 3`），強制保留第 4 槽給主互動 Agent（3 路背景滿載下前景 **`1.40s`** 完成交付）。
-   - 嚴格將 Slot 鎖定至 SSE 串流（`aiter_raw()`）完整結束，並提供 `[20s, 15s, 10s, 5s]` 階梯超時與防驚群延展，超額突發 **`1.2 ms`** 秒退 HTTP 429 觸發雲端備援。
-6. **P4 生產環境終極硬化與真看圖架構**：
-   - **多輪長對話增量插隊 (`PR #95` / `Patch 0045`)**：改以「未快取之增量 tokens（`prompt.len - resume_at ≤ 4096`）」計算。帶有 15K~300K 快取歷史的對話在背景有 32K 冷預填運行時，首字回應延遲由 31.7 秒大幅縮減至 **1.52 秒**（**快 20.9 倍**）。
-   - **圖片預處理獨立 Scratch Arena (`PR #112` / `Patch 0056`)**：PNG 解碼、雙三次縮放、padding 與 patchify 在獨立 `ArenaAllocator` 進行並在每張圖後立即重置，僅拷貝 16-byte 對齊的最終 payload 至請求 arena。多截圖場景記憶體消耗**降低 68%**（0.71 GiB 降至 0.23 GiB），徹底解決 Agent 多輪看圖累積導致的 OOM 崩潰。
-   - **CUDA Graph 上限管理 (`Patch 0033`)**：鎖定 `TF_DS_GRAPH_CAP=128` 並採 LRU 自動淘汰，杜絕長達數週連續運行時顯存緩慢膨脹。
-   - **Anthropic 前端相容與保活 (`Patches 0029–0032`)**：全面相容 Claude Code / `/v1/messages` 規範，並在冷預填超過 25 秒時自動送出 SSE `: ping` 保持連線。
-   - **合成視覺探針驗證 (`scripts/vision_probe.py`)**：以實體 data URL 格式驗證紅圓/綠方幾何形狀與色彩（100%）、四象限方格計數（100%）與精確 OCR 文字提取（100%）。
-   - **LMCache 風格分層 NVMe 冷盤快取管理器 (`Stage 2B-2 P6`)**：正式引進會話級分層異步下沉架構。將長對話與多輪 Agent 會話在輪次結束後非同步寫入至本機 NVMe 高速快取目錄（`/home/joseyarashio/.cache/dgx_cold_kv/`，4.7 GB/s 循序讀取），完全零阻斷在線 GPU 解碼。實裝嚴格的雙層 TTL 機制：**第 1 層（10 分鐘記憶體閒置下沉至 NVMe）** 與 **第 2 層（24 小時未訪問背景永久清除）**，並設有 50 GB 磁碟硬上限與 LRU 自動淘汰。實機回歸測試自動成功下沉 7 組大型會話（487 KB），解碼速度與智商 100% 毫髮無損，可用顯存依然維持 6.99 GiB。
-   - **擴展升級：6 併發運算槽位與 8 佇列緩衝 (`Stage 2B-2 P5`)**：正式將雙節點活躍並行槽位由 4 擴展至 6（`--parallel 6`），並將 Proxy 優先權待命佇列由 4 放寬至 8 位（支援最高 14 路請求在線）。8 階梯超時嚴格遵循 **25 秒起始、每階退 3 秒** 規則：`[25.0, 22.0, 19.0, 16.0, 13.0, 10.0, 7.0, 4.0]`。在 64-row 算子滿版支持下，**C6 併發聚合吞吐由 115.8 tok/s 巨幅暴增至 170.07 tok/s（飆升 +46.8%）**！實機通過 16 路高壓突發測試（前 6 路進運算槽、中 8 路進待命緩衝、第 15～16 路 1.3ms 秒退 429），可用記憶體依然安全守住 7.13 GiB 水位。
-   - **8K 增量插隊窗口與 3.0GB 快取記憶體擴展 (`Stage 2B-2 P4n`)**：將短請求插隊窗口由 4,096 放寬至 `TF_FILL_CUT_IN=8192`，使多輪 Agent 帶有 6K～8K 工具調用結果的長對話在背景進行 32K 冷預填期間仍能毫秒級插隊（實測短插隊 TTFT 僅 1.13s）；同時將快照記憶體預算擴展至 `--prompt-cache-gib 3.0`。實測 D1 4 代理並行掃描全部達成 **26,624 快取 tokens 滿額命中**，D3 長工具鏈 Turn 6 精確命中 2,048 快取 tokens。
-   - **Strata 確定態前綴快取視窗 (`Stage 2B-2 P4j`)**：在 Single-Flight 基礎上擴展 60 秒確定態前綴防抖視窗（`prefix_committed`），使後續抵達之兄弟請求在 Leader 預填完成後能 100% 穩定掛載快取區塊。混合負載總耗時推升至 5.80s（比基線快 5.8 倍）。
-   - **Strata Single-Flight 前綴快取協同 (`Stage 2B-2 P4i`)**：徹底解決多個子代理同時掃描同一個 Git Repo（>30K tokens）時的「Delay-Hit」排隊雪崩與重複預填。Proxy 自動提取規範化前綴哈希並維護 Single-Flight 事件狀態機，讓後續抵達的兄弟請求在 Leader 預填完成時直接掛載快取。實測錯開進場批次總耗時由 21.78s 驟降至 12.81s（加速 41%）。
-   - **CPU 核心親和性綁定 (`--cpuset-cpus=5-9,15-19`)**：雙節點推論容器嚴格綁定於 10 顆 3.9 GHz Cortex-X925 超大核，徹底隔離 2.8 GHz Cortex-A725 背景核心。消除 CPU 排程抖動，冷預填吞吐推升至 2,255 tok/s，多輪增量插隊 TTFT 壓至 1.01s。
-   - **長對話快取原地擴展 (`PR #115` / `Patch 0057`)**：徹底解決長對話（>500K tokens）在 KV 空間緊張時因嘗試跨區拷貝失敗而導致快取全數作廢的致命缺陷。改為允許原地直接擴展並僅淘汰尾部被覆蓋之閒置狀態，特定衝突情境下完成時間由 284.6s 驟降至 1.7s。
-   - **可選思維鏈歷史過濾防護 (`PR #116` / `Patch 0058`)**：新增可選開關 `--drop-reasoning-history`（或 `DROP_REASONING_HISTORY=1`），在多輪工具循環中主動剝離歷史 Assistant 之 `reasoning_content`，防止模型因自我思維模仿陷入 telegram 僵化與 loop guard abort 死循環。
-   - **64-Row 解碼窗口與 32-Stream 算子擴展 (`v0.7.5` / `v2b2-p4e-64row-extended`)**：雙節點同步植入 16 個 `_rowmm_parts` 64-row cubin 算子（`aot.json` 核心數自 198 增至 214），引擎上限放寬至 `round.max_rows = 64` 與 `max_streams = 32`。在維持 4 槽並發與 1.05M 記憶體池（確保 8+ GiB 可用記憶體）前提下，徹底解除 48-row 歷史天花板，提供完整的算子批次不變性擴展能力。
-   - **三重開機自癒防護**：Docker `--restart unless-stopped` + user systemd `spark-fastfail-proxy.service` + `spark-dsv41-cluster.service` 開機健康檢查與自癒啟動。
+在 1 小時連續隨機混流高壓馬拉松（`omni_eval_1hour_p15_transcending_champion.json`）實測中，本配方達成：
+* **100.00% 完美成功交付**：833 / 833 筆請求全量成功交付，**0 筆失敗、0 筆 429 秒退、0 筆 OOM**。
+* **9,566,208 (9.57M) Tokens 快取命中復用**：創歷史全時段最高紀錄（比 P11 基準多出 +30.7 萬 tokens）。
+* **279,583 Tokens 生成總量**：創歷史全時段最高紀錄（比 P11 基準多出 +5,736 tokens）。
+* **30.63 秒平均整體耗時**：比 P11 基準更快 0.47 秒，動態排隊常駐僅 0~1 筆，達成 **0ms 緩衝膨脹**。
 
 ---
 
-## 7. 密碼學部署清單與記憶體成分帳本 (Deployment Manifest & Memory Audit)
+### 五大關鍵技術革新與突破
 
-依據 HPC 嚴格架構標準，為每次生產部署產出自動化密碼學校驗清單（`deployments/manifest.json`），徹底釐清實體記憶體分佈與無 OOM 邊界：
+1. **解耦 2M 多流共享 KV 池（Patch 0063 / `out.p11b` / `out.2m`）**：
+   * 將單一請求上下文長度（1M）與多流共享緩衝池（`TF_DS_WINDOW=2097152`）徹底解耦。
+   * 透過 MLA 壓縮（890 bytes/token/rank），2M 完整 Token KV 池於每節點僅佔用 **1.74 GiB** 物理空間。
+2. **Strata 三層存儲分級架構與 NVMe 快取最大化**：
+   * **L1 熱池（UMA LPDDR5X @ 546 GB/s）**：常駐 2M KV 池與 2.5 GiB 主機顯存快照池（`--prompt-cache-gib 2.5`）。
+   * **L2 溫池（PCIe 4.0 NVMe Learn Imprint 最大化）**：**32 GiB 持久化學習印記（`--learn --learn-gib 32`）**，**126.9 GB 快照存儲（3,433+ 份活躍塊檔案）**，**零宿主實體顯存索引佔用**，重啟時毫秒級熱 Radix 樹還原。
+   * **L3 冷池（異步落盤冷存儲）**：50 GB 硬配額管理，背景 gzip 異步落盤，主推論線程 0ms 阻塞。
+3. **8 槽位 Erlang 安全工作竊取排程器（Port 8889 Proxy）**：
+   * 1~6 號槽位標準全開放，**7 號槽位支援安全工作竊取（Safe Work-Stealing）**（在無可運行之 P0/P1 緊急任務時開放 P2 背景長文本借調），**8 號槽位神聖保留**（專屬 P0 前景互動與 P1 視覺跟隨）。
+   * 階梯式超時矩陣 `[25s, 22s, 19s, 16s, 13s, 10s, 7s, 4s]`，P0 自適應 16s 視窗，>12K 根節點主動展延 +8s 防驚群。
+4. **3.05 GiB 主動預填流水線屏障**：
+   * 根據主機剩餘可用 RAM 階梯動態調控大預填並發（>20K tokens）：RAM ≥ 3.05G 允許 3 路並發；< 3.05G 壓制為 2 路。
+   * 暖前綴完全豁免（標記為 512B），大預填計數器於首字 Delta 發出時立即遞減釋放，徹底根除虛假阻擋。
+5. **MS-DTC 動態溫控變速箱（`scripts/ms_dtc_governor.py`）**：
+   * 50 MHz 平滑調頻消除 150MHz 離散震盪；2400 MHz 待機（9.4W），2500 MHz 甜區爆發，89°C 軟夾持於 2200 MHz（杜絕 1800MHz 崩潰斷崖）。
 
-```json
-{
-  "cluster_topology": {
-    "nodes": 2,
-    "interconnect": "ConnectX-7 200Gbps RoCEv2 dual-rail direct (185 Gbps sustained)",
-    "host_memory_per_node_gib": 121.0,
-    "gpu_microarchitecture": "NVIDIA Grace-Blackwell SM121 (GB10)",
-    "cpu_microarchitecture": "MediaTek 10x Cortex-X925 (3.9GHz) + 10x Cortex-A725 (2.8GHz)",
-    "cpu_pinning": "5-9,15-19 (10x Cortex-X925 Super-Cores)"
-  },
-  "memory_audit_ledger": {
-    "rank0_device_working_set_gib": 99.2,
-    "rank1_device_working_set_gib": 99.2,
-    "kv_pool_allocated_tokens": 1048576,
-    "kv_pool_footprint_gib": 6.44,
-    "host_prompt_cache_budget_gib": 3.0,
-    "cuda_graph_lru_cap": 128,
-    "cuda_graph_footprint_gib": 0.65,
-    "node1_available_memory_gib": 7.60,
-    "node2_available_memory_gib": 9.30,
-    "engram_disk_mmap_mode": "Demand-Paged File-Backed (203 GB on NVMe SSD)",
-    "status": "Safe Watermark Maintained (Zero OOM Risk)"
-  }
-}
+---
+
+### 系統架構與 Strata 存儲設計圖
+
+![Dual NVIDIA DGX Spark TP=2 System Architecture and Strata Tiered Storage](assets/architecture.png)
+
+---
+
+### 1 小時馬拉松長跑全階段實測數據對照表
+
+所有階段均在完全相同的硬體配置下，以 1 小時連續壓力測試基準（`benchmarks/run_omni_eval.py --profile standard --duration 3600`）進行全量回歸評測：
+
+| 評測核心指標 | P11 基準 | P12 v1 (初版) | P12 v4 (去截斷) | P13 (前綴感知) | P14 (負向回退) | P15 終極超越冠軍 ⭐ |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **總發起請求數** | 839 | 711 | 725 | 757 | 778 | **833** |
+| **成功交付筆數 (200 OK)** | 836 (99.64%) | 647 (91.00%) | 713 (98.34%) | 745 (98.41%) | 694 (89.20%) | **833 (100.00% 完美全交付)** |
+| **429 秒退 / 丟棄筆數** | 3 (0.36%) | 64 (9.00%) | 12 (1.66%) | 12 (1.59%) | 84 (10.80%) | **0 (0.00% 零秒退)** |
+| **Prompt Cache 命中 Tokens** | 9,259,008 | 5,027,840 | 5,701,632 | 7,018,496 | 5,793,792 | **9,566,208 (歷史新高 +30.7萬)** |
+| **產出 Tokens 總量** | 273,847 | 211,262 | 228,633 | 239,951 | 226,285 | **279,583 (歷史新高 +5,736)** |
+| **單筆平均耗時 (Wall Clock)** | 31.10 秒 | 37.84 秒 | 35.22 秒 | 32.58 秒 | 41.93 秒 | **30.63 秒 (比基準快 0.47 秒)** |
+| **P0 互動式任務交付率** | 100.0% | 100.0% | 100.0% | 98.2% (退 3) | 99.4% (退 1) | **100.0% (163/163 全交付)** |
+| **P1 視覺追蹤任務交付率** | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | **100.0% (499/499 全交付)** |
+| **P2 背景長文本任務交付率** | 98.2% | 63.2% (退 60) | 92.9% (退 12) | 94.7% (退 9) | 54.0% (退 80) | **100.0% (171/171 全交付)** |
+| **單流貪婪解碼速率** | 91.56 tok/s | 91.80 tok/s | 92.10 tok/s | 92.38 tok/s | 92.10 tok/s | **92.14 tok/s (MTP 81.7%)** |
+| **多流滿載聚合吞吐 (C8)** | 168.0 tok/s | 162.0 tok/s | 170.5 tok/s | 172.0 tok/s | 169.0 tok/s | **175.0 tok/s (8 槽位滿載)** |
+| **系統全量接入速率** | 2,648 tok/s | 1,455 tok/s | 1,647 tok/s | 2,016 tok/s | 1,672 tok/s | **2,735 tok/s (35.2x 解碼放大)** |
+| **冷 8K 預填速率** | 2,135 tok/s | 2,097 tok/s | 2,145 tok/s | 2,210 tok/s | 2,180 tok/s | **2,221 tok/s (TTFT 2.64s)** |
+| **32K 搶佔插隊首字延遲** | 0.94 秒 | 1.13 秒 | 0.88 秒 | 0.79 秒 | 0.82 秒 | **0.783 秒** |
+| **視覺第二輪快取首字延遲** | 0.71 秒 | 0.73 秒 | 0.54 秒 | 0.48 秒 | 0.49 秒 | **0.475 秒 (100% 快取命中)** |
+| **Node 1 穩態可用顯存** | 3.80 GiB | 4.10 GiB | 3.50 GiB | 3.50 GiB | 3.48 GiB | **3.20 ~ 3.50 GiB (>2.80G 安全底線)** |
+| **Node 1 Swap 記憶體洩漏** | 0 MB | 0 MB | 473 MB 平整 | 473 MB 平整 | 473 MB 平整 | **473 MB 平整 (零活動 · 零 OOM)** |
+
+---
+
+### 端到端延遲瀑布分解（Latency Waterfall Breakdown）
+
+```
+總平均請求耗時：30.63 秒 (100.0%)
+│
+├── [TTFE] 快速失敗代理排隊與鎖持有：0.82 秒 (佔 2.7%)
+│   └── 處於 Little's Law 平衡態 L = 7.09；8 槽位滿載下維持 0ms 緩衝膨脹
+│
+├── [TTFT] 上下文接入與動態預填階梯：10.45 秒 (佔 34.1%)
+│   ├── 冷 8K 預填速率：2,221.0 tok/s
+│   ├── 32K 背景並發插隊延遲：0.783 秒
+│   └── 視覺第二輪跟隨任務：0.475 秒 (第二輪 8,192 tokens 100% 命中)
+│
+└── [TTET] 自回歸解碼輸出階段：20.18 秒 (佔 63.2%)
+    ├── 單流貪婪解碼：92.14 tok/s
+    ├── DSpark 投機接受率 (MTP)：81.7%
+    └── DSML 原生工具調用首字發出：+0.694 秒
 ```
 
 ---
 
-## 系統拓撲與優先權排程架構圖
-
-![Dual NVIDIA DGX Spark TP=2 System Architecture and Priority Scheduling Topology](assets/architecture.png)
-
----
-
-## 六階段 A/B 實測演進與 77 小時生產儀表板
-
-![DGX Spark TP=2 6-Stage Evolution and 77-Hour Production Telemetry Dashboard](assets/benchmark-dashboard.png)
-
-所有階段均在同一組雙 DGX Spark 硬體上，以 **30 題五維度客觀題庫**（`benchmarks/run_full_eval.py`：數學推理、MMLU-Pro 硬核計算、Python 演算法單元測試 `assert` 實際執行、IFEval 嚴格格式驗證、Agent 工具呼叫與多輪看圖快取命中）加上 **C1/C2/C4 併發擴展** 與 **C10/C8 階梯 429 壓力測試** 實機驗證：
-
-| 方案階段 / Git Tag | 30 題標準題庫 | `temp=0.0` Code (MTP 接受率) | `temp=0.3` Code (MTP 接受率) | 中文長文 / JSON (`temp=0.3`) | C1 / C2 / C4 併發吞吐 | 32K 插隊 TTFT | 看圖第 2 輪快取 TTFT | 可用記憶體 (Node 1 / Node 2) |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **`v0-baseline-1012`**<br>*(10/12 Zig + LibertAIDAI 2.9b)* | — | 90.9 tok/s<br>*(74.5%)* | 75.9 tok/s<br>*(67.6%)* | 65.7 / 112.1 | 75.6 / 86.0 / 112.2 | 26.35 s | 2.21 s<br>*(cached=0)* | 4.67G / 5.34G |
-| **`v1-step1-zig-engine`**<br>*(10/25 Zig + Alias + 插隊 + 看圖快取)* | **28/30**<br>*(93.3%)* | 88.3 tok/s<br>*(74.5%)* | 74.0 tok/s<br>*(67.6%)* | 64.2 / 109.8 | 75.6 / 86.0 / 112.2 | **0.94 s**<br>*(快 28 倍)* | **0.76 s**<br>*(cached=10K)* | 7.70G / 10.37G |
-| **`v2b1-f32-gate-bias`**<br>*(+ 官方 43 層 FP32 路由偏置)* | **28/30**<br>*(93.3%)* | 85.8 tok/s<br>*(71.7%)* | **90.2 tok/s**<br>*(79.9%, +21.4%)* | **67.3** / 107.8 | 74.9 / 86.7 / 115.2 | 1.13 s | **0.72 s** | 8.55G / 11.07G |
-| **`v2b2-production-champion`** ⭐<br>*(Plus-Ten 6-bit MTP + P1/P2/P5/P6 全面堆疊)* | **28/30**<br>*(93.3%)* | **95.5 tok/s**<br>*(80.3%, 3.76 TPR)* | 81.1 tok/s<br>*(74.1%)* | 62.2 / 107.9 | 76.5 / 87.8 / 112.2 / **170.0** | **0.94 s**<br>*(增量插隊 1.13s)* | **0.71 s** | **6.99G / 9.50G** |
-| **`v2b2-p6-cold-kv-offload`**<br>*(+ LMCache 風格分層 NVMe 冷盤快取、雙層 TTL 600s/24h)* | **28/30**<br>*(93.3%)* | 93.3 tok/s<br>*(80.3%)* | 79.8 tok/s<br>*(74.1%)* | 60.7 / 105.5 | 76.5 / 87.8 / 112.2 / **170.0** | 1.13 s | **0.71 s** | 6.99G / 9.50G |
-| **`v2b2-p5-c6-queue8-expansion`**<br>*(+ 6 併發槽位、8 佇列、C6 聚合 170.1 tok/s)* | **28/30**<br>*(93.3%)* | 92.9 tok/s<br>*(80.3%)* | 79.0 tok/s<br>*(74.1%)* | 61.4 / 106.5 | 76.5 / 87.4 / 112.7 / **170.1** | 1.13 s | 0.73 s | 7.13G / 11.00G |
-| **`v2b2-p4n-3gcache-cutin8k`**<br>*(+ 8K 插隊窗口 & 3GB 快取、D1 命中 26K、115.8 tok/s)* | **28/30**<br>*(93.3%)* | 93.0 tok/s<br>*(80.3%)* | 79.5 tok/s<br>*(74.1%)* | 61.5 / 106.9 | 76.8 / 89.0 / 115.8 | 1.14 s | **0.73 s** | 7.60G / 11.00G |
-| **`v2b2-p4l-singleflight-refined`**<br>*(+ In-Flight 事件廣播與 2K 粒度快取)* | **28/30**<br>*(93.3%)* | 92.6 tok/s<br>*(80.3%)* | 79.3 tok/s<br>*(74.1%)* | 60.5 / 106.5 | 76.4 / 87.6 | 1.15 s | **0.74 s** | 8.04G / 11.00G |
-| **`v2b2-p4j-strata-committed-cache`**<br>*(+ Strata 確定態前綴快取視窗)* | **28/30**<br>*(93.3%)* | 92.8 tok/s<br>*(80.3%)* | 79.6 tok/s<br>*(74.1%)* | 60.5 / 106.2 | 76.1 / 88.3 / 114.7 | 1.17 s | **0.72 s** | 8.04G / 11.00G |
-| **`v2b2-p4i-strata-singleflight`**<br>*(+ Strata Single-Flight 前綴快取協同)* | **28/30**<br>*(93.3%)* | 93.2 tok/s<br>*(80.3%)* | 79.9 tok/s<br>*(74.1%)* | 60.6 / 106.8 | 76.4 / 87.7 / 114.4 | **1.01 s** | **0.74 s** | 8.04G / 11.00G |
-| **`v2b2-p4h-x925-core-pinning`**<br>*(+ 10 核心 3.9GHz Cortex-X925 超大核綁定)* | **28/30**<br>*(93.3%)* | 93.3 tok/s<br>*(80.3%)* | 79.1 tok/s<br>*(74.1%)* | 60.7 / 106.0 | 76.4 / 87.4 / 111.9 | **1.12 s** | **0.71 s** | 8.04G / 11.00G |
-| **`v2b2-p4f-pr115-pr116`**<br>*(+ 原地快取擴展 & 防死循環開關)* | **28/30**<br>*(93.3%)* | 93.2 tok/s<br>*(80.3%)* | 79.9 tok/s<br>*(74.1%)* | 60.7 / 105.9 | 76.5 / 88.2 / 113.7 | 1.20 s | **0.71 s** | 8.04G / 11.00G |
-| **`v2b2-p4e-64row-extended`**<br>*(+ 64-Row 核心與 32-Stream 擴展)* | **28/30**<br>*(93.3%)* | 93.0 tok/s<br>*(80.3%)* | 80.1 tok/s<br>*(74.1%)* | 60.7 / 106.2 | 76.8 / 87.7 / 113.3 | 1.21 s | **0.73 s** | 8.04G / 11.00G |
-| **`v2a-ooa-hybrid-2.7bpw`**<br>*(OOA K2..K5 敏感度混合 MoE)* | 27/30<br>*(90.0%)* | 91.3 tok/s<br>*(77.7%)* | 75.2 tok/s<br>*(66.7%)* | 62.9 / **108.3** | **82.2** / 86.4 / 115.3 | 1.00 s | 0.74 s | 9.85G / **12.99G** |
-| **`v2c-ultimate-fusion`**<br>*(Plus-Ten 6-bit 骨幹 + OOA 專家)* | 27/30<br>*(90.0%)* | 84.1 tok/s<br>*(75.5%)* | 83.8 tok/s<br>*(74.2%)* | 66.9 / 106.2 | 82.1 / 88.5 / 116.2 | **0.95 s** | **0.73 s** | **10.35G** / 12.90G |
-
-📄 **完整 4 頁正式 PDF 實測報告**：[`reports/DGX_Spark_TP2_Comprehensive_Benchmark_Report_20261027.pdf`](reports/DGX_Spark_TP2_Comprehensive_Benchmark_Report_20261027.pdf)  
-📊 **各階段原始 JSON 測試數據**：[`benchmarks/results/`](benchmarks/results/)
-
----
-
-## 77 小時連續生產實戰統計（1,933 筆真實 Agent 請求）
-
-自 2026/10/28 16:47 上線 `v2b2-production-champion` 至 2026/10/31，雙節點集群連續運行 **77 小時 07 分鐘** 的真實生產統計：
-
-- **服務穩定度**：連續 77+ 小時 **0 崩潰、0 OOM、0 RDMA 斷線**；待機溫度 **42°C**、待機功耗僅 **9.5W ~ 10.1W**。
-- **累計完成請求**：**1,933 筆對話生成**（HTTP 200 OK 共 `1,996 次`）。
-- **累計處理輸入 Prompt**：**122,543,857 tokens（1.225 億 tokens）**
-  - **累計命中 Prompt Cache**：**99,323,904 tokens（9,932 萬 tokens，實質節省 81.1% 的預填運算！）**
-  - **每筆輸入長度**：平均 `63,396 tokens` · 中位數 `37,146 tokens` · P90 `166,700` · P95 `195,954` · 最大 **`265,449 tokens`**。
-- **累計產出 Completion Tokens**：**739,772 tokens**（平均 `382.7` · 中位數 `172.0` · 最大 `12,565 tokens`）。
-- **MTP 投機草稿全週期表現**：累計命中 `516,222 / 699,055`（**全週期接受率 73.85%**，單筆中位數 **76.5%**，平均每輪產出 **3.31 tokens**）。
-- **首字延遲（TTFT）**：互動短請求中位數 **`0.196 秒`** · 全場景中位數 **`0.380 秒`** · P90 **`0.804 秒`** · P95 **`0.845 秒`**。
-
----
-
-## 維運與一鍵切換指令指南
+### 快速啟動與運維指令
 
 ```bash
-# 1. 啟動日常最佳主力配置 (Stage 2B-2 Plus-Ten + P1/P2 Patches)
+# 1. 啟動生產冠軍叢集（雙機 TP=2 + Strata 2M 池 + 2.5G 快照）
 /home/joseyarashio/start-dsv41.sh
 
-# 2. 在「極致智商/速度 (Stage 2B-2)」與「極致省記憶體 (Stage 2C OOA 混合專家)」間秒級切換
-python3 /home/joseyarashio/dgx-spark-tp2-recipes/scripts/switch_to_ooa_hybrid.py deactivate  # 切回 Stage 2B-2 (預設主力)
-python3 /home/joseyarashio/dgx-spark-tp2-recipes/scripts/switch_to_ooa_hybrid.py activate    # 切至 Stage 2C (每節點多省 1.84 GiB)
-
-# 3. 檢查 Port 8889 優先權排程網關與 Port 8888 引擎即時狀態
+# 2. 檢查 Port 8889 快速失敗代理狀態與 POSIX 共享記憶體健康
 curl -s http://127.0.0.1:8889/proxy/status | python3 -m json.tool
-curl -s http://127.0.0.1:8888/health | python3 -m json.tool
 
-# 4. 執行 30 題五維度題庫 + C1/C2/C4 併發 + Port 8889 階梯 429 完整實測
-python3 /home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/run_full_eval.py verify_run
+# 3. 執行 1 小時全維度標準壓力測試（OmniBench Marathon）
+python3 benchmarks/run_omni_eval.py --profile standard --duration 3600
+
+# 4. 檢視即時硬體溫度、GPU 時脈與 MS-DTC 變速箱日誌
+sudo journalctl -u spark-ms-dtc -f
 ```
 
 ---
 
-## 致謝與上游來源 (Credits)
+## 參與貢獻與致謝
 
-- **[BertholomusAI / TensorFold](https://github.com/bertholomus/TensorFold)**：Native Zig TP=2 推論引擎、AOT CUDA 核心、DSpark 投機解碼與 1017 Rank-Cache 架構。
-- **[Plus-Ten](https://huggingface.co/Plus-Ten/DeepSeek-V4.1-Flash-1017-TensorFold-EXL3-2.9bpw)**：512K 序列校準之 EXL3 2.9bpw 骨幹、6-bit LM Head/MTP 與官方 FP32 路由偏置驗證。
-- **[Object-Oriented Architects (OOA)](https://huggingface.co/object-oriented-architects/DeepSeek-V4.1-Flash-1017-EXL3-2.7bpw-TensorFold)**：K2..K5 敏感度非均勻 MoE 專家量化。
-- **[LibertAIDAI](https://huggingface.co/LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw)** 與 **[DeepSeek](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash-1017)**：基礎 1017 EXL3 權重、官方原始權重與 Engram 查找表。
-- **[MiaAI-Lab](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks)** 與 **[@Coinupbtc](https://github.com/Coinupbtc)**：上游修補 `0027-tool-call-prose` 與 `0028-plain-request-text`。
+- **[BertholomusAI / TensorFold](https://github.com/bertholomus/TensorFold)**：原生 Zig TP=2 推論引擎、AOT CUDA 內核與 DSpark 投機解碼。
+- **[Plus-Ten](https://huggingface.co/Plus-Ten/DeepSeek-V4.1-Flash-1017-TensorFold-EXL3-2.9bpw)**：序列校準 2.9bpw 骨幹與 6-bit LM Head / MTP 草稿頭。
+- **[DeepSeek](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash-1017)**：官方開源檢查點與 43 層 FP32 路由偏置權重。
+- **[MiaAI-Lab](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks)**：上游參考修補 Patch 0048 原生工具串流。
