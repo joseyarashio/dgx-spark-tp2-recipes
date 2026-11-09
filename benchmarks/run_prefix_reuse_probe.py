@@ -18,6 +18,7 @@ Usage: run_prefix_reuse_probe.py [--base http://127.0.0.1:8889] [--turns 6] [--o
 import argparse, json, os, random, time, urllib.request
 
 MODEL = "DeepSeek-V4.1-Flash-TF"
+TOOL_WORDS = 900
 KEEP_LAST_N = 2  # rank0.sh: --drop-reasoning-history --keep-last-n-reasoning 2
 
 
@@ -166,7 +167,7 @@ def run_scenario(base, name, system, tools, thinking, echo, qs, turns, seed, max
         if m.get("tool_calls"):
             for c in m["tool_calls"]:
                 msgs.append({"role": "tool", "tool_call_id": c.get("id", "call"),
-                             "content": corpus(rng.randrange(1 << 30), 900)})
+                             "content": corpus(rng.randrange(1 << 30), TOOL_WORDS)})
         else:
             msgs.append({"role": "user", "content": qs[(t + 1) % len(qs)]})
         print(f"  {name} t{t+1}: P={P} C={C} unc={P-C} " + " ".join(
@@ -182,9 +183,12 @@ def main():
     ap.add_argument("--max-tokens", type=int, default=400)
     ap.add_argument("--seed", type=int, default=int(time.time()))
     ap.add_argument("--only", default="")
+    ap.add_argument("--tool-words", type=int, default=900)
     ap.add_argument("--out", default=os.path.join(os.path.dirname(__file__), "results",
                                                   f"prefix_reuse_probe_{time.strftime('%Y%m%d_%H%M%S')}.json"))
     a = ap.parse_args()
+    global TOOL_WORDS
+    TOOL_WORDS = a.tool_words
     defs, qs = scenario_defs(a.seed)
     report = {"seed": a.seed, "base": a.base, "keep_last_n": KEEP_LAST_N, "scenarios": {}}
     for i, (name, system, tools, thinking, echo) in enumerate(defs):
