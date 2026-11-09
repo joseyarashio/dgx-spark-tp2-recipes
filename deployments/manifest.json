@@ -10,28 +10,28 @@
     "cpu_pinning": "5-9,15-19 (10x Cortex-X925 Super-Cores)"
   },
   "cryptographic_hashes": {
-    "recipe_commit": "c8b734914df2d014cae07cd11e89abb9f778f446",
-    "engine_commit": "c976abd768fb9b967fcd2886b4e0b0f0c4d67dcd",
+    "recipe_commit": "72a047bf64e721d3b4f00d6c9db416618aaad20e",
+    "engine_commit": "6e0a623ddbfbb8f68b8c8efbbe116d297e001d4e",
     "patchset_sha256": "ed98863d757cd11ece3251029cc0aeeef58781297e4db7dbd066b0a7a8dc962b",
     "kernel_manifest_sha256": "ae370ac9aef8cfd937319037b850a825748085c8c54e9e0bbd8421bb5565ddf5",
-    "launch_config_sha256": "196c808d7d31783ab204829b2ce469cde7651ce05bb161d6cdf7ea23091abc4c",
+    "launch_config_sha256": "634c7c654261f78c3c0161fd0b5420cd44a2b60d7359709884c1a53da0258885",
     "proxy_sha256": "421079a34f61482df269b02a90639ef80cf74cf66201c3131789170bdcae1679"
   },
   "engine_binaries": {
-    "rank0_tensorfold_native_sha256": "368a9d6b88180c9c2c8f9d354f4e5673333927ce4f5a3fb78244d3750e4f9732",
+    "rank0_tensorfold_native_sha256": "b6b89c6a920093ce71dd0ad4247f7ebebd5a4363db271fa5272a7c4be13b2699",
     "rank1_tf_dsv41_lanes_sha256": "c35d6a8342a80b3c836065f115df659f8858113f727ed2db7515ea7367290aed",
     "node2_tf_dsv41_lanes_sha256": "c35d6a8342a80b3c836065f115df659f8858113f727ed2db7515ea7367290aed",
     "rank1_binary_synced": true
   },
   "memory_audit_ledger": {
-    "measured_at": "2026-11-09 23:07:00 +0800",
-    "rank0_engine_active_gib": 105.49,
+    "measured_at": "2026-11-10 03:11:40 +0800",
+    "rank0_engine_active_gib": 105.48,
     "parallel_slots": 8,
     "kv_pool_allocated_tokens": 2097152,
     "host_prompt_cache_budget_gib": 2.5,
     "cuda_graph_lru_cap": 128,
-    "node1_available_memory_gib": 5.52,
-    "node2_available_memory_gib": 8.21,
+    "node1_available_memory_gib": 5.51,
+    "node2_available_memory_gib": 8.16,
     "engram_mode": "O_DIRECT Linux AIO from local NVMe (203 GB tables)"
   }
 }
