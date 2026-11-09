@@ -173,4 +173,11 @@ zig build native -Doptimize=fast -Dfatbins=$PWD/fatbins -p out   # tensorfold-na
 zig build        -Doptimize=fast -Dfatbins=$PWD/fatbins -p out   # tf-dsv41-lanes (rank 1)
 ```
 
-`-Dfatbins` is required: without it the binary has no CUDA kernels and fails at start with `NoKernelImages`. The 21 SM121 fatbins are not in git; copy them from a working node.
+`-Dfatbins` is required: without it the binary has no CUDA kernels and fails at start with `NoKernelImages`. The 21 SM121 fatbins (CUDA 13.0, `sm_121` cubin only) are not in git. They are attached to the fork release [`dgx-spark-tp2-p16-consolidated`](https://github.com/joseyarashio/TensorFold/releases/tag/dgx-spark-tp2-p16-consolidated):
+
+```bash
+gh release download dgx-spark-tp2-p16-consolidated -R joseyarashio/TensorFold -p 'tensorfold-dsv41-sm121-fatbins-*'
+sha256sum -c tensorfold-dsv41-sm121-fatbins-c976abd7.tar.gz.sha256 && tar xzf tensorfold-dsv41-sm121-fatbins-c976abd7.tar.gz
+```
+
+The same release also has the exact production binaries (`tensorfold-dsv41-p16-production-binaries-arm64.tar.gz`, built 2026-11-09 11:33). A source rebuild of `c976abd7` builds and includes Patches 0064/0065, but it is not byte-identical to them (same symbol set, different code layout). If a rebuild must match production byte for byte, use the release binaries.
