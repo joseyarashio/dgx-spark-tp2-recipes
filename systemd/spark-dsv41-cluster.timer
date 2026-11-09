@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the DGX Spark TP=2 health watchdog after boot and every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Persistent=false
+
+[Install]
+WantedBy=timers.target

@@ -251,6 +251,7 @@ def main():
     with open(OUTPUT_FILE, "w") as f:
         json.dump(summary_data, f)
     print(f"Results saved to {OUTPUT_FILE}")
+    return summary_data
 
 if __name__ == "__main__":
     main()

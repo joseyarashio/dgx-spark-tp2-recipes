@@ -1,0 +1,8 @@
+[Unit]
+Description=DGX Spark TP=2 Cluster Health & Auto-Heal Watchdog
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/joseyarashio/dgx-spark-tp2-recipes/scripts/cluster_watchdog.sh

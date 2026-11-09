@@ -24,7 +24,7 @@ def sha256_dir(path, ext=None):
 def generate():
     recipes_dir = "/home/joseyarashio/dgx-spark-tp2-recipes"
     engine_dir = "/home/joseyarashio/TensorFold-dsv41-zig"
-    kit_dir = "/home/joseyarashio/dsv41-tensorfold-tp2/kit/aot"
+    kit_dir = "/home/joseyarashio/dsv41-2m-kit/aot"
 
     engine_commit = subprocess.run(["git", "-C", engine_dir, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
     recipe_commit = subprocess.run(["git", "-C", recipes_dir, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
@@ -37,6 +37,31 @@ def generate():
             launch_h.update(open(sf, "rb").read())
     launch_config_sha256 = launch_h.hexdigest()
     proxy_sha256 = sha256_file(os.path.join(recipes_dir, "proxy", "proxy.py"))
+
+    def meminfo_gib(cmd):
+        out = subprocess.run(cmd, capture_output=True, text=True).stdout
+        for line in out.splitlines():
+            if line.startswith("MemAvailable:"):
+                return round(int(line.split()[1]) / 1024 / 1024, 2)
+        return None
+    import re, urllib.request
+    rank0 = open("/home/joseyarashio/.cache/dsv41-1017-logs/rank0.sh").read()
+    rank1 = open("/home/joseyarashio/.cache/dsv41-1017-logs/rank1.sh").read()
+    pool = int(re.search(r"--pool (\d+)", rank1).group(1))
+    prompt_cache = float(re.search(r"--prompt-cache-gib ([0-9.]+)", rank0).group(1))
+    parallel = int(re.search(r"--parallel (\d+)", rank0).group(1))
+    try:
+        mem = json.loads(urllib.request.urlopen("http://127.0.0.1:8888/health", timeout=5).read())["memory"]["active"]
+        active_gib = round(mem / 2**30, 2)
+    except Exception:
+        active_gib = None
+    binaries = {
+        "rank0_tensorfold_native_sha256": sha256_file(os.path.join(engine_dir, "out/native/bin/tensorfold-native")),
+        "rank1_tf_dsv41_lanes_sha256": sha256_file(os.path.join(engine_dir, "out/bin/tf-dsv41-lanes")),
+    }
+    node2_lanes = subprocess.run(["ssh", "-o", "BatchMode=yes", "10.100.184.1", "sha256sum", os.path.join(engine_dir, "out/bin/tf-dsv41-lanes")], capture_output=True, text=True).stdout.split()
+    binaries["node2_tf_dsv41_lanes_sha256"] = node2_lanes[0] if node2_lanes else None
+    binaries["rank1_binary_synced"] = binaries["node2_tf_dsv41_lanes_sha256"] == binaries["rank1_tf_dsv41_lanes_sha256"]
 
     manifest = {
         "manifest_version": "1.0.0",
@@ -57,18 +82,17 @@ def generate():
             "launch_config_sha256": launch_config_sha256,
             "proxy_sha256": proxy_sha256
         },
+        "engine_binaries": binaries,
         "memory_audit_ledger": {
-            "rank0_device_working_set_gib": 99.2,
-            "rank1_device_working_set_gib": 99.2,
-            "kv_pool_allocated_tokens": 1048576,
-            "kv_pool_footprint_gib": 6.44,
-            "host_prompt_cache_budget_gib": 3.0,
+            "measured_at": subprocess.run(["date", "+%F %T %z"], capture_output=True, text=True).stdout.strip(),
+            "rank0_engine_active_gib": active_gib,
+            "parallel_slots": parallel,
+            "kv_pool_allocated_tokens": pool,
+            "host_prompt_cache_budget_gib": prompt_cache,
             "cuda_graph_lru_cap": 128,
-            "cuda_graph_footprint_gib": 0.65,
-            "node1_available_memory_gib": 7.60,
-            "node2_available_memory_gib": 9.30,
-            "engram_disk_mmap_mode": "Demand-Paged File-Backed (203 GB on NVMe)",
-            "status": "Safe Watermark Maintained (Zero OOM Risk)"
+            "node1_available_memory_gib": meminfo_gib(["cat", "/proc/meminfo"]),
+            "node2_available_memory_gib": meminfo_gib(["ssh", "-o", "BatchMode=yes", "10.100.184.1", "cat", "/proc/meminfo"]),
+            "engram_mode": "O_DIRECT Linux AIO from local NVMe (203 GB tables)"
         }
     }
 
