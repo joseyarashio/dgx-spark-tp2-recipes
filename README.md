@@ -180,4 +180,4 @@ gh release download dgx-spark-tp2-p16-consolidated -R joseyarashio/TensorFold -p
 sha256sum -c tensorfold-dsv41-sm121-fatbins-c976abd7.tar.gz.sha256 && tar xzf tensorfold-dsv41-sm121-fatbins-c976abd7.tar.gz
 ```
 
-The same release also has the exact production binaries (`tensorfold-dsv41-p16-production-binaries-arm64.tar.gz`, built 2026-11-09 11:33). A source rebuild of `c976abd7` builds and includes Patches 0064/0065, but it is not byte-identical to them (same symbol set, different code layout). If a rebuild must match production byte for byte, use the release binaries.
+The same release also has the exact production binaries (`tensorfold-dsv41-p16-production-binaries-arm64.tar.gz`, built 2026-11-09 11:33). A source rebuild of `c976abd7` builds and includes Patches 0064/0065, but zig 0.17 builds are not deterministic: rebuilds have the same symbol set but can differ in code layout (one of three rebuilds matched production byte for byte, likely a zig cache hit). If a rebuild must match production byte for byte, use the release binaries.
