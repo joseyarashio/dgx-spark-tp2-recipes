@@ -211,7 +211,7 @@ def test_quality(profile="smoke"):
     p_math = [
         {"role": "user", "content": "How many 5-digit positive integers (from 10000 to 99999) have digits that are strictly increasing from left to right (e.g. 13579)? Put the final integer in \\boxed{N}."}
     ]
-    r_math = stream_chat(p_math, max_tokens=384, temperature=0.0, base_url=API_8888)
+    r_math = stream_chat(p_math, max_tokens=384, temperature=0.0, base_url=API_8889)
     passed_math = "126" in r_math.get("content", "")
     results["math_gsm8k"] = {"passed": passed_math, "ttft": r_math.get("client_ttft_seconds"), "wall_s": r_math.get("wall_seconds")}
     print(f"  GSM8K Math Combinatorics: {'PASS' if passed_math else 'FAIL'} (TTFT: {r_math.get('client_ttft_seconds')}s)", flush=True)
@@ -221,7 +221,7 @@ def test_quality(profile="smoke"):
         {"role": "system", "content": "Answer the multiple choice question with only the single letter of the correct option."},
         {"role": "user", "content": "Which architectural feature in DeepSeek-V4/V3 allows sparse computation without activating every parameter on every token?\nA) Multi-Query Attention\nB) Mixture-of-Experts (MoE)\nC) Dense Feedforward Network\nD) Rotary Position Embeddings"}
     ]
-    r_mmlu = stream_chat(p_mmlu, max_tokens=16, temperature=0.0, base_url=API_8888)
+    r_mmlu = stream_chat(p_mmlu, max_tokens=16, temperature=0.0, base_url=API_8889)
     passed_mmlu = "B" in r_mmlu.get("content", "").strip()[:5]
     results["mmlu_moe"] = {"passed": passed_mmlu, "ttft": r_mmlu.get("client_ttft_seconds"), "wall_s": r_mmlu.get("wall_seconds")}
     print(f"  MMLU-Pro Knowledge:   {'PASS' if passed_mmlu else 'FAIL'} (TTFT: {r_mmlu.get('client_ttft_seconds')}s)", flush=True)
@@ -231,7 +231,7 @@ def test_quality(profile="smoke"):
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "Write a 3-sentence summary of distributed memory systems. Your response must contain the word 'interconnect' exactly twice and end with the word 'DONE.'"}
     ]
-    r_ifeval = stream_chat(p_ifeval, max_tokens=96, temperature=0.0, base_url=API_8888)
+    r_ifeval = stream_chat(p_ifeval, max_tokens=96, temperature=0.0, base_url=API_8889)
     cnt_interconnect = r_ifeval.get("content", "").lower().count("interconnect")
     ends_done = r_ifeval.get("content", "").strip().endswith("DONE.")
     passed_ifeval = (cnt_interconnect == 2) and ends_done
@@ -243,7 +243,7 @@ def test_quality(profile="smoke"):
         {"role": "system", "content": "Write only valid Python code defining `def solve(n: int) -> int:` that returns the sum of all multiples of 3 or 5 below n. Do not wrap in markdown quotes."},
         {"role": "user", "content": "Provide the function."}
     ]
-    r_code = stream_chat(p_code, max_tokens=96, temperature=0.0, base_url=API_8888)
+    r_code = stream_chat(p_code, max_tokens=96, temperature=0.0, base_url=API_8889)
     code_text = r_code.get("content", "").replace("```python", "").replace("```", "").strip()
     passed_code = False
     try:
@@ -299,7 +299,7 @@ def test_tool_eval():
     
     # 2.1 Tool call 1
     p_tc1 = [{"role": "user", "content": "Please configure the GPU clock governor on node 192.168.10.148 with min clock 1800 MHz, max clock 2500 MHz, and high thermal threshold 84 C."}]
-    r_forced = stream_chat(p_tc1, max_tokens=256, tools=tools_schema, temperature=0.0, enable_thinking=False, base_url=API_8888)
+    r_forced = stream_chat(p_tc1, max_tokens=256, tools=tools_schema, temperature=0.0, enable_thinking=False, base_url=API_8889)
     tcs = r_forced.get("tool_calls", [])
     has_tc = False
     try:
@@ -318,7 +318,7 @@ def test_tool_eval():
         {"role": "system", "content": "You are a helpful assistant with tools."},
         {"role": "user", "content": "What is the capital of France?"}
     ]
-    r_auto = stream_chat(p_auto, max_tokens=64, tools=tools_schema, tool_choice="auto", base_url=API_8888)
+    r_auto = stream_chat(p_auto, max_tokens=64, tools=tools_schema, tool_choice="auto", base_url=API_8889)
     no_unneeded_call = len(r_auto.get("tool_calls", [])) == 0 and "paris" in r_auto.get("content", "").lower()
     results["tool_choice_auto_plain"] = {"passed": no_unneeded_call}
     print(f"  Tool Auto Precision:  {'PASS' if no_unneeded_call else 'FAIL'} (No hallucinated tool calls)", flush=True)
@@ -337,7 +337,7 @@ def test_prefill():
         {"role": "system", "content": corpus_8k},
         {"role": "user", "content": "Count the number of letters in word DGX."}
     ]
-    r_8k_cold = stream_chat(p_8k, max_tokens=32, temperature=0.0, base_url=API_8888)
+    r_8k_cold = stream_chat(p_8k, max_tokens=32, temperature=0.0, base_url=API_8889)
     tf_8k = r_8k_cold.get("tensorfold", {})
     prefill_s = tf_8k.get("prefill_seconds", r_8k_cold.get("client_ttft_seconds", 1.0))
     toks = r_8k_cold.get("prompt_tokens", 5870)
@@ -346,7 +346,7 @@ def test_prefill():
     print(f"  Cold 8K Prefill:      {rate_8k:.1f} tok/s (Tokens: {toks}, Prefill: {prefill_s:.3f}s)", flush=True)
 
     # 3.2 Warm Cached 8K Prefill
-    r_8k_warm = stream_chat(p_8k, max_tokens=32, temperature=0.0, base_url=API_8888)
+    r_8k_warm = stream_chat(p_8k, max_tokens=32, temperature=0.0, base_url=API_8889)
     cached_toks = r_8k_warm.get("cached_tokens", 0)
     warm_ttft = r_8k_warm.get("client_ttft_seconds", 0.0)
     results["prefill_8k_cached"] = {"cached_tokens": cached_toks, "ttft_s": warm_ttft}
@@ -361,12 +361,12 @@ def test_prefill():
             {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_b64}"}}
         ]}
     ]
-    r_img1 = stream_chat(p_img_t1, max_tokens=32, base_url=API_8888)
+    r_img1 = stream_chat(p_img_t1, max_tokens=32, base_url=API_8889)
     p_img_t2 = p_img_t1 + [
         {"role": "assistant", "content": r_img1.get("content", "")},
         {"role": "user", "content": f"[{nonce}] In the same image, what color is in the bottom-right quadrant?"}
     ]
-    r_img2 = stream_chat(p_img_t2, max_tokens=32, base_url=API_8888)
+    r_img2 = stream_chat(p_img_t2, max_tokens=32, base_url=API_8889)
     img_cached = r_img2.get("cached_tokens", 0)
     results["vision_scratch_arena"] = {"turn1_ttft": r_img1.get("client_ttft_seconds"), "turn2_ttft": r_img2.get("client_ttft_seconds"), "turn2_cached": img_cached}
     print(f"  Vision Arena Reuse:   Turn 1 TTFT: {r_img1.get('client_ttft_seconds')}s, Turn 2 TTFT: {r_img2.get('client_ttft_seconds')}s (Cached: {img_cached})", flush=True)
@@ -381,7 +381,7 @@ def test_decode():
     # 4.1 Greedy Decode (MTP test)
     prompt_code = "Write a complete, well-commented Python implementation of an LRU Cache using a doubly linked list and hash map, including thread-safety locks, type annotations, and a thorough unit test suite."
     p_decode = [{"role": "user", "content": prompt_code}]
-    r_greedy = stream_chat(p_decode, max_tokens=384, temperature=0.0, base_url=API_8888)
+    r_greedy = stream_chat(p_decode, max_tokens=384, temperature=0.0, base_url=API_8889)
     tf_g = r_greedy.get("tensorfold", {})
     sp_g = r_greedy.get("speculative", {})
     tps_greedy = tf_g.get("tokens_per_second", 0.0)
@@ -392,7 +392,7 @@ def test_decode():
     # 4.2 Sampling Decode (temp=0.7)
     prompt_prose = "請詳細分析分散式大語言模型推論在雙節點 RoCEv2 網路架構下的通訊瓶頸、All-Reduce 延遲特性、Speculative Decoding 草稿驗證機制，以及 Unified Memory 架構下的記憶體管理策略。"
     p_sample = [{"role": "user", "content": prompt_prose}]
-    r_sample = stream_chat(p_sample, max_tokens=192, temperature=0.7, base_url=API_8888)
+    r_sample = stream_chat(p_sample, max_tokens=192, temperature=0.7, base_url=API_8889)
     tf_s = r_sample.get("tensorfold", {})
     tps_sample = tf_s.get("tokens_per_second", 0.0)
     results["decode_sampling"] = {"tokens_per_second": tps_sample}
@@ -414,7 +414,7 @@ def test_concurrency(profile="smoke"):
         ]
         t0 = time.perf_counter()
         with concurrent.futures.ThreadPoolExecutor(max_workers=c) as executor:
-            futures = [executor.submit(stream_chat, p, 128, 0.0, base_url=API_8888) for p in prompts]
+            futures = [executor.submit(stream_chat, p, 128, 0.0, base_url=API_8889) for p in prompts]
             res_list = [f.result() for f in futures]
         wall = time.perf_counter() - t0
         total_tokens = sum(r.get("completion_tokens", 0) for r in res_list)
@@ -429,9 +429,9 @@ def test_concurrency(profile="smoke"):
     p_short = [{"role": "user", "content": "What is 2+2? Answer in one word."}]
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        f_long = executor.submit(stream_chat, p_long, 16, 0.0, base_url=API_8888)
+        f_long = executor.submit(stream_chat, p_long, 16, 0.0, base_url=API_8889)
         time.sleep(0.3) # Wait until prefill starts
-        f_short = executor.submit(stream_chat, p_short, 16, 0.0, base_url=API_8888)
+        f_short = executor.submit(stream_chat, p_short, 16, 0.0, base_url=API_8889)
         res_short = f_short.result()
         res_long = f_long.result()
 
