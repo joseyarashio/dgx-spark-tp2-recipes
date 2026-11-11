@@ -10,6 +10,8 @@ seconds, not a full 32K budget. Loop = same >=20-char unit repeated >=5x back to
 (identical to the historical marathon rescan), checked on content and reasoning separately.
 
   ARMS='[{"name":"t0.3","temperature":0.3}, ...]' N_LOWMED=120 N_AGENT=16 CONC=6 python3 run_loop_ab.py
+Arm keys starting with "_" are routing, not request fields: _api (URL), _model, _key_env (env var holding a
+Bearer key), _off_effort_none (also send reasoning_effort=none when thinking is off; needed for the cloud copy).
 """
 import concurrent.futures, contextlib, io, json, os, random, re, string, sys, threading, time, urllib.request
 
@@ -58,9 +60,14 @@ def agent(i):
 
 def run(scn, i, arm):
     body, meta = (lowmed if scn == "lowmed" else agent)(i)
-    body.update({"model": MODEL, "stream": True, "stream_options": {"include_usage": True}})
-    body.update({k: v for k, v in arm.items() if k != "name"})
-    req = urllib.request.Request(API, json.dumps(body).encode(), {"Content-Type": "application/json", "X-Priority": "2"})
+    body.update({"model": arm.get("_model", MODEL), "stream": True, "stream_options": {"include_usage": True}})
+    if not meta.get("think") and arm.get("_off_effort_none"):
+        body["reasoning_effort"] = "none"  # cloud (Workers AI) ignores enable_thinking=false; the local engine accepts both
+    body.update({k: v for k, v in arm.items() if k != "name" and not k.startswith("_")})
+    hdr = {"Content-Type": "application/json", "X-Priority": "2"}
+    if arm.get("_key_env"):
+        hdr["Authorization"] = "Bearer " + os.environ[arm["_key_env"]]
+    req = urllib.request.Request(arm.get("_api", API), json.dumps(body).encode(), hdr)
     t0 = time.time(); ttft = None; c = []; r = []; cn = rn = 0; nxt = CHECK_EVERY
     fin = None; usage = {}; loop_ch = None; status = 0; err = None
     try:
