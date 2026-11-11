@@ -1,0 +1,9 @@
+{
+  "label": "tokenmapfix_baseline",
+  "time": "2026-11-11 18:35:38",
+  "sweep_greedy_tps": 88.1,
+  "sweep_mtp_accept": 0.7309,
+  "c2_agg": 117.32,
+  "c4_agg": 143.43,
+  "c8_agg": 157.06
+}

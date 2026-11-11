@@ -4,7 +4,16 @@
 Every metric comes from one run's own JSON (no cross-run cherry-picking). Usage:
   compare_1hour_runs.py NEW.json BASE1.json [BASE2.json ...]
 """
-import json, statistics, sys, os
+import json, re, statistics, sys, os
+
+# Same >=20-char unit repeated >=5x back to back; the unit is bounded for speed (identical hits on
+# every historical 1h run). 200 OK does not mean usable: a looped reply is a failed reply.
+LOOP = re.compile(r"(.{20,600}?)\1{4,}", re.S)
+
+
+def looped(r):
+    c = r.get("content")
+    return isinstance(c, str) and bool(LOOP.search(c))
 
 
 def pct(xs, q):
@@ -51,6 +60,11 @@ def summarize(path):
         "ok_200": len(ok),
         "ok_rate_pct": round(100 * len(ok) / max(len(res), 1), 2),
         "status_codes": codes,
+        "loop_replies": sum(1 for r in ok if looped(r)),
+        "loop_rate_pct": round(100 * sum(1 for r in ok if looped(r)) / max(len(ok), 1), 2),
+        "loop_lowhit_medium": "{}/{}".format(
+            sum(1 for r in ok if r.get("mode") == "LOW_HIT" and r.get("len_tier") == "medium" and looped(r)),
+            sum(1 for r in ok if r.get("mode") == "LOW_HIT" and r.get("len_tier") == "medium")),
         "gen_tokens": sum(r.get("tokens") or 0 for r in ok),
         "cached_tokens": sum(r.get("cached_tokens") or 0 for r in ok),
         "ttft_p50_s": round(pct(ttft, 0.5) or 0, 3),

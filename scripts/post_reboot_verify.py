@@ -18,9 +18,11 @@ ARM = f"{STATE}/armed.json"
 N2 = "10.100.184.1"
 ENGINE = f"{HOME}/TensorFold-dsv41-zig"
 LOGS = f"{HOME}/.cache/dsv41-1017-logs"
-BEST_GREEDY = 92.58          # P16 historical best, single-stream greedy tok/s
-GREEDY_FLOOR = 0.95          # pass if >= 95% of best
-MTP_FLOOR = 0.75
+# Decode is judged by benchmarks/run_decode_gate.py (9-prompt code sweep median + C2/C4/C8 vs the stored
+# baseline in benchmarks/gates/decode_gate_baseline.json). A single prompt's greedy tok/s / MTP follow that
+# prompt's text (the LRU prompt moved 95 -> 91 tok/s after the Engram token-map fix while pooled MTP rose).
+TOKEN_MAP = f"{HOME}/.cache/dsv41-1017-rank-cache/dsv41_token_map.json"
+KIT = f"{HOME}/dsv41-2m-kit"
 HEALTH_WAIT_S = 25 * 60
 
 
@@ -135,6 +137,9 @@ def run(require_reboot=True):
         add("rank0.sh / rank1.sh / start-dsv41.sh 未變", sha(f"{LOGS}/rank0.sh") == e["rank0_sh"] and sha(f"{LOGS}/rank1.sh") == e["rank1_sh"] and sha(f"{HOME}/start-dsv41.sh") == e["start_sh"])
         _, f2 = n2(f"cd {ENGINE}/fatbins && cat *.fatbin | sha256sum")
         add("Node2 fatbins 備份完好", f2.split()[0:1] == [e["fatbins_concat"]])
+    want_map = json.load(open(f"{KIT}/engram.json"))["token_map_sha256"]
+    _, m2 = n2(f"sha256sum {TOKEN_MAP}")
+    add("Engram token map sha 雙機 = engram.json", sha(TOKEN_MAP) == want_map and m2.split()[0:1] == [want_map], want_map[:16])
 
     # 5. Host services
     for u in ["spark-fastfail-proxy.service", "spark-ms-dtc-governor.service", "spark-dsv41-cluster.timer", "hermes-gateway.service"]:
@@ -187,7 +192,7 @@ def run(require_reboot=True):
                     "prefill_8k_tok_s": d["prefill"]["prefill_8k_cold"]["tok_s"],
                 }
                 attempts.append(smoke)
-                if smoke["greedy"] >= BEST_GREEDY * GREEDY_FLOOR or external == 0:
+                if external == 0:
                     break
                 w = 0
                 while w < 900 and external_last(90) > 0:
@@ -198,22 +203,32 @@ def run(require_reboot=True):
     if smoke:
         add("品質題全過", smoke["quality_all"], smoke["quality"])
         add("工具呼叫門檻", smoke["tool_gate"])
-        perf_name = f"單流 greedy ≥ {BEST_GREEDY * GREEDY_FLOOR:.1f}（歷史最佳 {BEST_GREEDY} 的 95%）"
-        if smoke["greedy"] < BEST_GREEDY * GREEDY_FLOOR and smoke["external_requests"] > 0:
-            perf_inconclusive.append(f"{perf_name}：{smoke['greedy']}，測試期間外部請求 {smoke['external_requests']} 次，數據受污染，無法判定")
-        else:
-            add(perf_name, smoke["greedy"] >= BEST_GREEDY * GREEDY_FLOOR, smoke["greedy"])
-            add(f"MTP 接受率 ≥ {MTP_FLOOR:.0%}", smoke["mtp"] >= MTP_FLOOR, smoke["mtp"])
         add("32K 插隊 TTFT ≤ 1.5s", smoke["cut_in_ok"], smoke["cut_in_s"])
     else:
         add("smoke 測試執行", False, attempts[-1] if attempts else "服務未恢復，未執行")
+    gate = None
+    if code == 200:
+        label = f"postreboot_{int(time.time())}"
+        grc, glog = sh(f"cd {REPO}/benchmarks && timeout 2400 python3 run_decode_gate.py --reps 1 --label {label}", 2460)
+        gpath = f"{REPO}/benchmarks/results/decode_gate_{label}.json"
+        if os.path.exists(gpath):
+            gate = json.load(open(gpath))
+            gs = gate["summary"]
+            if gate["verdict"] == "inconclusive":
+                perf_inconclusive.append(f"解碼門檻：乾淨樣本不足（外部流量），無法判定；{gs}")
+            else:
+                for k, v in gate["checks"].items():
+                    add(f"解碼門檻 {k} ≥ 基準 95%", v["ok"], f"{v['value']}（需 {v['need']}，基準 {v['baseline']}）")
+                add("C2/C4/C8 每路都有產出", all(gs[f"c{c}_streams_ok"] for c in (2, 4, 8)))
+        else:
+            add("解碼門檻執行", False, glog[-300:])
 
     ok = all(c["ok"] for c in checks)
     fails = [c for c in checks if not c["ok"]]
     rep = {"time": time.strftime("%F %T %z"), "overall_pass": ok, "mode": "run" if require_reboot else "dry-run",
            "uptime_since": {"node1": up1, "node2": up2}, "recovered_by": how, "checks": checks, "smoke_attempts": attempts,
            "gpu_clock_temp": {"node1": clk1, "node2": clk2}, "mem_available_gib": {"node1": mem1, "node2": mem2},
-           "governor_last": gl[-160:], "perf_inconclusive": perf_inconclusive, "idle_wait_s": idle_wait, "elapsed_s": round(time.time() - t_start)}
+           "governor_last": gl[-160:], "decode_gate": (gate or {}).get("summary"), "perf_inconclusive": perf_inconclusive, "idle_wait_s": idle_wait, "elapsed_s": round(time.time() - t_start)}
     stamp = time.strftime("%Y%m%d_%H%M%S")
     json.dump(rep, open(f"{STATE}/report_{stamp}.json", "w"), indent=2, ensure_ascii=False)
     json.dump(rep, open(f"{REPO}/benchmarks/results/post_reboot_verify_{stamp}.json", "w"), indent=2, ensure_ascii=False)
@@ -223,9 +238,12 @@ def run(require_reboot=True):
              f"• 開機時間：Node1 {up1}，Node2 {up2}；服務恢復方式：{how}",
              f"• 驗證共 {len(checks)} 項，耗時 {rep['elapsed_s']}s"]
     if smoke:
-        lines.append(f"• smoke：品質 {smoke['quality']}、工具 {'PASS' if smoke['tool_gate'] else 'FAIL'}、單流 *{smoke['greedy']} tok/s*"
-                     f"（歷史最佳 {BEST_GREEDY}，{smoke['greedy'] / BEST_GREEDY * 100:.1f}%）、MTP {smoke['mtp'] * 100:.1f}%、C2 {smoke['c2']}、"
+        lines.append(f"• smoke：品質 {smoke['quality']}、工具 {'PASS' if smoke['tool_gate'] else 'FAIL'}、單題單流 {smoke['greedy']} tok/s（僅參考）、"
                      f"32K 插隊 {smoke['cut_in_s']}s、8K 預填 {smoke['prefill_8k_tok_s']} tok/s；測試期間外部請求 {smoke['external_requests']} 次")
+    if gate:
+        gs = gate["summary"]
+        lines.append(f"• 解碼門檻（{gate['verdict']}）：9 題程式碼中位 *{gs['sweep_greedy_tps']} tok/s*（{gs['sweep_greedy_min']}–{gs['sweep_greedy_max']}）、"
+                     f"MTP {gs['sweep_mtp_accept']}、C2 {gs['c2_agg']}、C4 {gs['c4_agg']}、C8 {gs['c8_agg']}")
     lines.append(f"• GPU 時脈,溫度：Node1 {clk1}，Node2 {clk2}；可用記憶體：Node1 {mem1} GiB，Node2 {mem2} GiB")
     if smoke is not None:
         lines.append(f"• 等待外部流量空檔：{idle_wait}s")
