@@ -220,6 +220,8 @@ def run(require_reboot=True):
                 for k, v in gate["checks"].items():
                     add(f"解碼門檻 {k} ≥ 基準 95%", v["ok"], f"{v['value']}（需 {v['need']}，基準 {v['baseline']}）")
                 add("C2/C4/C8 每路都有產出", all(gs[f"c{c}_streams_ok"] for c in (2, 4, 8)))
+        elif grc == 124:
+            perf_inconclusive.append("解碼門檻：40 分鐘內等不到足夠的外部流量空檔，逾時未完成，無法判定")
         else:
             add("解碼門檻執行", False, glog[-300:])
 

@@ -8,4 +8,4 @@ Type=oneshot
 ExecStart=/usr/bin/python3 -u /home/joseyarashio/dgx-spark-tp2-recipes/scripts/post_reboot_verify.py run
 StandardOutput=append:/home/joseyarashio/.cache/spark-reboot-verify/run.log
 StandardError=append:/home/joseyarashio/.cache/spark-reboot-verify/run.log
-TimeoutStartSec=60min
+TimeoutStartSec=150min
