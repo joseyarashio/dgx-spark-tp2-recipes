@@ -1,0 +1,183 @@
+{
+  "benchmark": "OmniBench-Principal-Test",
+  "profile": "smoke",
+  "timestamp": "2026-11-11 18:45:33",
+  "system_before": {
+    "time": "2026-11-11 18:45:33",
+    "engine_8888": {
+      "status": "ok",
+      "model": "DeepSeek-V4.1-Flash-1017-TF",
+      "model_ids": [
+        "DeepSeek-V4.1-Flash-1017-TF",
+        "DeepSeek-V4.1-Flash-TF",
+        "current"
+      ],
+      "max_batch_size": 8,
+      "warming": false,
+      "memory": {
+        "active": 114019616036,
+        "cache": 0,
+        "peak": 114279058724
+      },
+      "live": {
+        "connections": 0,
+        "waiting": 0,
+        "decode_tokens_per_second": 0.0,
+        "prefill_tokens_per_second": 0.0
+      }
+    },
+    "proxy_8889": {
+      "status": "ok",
+      "model": "DeepSeek-V4.1-Flash-1017-TF",
+      "model_ids": [
+        "DeepSeek-V4.1-Flash-1017-TF",
+        "DeepSeek-V4.1-Flash-TF",
+        "current"
+      ],
+      "max_batch_size": 8,
+      "warming": false,
+      "memory": {
+        "active": 114019616036,
+        "cache": 0,
+        "peak": 114279058724
+      },
+      "live": {
+        "connections": 0,
+        "waiting": 0,
+        "decode_tokens_per_second": 0.0,
+        "prefill_tokens_per_second": 0.0
+      }
+    }
+  },
+  "dimensions": {
+    "quality": {
+      "math_gsm8k": {
+        "passed": true,
+        "ttft": 0.1876,
+        "wall_s": 4.8496
+      },
+      "mmlu_moe": {
+        "passed": true,
+        "ttft": 0.2737,
+        "wall_s": 0.3172
+      },
+      "ifeval_rules": {
+        "passed": true,
+        "interconnect_count": 2,
+        "ends_done": true
+      },
+      "python_code": {
+        "passed": true
+      }
+    },
+    "tool_eval": {
+      "tool_choice_required": {
+        "passed": true,
+        "tool_called": true,
+        "clean_token": true
+      },
+      "tool_choice_auto_plain": {
+        "passed": true
+      }
+    },
+    "prefill": {
+      "prefill_8k_cold": {
+        "prompt_tokens": 5876,
+        "prefill_s": 3.38838154,
+        "tok_s": 1734.2
+      },
+      "prefill_8k_cached": {
+        "cached_tokens": 4096,
+        "ttft_s": 0.8955
+      },
+      "vision_scratch_arena": {
+        "turn1_ttft": 0.4218,
+        "turn2_ttft": 0.4324,
+        "turn2_cached": 0
+      }
+    },
+    "decode": {
+      "decode_greedy": {
+        "tokens_per_second": 90.87371568913147,
+        "mtp_acceptance": 0.7401
+      },
+      "decode_sampling": {
+        "tokens_per_second": 72.56914422351487
+      }
+    },
+    "concurrency": {
+      "concurrency_c1": {
+        "wall_s": 1.71,
+        "total_tokens": 128,
+        "aggregate_tok_s": 75.01
+      },
+      "concurrency_c2": {
+        "wall_s": 2.48,
+        "total_tokens": 256,
+        "aggregate_tok_s": 103.32
+      },
+      "cut_in_32k": {
+        "short_ttft_s": 0.6944,
+        "passed": true
+      }
+    },
+    "fault_and_storage": {
+      "cuda_graph_stability": {
+        "engine_healthy": true
+      },
+      "nvme_cold_storage": {
+        "imprint_active": false,
+        "snapshot_files": 0,
+        "total_mb": 0.0
+      }
+    }
+  },
+  "system_after": {
+    "time": "2026-11-11 18:46:00",
+    "engine_8888": {
+      "status": "ok",
+      "model": "DeepSeek-V4.1-Flash-1017-TF",
+      "model_ids": [
+        "DeepSeek-V4.1-Flash-1017-TF",
+        "DeepSeek-V4.1-Flash-TF",
+        "current"
+      ],
+      "max_batch_size": 8,
+      "warming": false,
+      "memory": {
+        "active": 114032985380,
+        "cache": 0,
+        "peak": 114279058724
+      },
+      "live": {
+        "connections": 0,
+        "waiting": 0,
+        "decode_tokens_per_second": 49.0,
+        "prefill_tokens_per_second": 172.3
+      }
+    },
+    "proxy_8889": {
+      "status": "ok",
+      "model": "DeepSeek-V4.1-Flash-1017-TF",
+      "model_ids": [
+        "DeepSeek-V4.1-Flash-1017-TF",
+        "DeepSeek-V4.1-Flash-TF",
+        "current"
+      ],
+      "max_batch_size": 8,
+      "warming": false,
+      "memory": {
+        "active": 114032985380,
+        "cache": 0,
+        "peak": 114279058724
+      },
+      "live": {
+        "connections": 0,
+        "waiting": 0,
+        "decode_tokens_per_second": 49.0,
+        "prefill_tokens_per_second": 172.3
+      }
+    }
+  },
+  "total_elapsed_seconds": 27.57
+}

@@ -211,8 +211,10 @@ def test_quality(profile="smoke"):
     p_math = [
         {"role": "user", "content": "How many 5-digit positive integers (from 10000 to 99999) have digits that are strictly increasing from left to right (e.g. 13579)? Put the final integer in \\boxed{N}."}
     ]
-    r_math = stream_chat(p_math, max_tokens=384, temperature=0.0, base_url=API_8889)
-    passed_math = "126" in r_math.get("content", "")
+    # 384 tokens cut the derivation before the answer once the Engram token map was fixed (the full
+    # greedy answer is 492 tokens, ends \\boxed{126}); score the boxed answer, not any "126" substring.
+    r_math = stream_chat(p_math, max_tokens=1024, temperature=0.0, base_url=API_8889)
+    passed_math = "boxed{126}" in r_math.get("content", "").replace(" ", "")
     results["math_gsm8k"] = {"passed": passed_math, "ttft": r_math.get("client_ttft_seconds"), "wall_s": r_math.get("wall_seconds")}
     print(f"  GSM8K Math Combinatorics: {'PASS' if passed_math else 'FAIL'} (TTFT: {r_math.get('client_ttft_seconds')}s)", flush=True)
 
