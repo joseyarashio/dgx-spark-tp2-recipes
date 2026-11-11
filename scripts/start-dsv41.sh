@@ -10,12 +10,24 @@ IMAGE="tensorfold-glm53:v0.6.0"
 MODEL_DIR="/home/joseyarashio/models/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw"
 ENGRAM_DIR="/home/joseyarashio/dsv41-engram-1017"
 KIT_DIR="/home/joseyarashio/dsv41-2m-kit"
-TOKEN_MAP="$KIT_DIR/dsv41_token_map.json"
+TOKEN_MAP="/home/joseyarashio/.cache/dsv41-1017-rank-cache/dsv41_token_map.json"  # compressed Engram map (sha de40bcdd, matches kit engram.json); the kit file is identity
 
 if [ ! -f "$KIT_DIR/vision/gate_bias_vl.safetensors" ]; then
   echo "ERROR: 1017 vision kit is not ready at $KIT_DIR"
   exit 1
 fi
+# Engram hashes token ids through this map; it must be the one kit engram.json was built with
+# (an identity map silently corrupts the Engram rows: the model then "sees" __init__/async def as typos and loops).
+python3 - "$TOKEN_MAP" "$KIT_DIR/engram.json" << 'PY'
+import hashlib, json, sys
+want = json.load(open(sys.argv[2]))["token_map_sha256"]
+got = hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest()
+if got != want:
+    sys.exit(f"ERROR: token map {sys.argv[1]} sha {got[:16]} != engram.json token_map_sha256 {want[:16]}")
+print(f"token map ok: {got[:16]} matches engram.json")
+PY
+ssh -o BatchMode=yes joseyarashio@"$WORKER_IP" "python3 -c 'import hashlib,json,sys; w=json.load(open(\"$KIT_DIR/engram.json\"))[\"token_map_sha256\"]; g=hashlib.sha256(open(\"$TOKEN_MAP\",\"rb\").read()).hexdigest(); sys.exit(0 if g==w else \"ERROR: node2 token map \"+g[:16]+\" != \"+w[:16])'" || exit 1
+grep -q -- "--token-map $TOKEN_MAP " <(ssh -o BatchMode=yes joseyarashio@"$WORKER_IP" "tr '\n' ' ' < /home/joseyarashio/.cache/dsv41-1017-logs/rank1.sh") || { echo "ERROR: node2 rank1.sh --token-map is not $TOKEN_MAP"; exit 1; }
 CACHE_DIR="/home/joseyarashio/.cache/dsv41-plusten-rank-cache/tf-ds-rank"
 SERVED_NAME="DeepSeek-V4.1-Flash-1017-TF"
 

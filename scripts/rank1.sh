@@ -8,7 +8,7 @@ exec /home/joseyarashio/TensorFold-dsv41-zig/out/bin/tf-dsv41-lanes \
   1 2 10.100.184.2 29620 \
   /home/joseyarashio/dsv41-2m-kit \
   --engram /home/joseyarashio/dsv41-engram-1017 \
-  --token-map /home/joseyarashio/dsv41-2m-kit/dsv41_token_map.json \
+  --token-map /home/joseyarashio/.cache/dsv41-1017-rank-cache/dsv41_token_map.json \
   --vision-bias /home/joseyarashio/dsv41-2m-kit/vision/gate_bias_vl.safetensors \
   --pool 2097152 --rdma rocep1s0f1,roceP2p1s0f1 \
   --graphs 1 --side 1 --prefetch 1 --aio 1 \

@@ -10,7 +10,7 @@ IMAGE="tensorfold-glm53:v0.6.0"
 MODEL_DIR="/home/joseyarashio/models/DeepSeek-V4.1-Flash-1017-EXL3-2.7bpw-OOA"
 ENGRAM_DIR="/home/joseyarashio/dsv41-engram-1017"
 KIT_DIR="/home/joseyarashio/dsv41-1017-kit"
-TOKEN_MAP="$KIT_DIR/dsv41_token_map.json"
+TOKEN_MAP="/home/joseyarashio/.cache/dsv41-1017-rank-cache/dsv41_token_map.json"  # compressed Engram map (sha de40bcdd); the kit file is an identity map
 CACHE_DIR="/home/joseyarashio/.cache/dsv41-ooa-rank-cache/tf-ds-rank"
 SERVED_NAME="DeepSeek-V4.1-Flash-1017-TF"
 

@@ -10,7 +10,7 @@ IMAGE="tensorfold-glm53:v0.6.0"
 MODEL_DIR="/home/joseyarashio/models/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw"
 ENGRAM_DIR="/home/joseyarashio/dsv41-engram-1017"
 KIT_DIR="/home/joseyarashio/dsv41-1017-kit"
-TOKEN_MAP="$KIT_DIR/dsv41_token_map.json"
+TOKEN_MAP="/home/joseyarashio/.cache/dsv41-1017-rank-cache/dsv41_token_map.json"  # compressed Engram map (sha de40bcdd); the kit file is an identity map
 
 if [ ! -f "$KIT_DIR/vision/gate_bias_vl.safetensors" ]; then
   echo "ERROR: 1017 vision kit is not ready at $KIT_DIR"
