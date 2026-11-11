@@ -10,11 +10,11 @@
     "cpu_pinning": "5-9,15-19 (10x Cortex-X925 Super-Cores)"
   },
   "cryptographic_hashes": {
-    "recipe_commit": "72a047bf64e721d3b4f00d6c9db416618aaad20e",
+    "recipe_commit": "f03a0df8b684c6ae53fb460097221fda8b11e3a4",
     "engine_commit": "6e0a623ddbfbb8f68b8c8efbbe116d297e001d4e",
     "patchset_sha256": "ed98863d757cd11ece3251029cc0aeeef58781297e4db7dbd066b0a7a8dc962b",
-    "kernel_manifest_sha256": "ae370ac9aef8cfd937319037b850a825748085c8c54e9e0bbd8421bb5565ddf5",
-    "launch_config_sha256": "634c7c654261f78c3c0161fd0b5420cd44a2b60d7359709884c1a53da0258885",
+    "kernel_manifest_sha256": "23910cedc7772d855a3bbd9eccd4404c73a96f2ad4ec8cbe9865a267d7c47c33",
+    "launch_config_sha256": "a3dbe7f7b93b8fdcea8a6282133934d59b62183c799d62c166c80abe2601dd10",
     "proxy_sha256": "421079a34f61482df269b02a90639ef80cf74cf66201c3131789170bdcae1679"
   },
   "engine_binaries": {
@@ -24,14 +24,14 @@
     "rank1_binary_synced": true
   },
   "memory_audit_ledger": {
-    "measured_at": "2026-11-10 03:11:40 +0800",
-    "rank0_engine_active_gib": 105.48,
+    "measured_at": "2026-11-11 18:41:50 +0800",
+    "rank0_engine_active_gib": 106.17,
     "parallel_slots": 8,
     "kv_pool_allocated_tokens": 2097152,
     "host_prompt_cache_budget_gib": 2.5,
     "cuda_graph_lru_cap": 128,
-    "node1_available_memory_gib": 5.51,
-    "node2_available_memory_gib": 8.16,
+    "node1_available_memory_gib": 3.58,
+    "node2_available_memory_gib": 5.54,
     "engram_mode": "O_DIRECT Linux AIO from local NVMe (203 GB tables)"
   }
 }

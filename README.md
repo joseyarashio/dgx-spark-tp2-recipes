@@ -181,3 +181,17 @@ sha256sum -c tensorfold-dsv41-sm121-fatbins-c976abd7.tar.gz.sha256 && tar xzf te
 ```
 
 The same release also has the exact production binaries (`tensorfold-dsv41-p16-production-binaries-arm64.tar.gz`, built 2026-11-09 11:33). A source rebuild of `c976abd7` builds and includes Patches 0064/0065, but zig 0.17 builds are not deterministic: rebuilds have the same symbol set but can differ in code layout (one of three rebuilds matched production byte for byte, likely a zig cache hit). If a rebuild must match production byte for byte, use the release binaries.
+
+## Engram token map and decode gate (2026-11-11)
+
+**Token map fix.** From 2026-10-27 the launch scripts passed `$KIT_DIR/dsv41_token_map.json` to both ranks. That file is an identity map (sha `d33e73ff…`), but `engram.json` was built with the compressed map (`token_map_sha256` = `de40bcdd…`). Every Engram n-gram lookup therefore read the wrong rows. The model then treated correct code (`__init__`, `async def`, `startswith`) as typos and often looped while "correcting" them. Both ranks now read `~/.cache/dsv41-1017-rank-cache/dsv41_token_map.json`. `start-dsv41.sh` refuses to start if either node's map sha differs from `engram.json` or if Node 2's `rank1.sh` points elsewhere. `post_reboot_verify.py` checks the same sha after a reboot. NVMe Imprint states learned under the wrong map were moved aside (`~/.cache/dsv41-nvme-imprint.badmap_*`, both nodes).
+
+**Measured on the same engine and weights, cold disk cache, versus the cold-cache learnfix run:**
+
+- 1 h standard marathon: looped replies 0/718 (was 5/727); replies calling correct code a typo 0 (was 194); 718/720 HTTP 200 (two 429s, was 727/728); generated 243K tokens (was 247K); TTFT p50 12.8 s (was 13.2 s).
+- 5-rep medians: sampling 61 → 67 tok/s; C2 aggregate 102–107 → 115; C4 132–137 → 142; C8 150–153 → 157.
+- Pooled MTP acceptance over 89 paired requests (30-question bank plus stress) 0.772 → 0.786.
+- Cold 32K cut-in median 1.49 s. The 0.64 s in older runs came from cache hits: the probe's 32K corpus has no nonce.
+- The single LRU code prompt went 95 → 91 tok/s and its MTP acceptance 0.80 → 0.74. Its output now differs from character 89, and the adaptive depth drafted more (350 → 377) while accepting the same count (281 → 279). It is not an engine regression. The MTP draft path does not read Engram.
+
+**Decode gate.** Do not gate decode on one prompt. Its speed follows its text: across 9 code prompts, greedy spans 79–96 tok/s and acceptance spans 0.64–0.80. `benchmarks/run_decode_gate.py` takes the median over a 9-prompt code sweep plus the C2/C4/C8 ladder. It runs through 8889, waits for an idle window, and drops samples that overlap external traffic. A run passes at ≥ 95% of `benchmarks/gates/decode_gate_baseline.json`. The current baseline (3 reps, per-prompt spread < 1 tok/s) is 88.10 tok/s median greedy, MTP 0.731, C2 117.3, C4 143.4, C8 157.1. Re-baseline with `--write-baseline` only after an intended change that has passed the full regression.

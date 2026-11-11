@@ -1,0 +1,99 @@
+============================================================
+ Running Full Question Bank + Stress Test: stage2b2_p16_tokenmapfix_cleanimprint
+============================================================
+
+=== PART A: 25-Item Question Bank (5 Domains) ===
+  [Math][math_1_mod] pass=False | 101.4 tok/s | ans='8 ≡ 2 mod 4 ✅\n\nSo \\(x = 58\\).\n\n---\n\n**Step 3 – Final answer:**\n\n\\[\n\\boxed{58}\n\\]'
+  [Math][math_2_comb] pass=True | 105.9 tok/s | ans='---\n\n### Step 5 – Conclusion\nThere are \\(126\\) such integers.\n\n\\[\n\\boxed{126}\n\\]'
+  [Math][math_3_prob] pass=True | 102.3 tok/s | ans='---\n\n### Step 8 – Conclusion\nThe number of outcomes is \\(27\\).\n\n\\[\n\\boxed{27}\n\\]'
+  [Math][math_4_alg] pass=True | 109.7 tok/s | ans='\\]\n\n---\n\n### Step 3: Conclusion\n\nThe exact integer value is:\n\n\\[\n\\boxed{527}\n\\]'
+  [Math][math_5_seq] pass=True | 120.4 tok/s | ans='\\( a_6 = 3(122) - 1 = 366 - 1 = 365 \\)\n\n---\n\n**Final answer:**\n\\[\n\\boxed{365}\n\\]'
+  [MMLU-Pro][mmlu_1_arch] pass=True (picked='B', expected='B') | raw='B'
+  [MMLU-Pro][mmlu_2_algo] pass=True (picked='A', expected='A') | raw='A'
+  [MMLU-Pro][mmlu_3_chem] pass=True (picked='C', expected='C') | raw='C'
+  [MMLU-Pro][mmlu_4_phys] pass=True (picked='A', expected='A') | raw='A'
+  [MMLU-Pro][mmlu_5_net] pass=True (picked='B', expected='B') | raw='B'
+  [MMLU-Pro][mmlu_6_calc_circuit] pass=False (picked='C', expected='B') | raw='C'
+  [MMLU-Pro][mmlu_7_calc_thermo] pass=True (picked='B', expected='B') | raw='B'
+  [MMLU-Pro][mmlu_8_calc_cache] pass=True (picked='B', expected='B') | raw='B'
+  [MMLU-Pro][mmlu_9_calc_prob] pass=True (picked='B', expected='B') | raw='B'
+  [MMLU-Pro][mmlu_10_calc_linalg] pass=True (picked='B', expected='B') | raw='B'
+  [Code][code_1_dijkstra] pass=True | 123.3 tok/s | err=''
+  [Code][code_2_merge_intervals] pass=True | 113.7 tok/s | err=''
+  [Code][code_3_edit_distance] pass=True | 106.7 tok/s | err=''
+  [Code][code_4_eval_rpn] pass=True | 119.9 tok/s | err=''
+  [Code][code_5_lis] pass=True | 115.4 tok/s | err=''
+  [IFEval][ifeval_1_json_no_fence] pass=True | preview='{"cluster":"roce","nodes":[148,149],"roce_gbps":185}'
+  [IFEval][ifeval_2_exact_bullets] pass=True | preview='- RDMA enables direct memory-to-memory data transfers between nodes, bypassing t'
+  [IFEval][ifeval_3_forbidden_letter] pass=True | preview='A laptop can run programs and do math quickly.'
+  [IFEval][ifeval_4_csv_strict] pass=True | preview='rank,ip,role\n1,10.0.0.1,admin\n2,10.0.0.2,user\n3,10.0.0.3,guest'
+  [IFEval][ifeval_5_end_phrase] pass=True | preview="KV cache quantization compresses the stored key and value tensors from a model's"
+  [Agent/Vision][tool_1_governor] pass=True | tool_calls=[{'name': 'set_gpu_clock_governor', 'arguments': '{"node_ip":"192.168.10.148","min_clk_mhz":1800,"max_clk_mhz":2500,"zone_hi_c":84}'}]
+  [Agent/Vision][tool_2_roce] pass=True | tool_calls=[{'name': 'query_roce_counters', 'arguments': '{"interface":"rocep1s0f0","gid_index":3}'}]
+  [Agent/Vision][tool_3_followup] pass=True | ans='Here are the RoCEv2 RDMA counters for **rocep1s0f0**, GID index **3**:\n\n| Counte'
+  [Agent/Vision][vision_4_quadrants] pass=True | TTFT=5.3211s | log=[tensorfold] done chatcmpl-a76a5e60e18e460090f9b3b555993663 prompt=11225 cached=0 thinking=False effort=none tokens=52 sha=aa0820839631 finish=stop rounds=9 accepted=43/43
+  [Agent/Vision][vision_5_cache_resume] pass=True (cached_hit=True) | TTFT=0.7162s | log=[tensorfold] done chatcmpl-d5611597eedf49d582cd0af68df1995e prompt=11300 cached=10240 thinking=False effort=none tokens=36 sha=f043f059dfb6 finish=stop rounds=9 accepted=27/35
+  ==> Question Bank Overall: 28/30 (93.3%)
+
+=== PART B: Single-Stream Decode, Cold Prefill & Cut-In ===
+  [temp_0.30][code] 92.62 tok/s | accept: 0.770 | tpr: 3.80
+  [temp_0.30][prose] 65.62 tok/s | accept: 0.622 | tpr: 2.18
+  [temp_0.30][structured] 109.86 tok/s | accept: 0.851 | tpr: 5.12
+  [temp_0.0][code] 91.15 tok/s | accept: 0.740 | tpr: 3.69
+  [temp_0.0][prose] 72.05 tok/s | accept: 0.660 | tpr: 2.48
+  [temp_0.0][structured] 109.38 tok/s | accept: 0.848 | tpr: 5.05
+  [Cold Prefill 8k] tokens=15714 | prefill_s=7.12s | tok/s=2205.8
+  [Cold Prefill 32k] tokens=63598 | prefill_s=28.80s | tok/s=2208.5
+  [Cut-In] Long 32K TTFT=28.8011s | Short Prompt TTFT (+1.0s behind)=0.91s
+
+=== PART C: Concurrency Scaling (C1 / C2 / C4 / C6) & Port 8889 Tiered 429 Stress Test ===
+  [Concurrency C1 via :8889] Wall=4.31s | Aggregate=89.14 tok/s | Per-stream mean=92.61 tok/s
+  [Concurrency C2 via :8889] Wall=8.55s | Aggregate=89.84 tok/s | Per-stream mean=54.65 tok/s
+  [Concurrency C4 via :8889] Wall=12.91s | Aggregate=118.97 tok/s | Per-stream mean=39.57 tok/s
+  [Concurrency C6 via :8889] Wall=17.19s | Aggregate=134.0 tok/s | Per-stream mean=29.12 tok/s
+  [Stress Test C14 Burst via :8889] Sending 16 concurrent requests (6 active + 8 queued + 2 immediate 429)...
+    -> Status counts: {200: 16}
+    -> Immediate 429 (queue_full, >8th req): []
+    -> Tiered timeout 429 (escaped standby queue): []
+    -> Completed 200 OK: [('worker_0', 17.8685), ('worker_1', 17.8428), ('worker_10', 9.7347), ('worker_11', 9.6284), ('worker_12', 13.4101), ('worker_13', 13.0832), ('worker_14', 16.9359), ('worker_15', 17.1341), ('worker_2', 16.8987), ('worker_3', 16.5393), ('worker_4', 16.0055), ('worker_5', 16.8974), ('worker_6', 2.9992), ('worker_7', 3.3362), ('worker_8', 6.3489), ('worker_9', 6.0362)]
+  [Stress Test C8 Heavy Stall via :8889] 4 long active requests (900 tokens) + 4 standby queue waiters (testing tiered timeout dropout)...
+    -> Heavy Stall Status counts: {200: 8}
+    -> Tiered timeout 429 dropouts: []
+
+============================================================
+ PART D: Multi-Agent Concurrency & Advanced Cache-Hit Benchmark
+============================================================
+Generated synthetic shared codebase: 105000 chars (~30000 tokens)
+
+  [D1: 4-Subagent Simultaneous Project Review (Burst Delay-Hit Scenario)]
+    -> Wall-clock total: 23.62s | Aggregate throughput: 43.36 tok/s
+    -> Leader (Worker 0) TTFT: 13.06s | Follower Mean TTFT: 14.94s
+    -> Delay-Hit Penalty Gap: +1.87s
+       worker_0: TTFT=13.06s, wall=23.32s, out_tok=256, cached=0
+       worker_1: TTFT=14.03s, wall=23.57s, out_tok=256, cached=26624
+       worker_2: TTFT=14.93s, wall=23.60s, out_tok=256, cached=26624
+       worker_3: TTFT=15.85s, wall=23.39s, out_tok=256, cached=26624
+
+  [D2: Staggered In-Flight Arrival (Prefill Pipeline Overlap)]
+    -> Staggered batch wall-clock: 19.49s
+       worker_0 (offset +0s): TTFT=14.02s, wall=18.98s, cached=0
+       worker_1 (offset +3s): TTFT=9.98s, wall=15.74s, cached=26624
+       worker_2 (offset +6s): TTFT=8.96s, wall=13.29s, cached=26624
+       worker_3 (offset +10s): TTFT=5.85s, wall=9.47s, cached=26624
+
+  [D3: 6-Turn Deep Autonomous Agent Tool Loop (Cache Growth & Retention)]
+    -> Turn 1: prompt_tok=220, cached_tok=0 (0.0%), TTFT=0.328s, out_speed=75.3 tok/s
+    -> Turn 2: prompt_tok=584, cached_tok=0 (0.0%), TTFT=0.519s, out_speed=69.1 tok/s
+    -> Turn 3: prompt_tok=1013, cached_tok=0 (0.0%), TTFT=0.679s, out_speed=65.0 tok/s
+    -> Turn 4: prompt_tok=1503, cached_tok=0 (0.0%), TTFT=0.867s, out_speed=63.7 tok/s
+    -> Turn 5: prompt_tok=2055, cached_tok=0 (0.0%), TTFT=1.121s, out_speed=68.0 tok/s
+    -> Turn 6: prompt_tok=2669, cached_tok=0 (0.0%), TTFT=1.548s, out_speed=68.3 tok/s
+
+  [D4: Mixed Workload Priority Slicing (2 Background + 2 Foreground Interactive)]
+    -> Mixed workload total wall: 30.57s
+       bg_worker_1 (low, delay=0.0s): TTFT=14.33s, wall=29.81s, sc=200
+       bg_worker_2 (low, delay=0.2s): TTFT=28.16s, wall=30.36s, sc=200
+       fg_user_1 (high, delay=1.5s): TTFT=0.46s, wall=17.02s, sc=200
+       fg_user_2 (high, delay=2.5s): TTFT=1.60s, wall=16.07s, sc=200
+
+=== Saved full evaluation to /home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/results/full_eval_stage2b2_p16_tokenmapfix_cleanimprint.json ===

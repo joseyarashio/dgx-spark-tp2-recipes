@@ -1,0 +1,1 @@
+jobs=336 arms=['t0.30', 't0.60', 't1.00'] conc=6 out=results/loop_ab_20261111.jsonl

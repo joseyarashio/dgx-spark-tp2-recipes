@@ -1,0 +1,6 @@
+FAIL init_yes   loop=False bad=True | "No. The correct special method name is `__init__` is not a real Python dunder; the initializer is `__init__`… actually it's `__init__` — no, it's `__init__`? Th"
+FAIL three_yes  loop=False bad=False | 'no'
+FAIL review     loop=False bad=True | '- `__init__` is not a valid Python constructor; it should be `__init__` → `__init__` is wrong, the correct name is `__init__`... actually the correct dunder is '
+FAIL name_main  loop=False bad=False | 'It checks whether the script is being run directly as the main program (as opposed to being imported as a module), and if so, executes the code block that follo'
+FAIL repr       loop=False bad=False | 'No'
+probe 0/5

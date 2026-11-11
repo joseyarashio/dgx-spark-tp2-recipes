@@ -1,0 +1,641 @@
+{
+ "d1_burst_delay_hit": {
+  "wall_total_s": 11.173501246987144,
+  "aggregate_tok_per_s": 91.64540078931073,
+  "leader_ttft_s": 1.8195,
+  "mean_follower_ttft_s": 2.3891666666666667,
+  "delay_hit_penalty_s": 0.5696666666666668,
+  "workers": {
+   "worker_0": {
+    "status_code": 200,
+    "id": "chatcmpl-f771d2594ca050204bd013eef90ef018",
+    "wall_seconds": 10.8932,
+    "client_ttft_seconds": 1.8195,
+    "finish_reason": "length",
+    "tensorfold": {
+     "enable_thinking": false,
+     "reasoning_effort": "none",
+     "engine": "lanes",
+     "tokens_per_second": 28.10283085767519,
+     "seconds": 9.966201687,
+     "prefill_seconds": 0.866335847,
+     "prefill_widths": [],
+     "prefill_raised": [],
+     "time_to_first_token": 0.908208507,
+     "sampling": "exact",
+     "drafts": true,
+     "token_sha": "2df5d3d46b4f",
+     "min_rows": 1
+    },
+    "speculative": {
+     "rounds": 101,
+     "drafted": 207,
+     "accepted": 154,
+     "acceptance_rate": 0.7439613526570048,
+     "tokens_per_round": 2.5346534653465347
+    },
+    "usage": {
+     "prompt_tokens": 27966,
+     "completion_tokens": 256,
+     "total_tokens": 28222,
+     "prompt_tokens_details": {
+      "cached_tokens": 26624
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0
+     }
+    },
+    "cached_tokens": 26624,
+    "prompt_tokens": 27966,
+    "log_line": "[tensorfold] done chatcmpl-f771d2594ca050204bd013eef90ef018 prompt=27966 cached=26624 thinking=False effort=none tokens=256 sha=2df5d3d46b4f finish=length rounds=101 accepted=154/207",
+    "content": "# Architecture, Locking Safety, and Channel Registration Audit\n\n## Executive Summary\n\nThe codebase consists of **75 identical copies** of the same module (`distributed_coordinator_sub_0.py` through `distributed_coordinator_sub_74.py`), each defining a class named `DistributedNode`. This is a **critical architectural defect**: 75 modules each export a class with the same name, and there is no aggregation, no shared state, no coordination between them. The \"distributed coordinator\" is not distributed \u2014 it is 75 isolated, stateless stubs.\n\nThe locking logic within a single instance is **correct** for the narrow operation it performs, but the surrounding architecture has several serious problems. Below is a detailed audit.\n\n---\n\n## 1. Architecture Audit\n\n### 1.1 Duplication / No Aggregation (Critical)\n\n- **75 files, byte-for-byte identical** except for the logger name (`coordinator_sub_N`) and the module filename.\n- Each module defines its own `DistributedNode` class. If a consumer does `from core.distributed_coordinator_sub_0 import DistributedNode` and `from core.distributed_coordinator_sub_1 import DistributedNode`, they get **two",
+    "reasoning_len": 0,
+    "tool_calls": []
+   },
+   "worker_3": {
+    "status_code": 200,
+    "id": "chatcmpl-fbf6d906c8631fc2268f0c9cc30797b3",
+    "wall_seconds": 11.1092,
+    "client_ttft_seconds": 3.5677,
+    "finish_reason": "length",
+    "tensorfold": {
+     "enable_thinking": false,
+     "reasoning_effort": "none",
+     "engine": "lanes",
+     "tokens_per_second": 33.8153966996507,
+     "seconds": 10.187081717,
+     "prefill_seconds": 0.877277855,
+     "prefill_widths": [],
+     "prefill_raised": [],
+     "time_to_first_token": 2.662902725,
+     "sampling": "exact",
+     "drafts": true,
+     "token_sha": "af5186d7d325",
+     "min_rows": 1
+    },
+    "speculative": {
+     "rounds": 104,
+     "drafted": 188,
+     "accepted": 151,
+     "acceptance_rate": 0.8031914893617021,
+     "tokens_per_round": 2.4615384615384617
+    },
+    "usage": {
+     "prompt_tokens": 27967,
+     "completion_tokens": 256,
+     "total_tokens": 28223,
+     "prompt_tokens_details": {
+      "cached_tokens": 26624
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0
+     }
+    },
+    "cached_tokens": 26624,
+    "prompt_tokens": 27967,
+    "log_line": "[tensorfold] done chatcmpl-fbf6d906c8631fc2268f0c9cc30797b3 prompt=27967 cached=26624 thinking=False effort=none tokens=256 sha=af5186d7d325 finish=length rounds=104 accepted=151/188",
+    "content": "# Codebase Review: Error Handling, Logging Coverage, and Graceful Shutdown Under Network Partition\n\n## Executive Summary\n\nThis codebase is **not a distributed systems implementation** \u2014 it is a **single class definition duplicated 75 times** with only the module name and logger name varying. There is no coordinator, no network I/O, no partition detection, no shutdown logic, and no error handling beyond a single `if` guard. The file is truncated mid-`__init__` signature at Section 75.\n\nThe review below addresses the three requested areas honestly: what exists, what is missing, and what would be required to make this a real RoCEv2 clustered runtime.\n\n---\n\n## 1. Structural Findings (Blocking Issues)\n\n### 1.1 Duplication, not distribution\nAll 75 modules define an identical `DistributedNode` class. There is:\n- **No coordinator** despite the module names (`distributed_coordinator_sub_N`).\n- **No inter-node communication** \u2014 no sockets, no RDMA verbs, no gRPC, no message bus.\n- **No cluster membership** \u2014 no peer registry, no gossip, no consensus.\n- **No partition detection** \u2014 `heartbeat_ts` is set",
+    "reasoning_len": 0,
+    "tool_calls": []
+   },
+   "worker_2": {
+    "status_code": 200,
+    "id": "chatcmpl-734553f5d0f3bcb252abd12e4696b98f",
+    "wall_seconds": 11.1568,
+    "client_ttft_seconds": 0.9047,
+    "finish_reason": "length",
+    "tensorfold": {
+     "enable_thinking": false,
+     "reasoning_effort": "none",
+     "engine": "lanes",
+     "tokens_per_second": 24.87222585027149,
+     "seconds": 11.137665169,
+     "prefill_seconds": 0.885055635,
+     "prefill_widths": [],
+     "prefill_raised": [],
+     "time_to_first_token": 0.900344261,
+     "sampling": "exact",
+     "drafts": true,
+     "token_sha": "1d6ef218d467",
+     "min_rows": 1
+    },
+    "speculative": {
+     "rounds": 106,
+     "drafted": 224,
+     "accepted": 150,
+     "acceptance_rate": 0.6696428571428571,
+     "tokens_per_round": 2.4150943396226414
+    },
+    "usage": {
+     "prompt_tokens": 27970,
+     "completion_tokens": 256,
+     "total_tokens": 28226,
+     "prompt_tokens_details": {
+      "cached_tokens": 26624
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0
+     }
+    },
+    "cached_tokens": 26624,
+    "prompt_tokens": 27970,
+    "log_line": "[tensorfold] done chatcmpl-734553f5d0f3bcb252abd12e4696b98f prompt=27970 cached=26624 thinking=False effort=none tokens=256 sha=1d6ef218d467 finish=length rounds=106 accepted=150/224",
+    "content": "# Pytest Test Suite for DistributedNode\n\nBelow is a complete pytest test suite covering the three areas requested: **active channels**, **concurrency locks**, and **counter polling**.\n\n## Important Structural Note\n\nThe codebase as presented defines **75 separate modules** (`core/distributed_coordinator_sub_0.py` \u2026 `core/distributed_coordinator_sub_74.py`), each containing an **identically-named** `DistributedNode` class. Because Python module namespaces are per-module, importing them all under the same name would shadow each other. The test suite therefore:\n\n1. Imports each module explicitly by its module path.\n2. Parametrizes over all 75 modules so every copy is exercised (guarding against drift between copies).\n3. Uses a single canonical module (`sub_0`) for the detailed behavioral tests, since all copies are byte-for-byte identical.\n\nIf the modules are not actually on disk (e.g., this is a single-file paste), the `importlib` helper falls back to loading the class from a shared fixture \u2014 see `conftest.py` below.\n\n---\n\n## `conftest.py`\n\n```python\nimport importlib\nimport pytest\n\nMODULE_NAMES = [f",
+    "reasoning_len": 0,
+    "tool_calls": []
+   },
+   "worker_1": {
+    "status_code": 200,
+    "id": "chatcmpl-edf327af04808ce1ab60bf45d354760c",
+    "wall_seconds": 11.1582,
+    "client_ttft_seconds": 2.6951,
+    "finish_reason": "length",
+    "tensorfold": {
+     "enable_thinking": false,
+     "reasoning_effort": "none",
+     "engine": "lanes",
+     "tokens_per_second": 30.128835344823823,
+     "seconds": 10.233288413,
+     "prefill_seconds": 0.87754121,
+     "prefill_widths": [],
+     "prefill_raised": [],
+     "time_to_first_token": 1.785729668,
+     "sampling": "exact",
+     "drafts": true,
+     "token_sha": "0f337a29ea45",
+     "min_rows": 1
+    },
+    "speculative": {
+     "rounds": 105,
+     "drafted": 203,
+     "accepted": 150,
+     "acceptance_rate": 0.7389162561576355,
+     "tokens_per_round": 2.4380952380952383
+    },
+    "usage": {
+     "prompt_tokens": 27970,
+     "completion_tokens": 256,
+     "total_tokens": 28226,
+     "prompt_tokens_details": {
+      "cached_tokens": 26624
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0
+     }
+    },
+    "cached_tokens": 26624,
+    "prompt_tokens": 27970,
+    "log_line": "[tensorfold] done chatcmpl-edf327af04808ce1ab60bf45d354760c prompt=27970 cached=26624 thinking=False effort=none tokens=256 sha=0f337a29ea45 finish=length rounds=105 accepted=150/203",
+    "content": "# Code Review: Distributed Coordinator \u2014 Deadlock, Memory Leak & Exception Risks\n\n## Executive Summary\n\nThe codebase is **75 near-identical copies** of the same `DistributedNode` class (one per \"Section\"), each in its own module (`core/distributed_coordinator_sub_N.py`). There is **no actual distributed logic** \u2014 no networking, no RoCEv2 verbs, no coordinator, no message passing. `poll_roce_counters` returns hardcoded constants. The file is truncated mid-`__init__` at Section 75.\n\nThis is a **scaffold/copy-paste artifact**, not a working distributed runtime. Below I enumerate the concrete risks present in the code as written, plus the structural risks the architecture implies.\n\n---\n\n## 1. Deadlock Risks\n\n### 1.1 `asyncio.Lock` held across `await`-free critical section \u2014 low risk, but fragile\n`register_channel` acquires `self.lock` and does only synchronous dict work. No `await` inside the critical section, so **no re-entrancy deadlock today**. However:\n\n- **Risk:** Any future addition of an `await` inside the `async with self.l",
+    "reasoning_len": 0,
+    "tool_calls": []
+   }
+  }
+ },
+ "d2_staggered_inflight": {
+  "wall_total_s": 12.69099952201941,
+  "workers": {
+   "worker_0": {
+    "status_code": 200,
+    "id": "chatcmpl-de0f81e93731ec04c93effc773211545",
+    "wall_seconds": 2.4044,
+    "client_ttft_seconds": 0.8882,
+    "finish_reason": "length",
+    "tensorfold": {
+     "enable_thinking": false,
+     "reasoning_effort": "none",
+     "engine": "lanes",
+     "tokens_per_second": 83.75390013555312,
+     "seconds": 2.386990588,
+     "prefill_seconds": 0.870527806,
+     "prefill_widths": [],
+     "prefill_raised": [],
+     "time_to_first_token": 0.885717365,
+     "sampling": "exact",
+     "drafts": true,
+     "token_sha": "dd0911ea0da6",
+     "min_rows": 2
+    },
+    "speculative": {
+     "rounds": 37,
+     "drafted": 121,
+     "accepted": 90,
+     "acceptance_rate": 0.743801652892562,
+     "tokens_per_round": 3.4594594594594597
+    },
+    "usage": {
+     "prompt_tokens": 27953,
+     "completion_tokens": 128,
+     "total_tokens": 28081,
+     "prompt_tokens_details": {
+      "cached_tokens": 26624
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0
+     }
+    },
+    "cached_tokens": 26624,
+    "prompt_tokens": 27953,
+    "log_line": "[tensorfold] done chatcmpl-de0f81e93731ec04c93effc773211545 prompt=27953 cached=26624 thinking=False effort=none tokens=128 sha=dd0911ea0da6 finish=length rounds=37 accepted=90/121",
+    "content": "# Channel Registration Safety \u2014 Summary\n\n- **Per-node locking is correct:** `register_channel` acquires `self.lock` (an `asyncio.Lock`) before checking and inserting into `active_channels`, so concurrent registrations on the *same* `DistributedNode` instance are serialized and the check-then-insert is atomic. Duplicate `channel_id` registrations return `False` rather than overwriting state.\n\n- **No cross-node coordination:** Each of the 75+ `distributed_coordinator_sub_N.py` modules defines its own independent `DistributedNode` class with its own lock",
+    "reasoning_len": 0,
+    "tool_calls": [],
+    "stagger_delay_s": 0.0
+   },
+   "worker_1": {
+    "status_code": 200,
+    "id": "chatcmpl-c13b5c0365f3cc2de841107e95b52130",
+    "wall_seconds": 2.5268,
+    "client_ttft_seconds": 0.8997,
+    "finish_reason": "length",
+    "tensorfold": {
+     "enable_thinking": false,
+     "reasoning_effort": "none",
+     "engine": "lanes",
+     "tokens_per_second": 78.02300685291121,
+     "seconds": 2.509152695,
+     "prefill_seconds": 0.881113974,
+     "prefill_widths": [],
+     "prefill_raised": [],
+     "time_to_first_token": 0.896867187,
+     "sampling": "exact",
+     "drafts": true,
+     "token_sha": "fb0d9a13017b",
+     "min_rows": 2
+    },
+    "speculative": {
+     "rounds": 41,
+     "drafted": 122,
+     "accepted": 86,
+     "acceptance_rate": 0.7049180327868853,
+     "tokens_per_round": 3.1219512195121952
+    },
+    "usage": {
+     "prompt_tokens": 27953,
+     "completion_tokens": 128,
+     "total_tokens": 28081,
+     "prompt_tokens_details": {
+      "cached_tokens": 26624
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0
+     }
+    },
+    "cached_tokens": 26624,
+    "prompt_tokens": 27953,
+    "log_line": "[tensorfold] done chatcmpl-c13b5c0365f3cc2de841107e95b52130 prompt=27953 cached=26624 thinking=False effort=none tokens=128 sha=fb0d9a13017b finish=length rounds=41 accepted=86/122",
+    "content": "# Channel Registration Safety Summary\n\n- **Per-node locking is correct:** `register_channel` wraps the check-then-insert in `async with self.lock`, so concurrent registrations on the *same* `DistributedNode` instance cannot race; the duplicate check and insertion are atomic with respect to that node's `asyncio.Lock`.\n\n- **No cross-node coordination:** Each of the 75+ `distributed_coordinator_sub_N.py` modules defines its own independent `DistributedNode` class with its own `active_channels` dict and lock. There is no shared registry, no cluster-wide uniqueness enforcement",
+    "reasoning_len": 0,
+    "tool_calls": [],
+    "stagger_delay_s": 3.0
+   },
+   "worker_2": {
+    "status_code": 200,
+    "id": "chatcmpl-5f05549995db9a5664cdcfc7ce50cf1f",
+    "wall_seconds": 2.6315,
+    "client_ttft_seconds": 0.8986,
+    "finish_reason": "length",
+    "tensorfold": {
+     "enable_thinking": false,
+     "reasoning_effort": "none",
+     "engine": "lanes",
+     "tokens_per_second": 73.26736052122433,
+     "seconds": 2.613801237,
+     "prefill_seconds": 0.880152687,
+     "prefill_widths": [],
+     "prefill_raised": [],
+     "time_to_first_token": 0.895780816,
+     "sampling": "exact",
+     "drafts": true,
+     "token_sha": "eada77f0cd90",
+     "min_rows": 3
+    },
+    "speculative": {
+     "rounds": 43,
+     "drafted": 132,
+     "accepted": 84,
+     "acceptance_rate": 0.6363636363636364,
+     "tokens_per_round": 2.9767441860465116
+    },
+    "usage": {
+     "prompt_tokens": 27953,
+     "completion_tokens": 128,
+     "total_tokens": 28081,
+     "prompt_tokens_details": {
+      "cached_tokens": 26624
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0
+     }
+    },
+    "cached_tokens": 26624,
+    "prompt_tokens": 27953,
+    "log_line": "[tensorfold] done chatcmpl-5f05549995db9a5664cdcfc7ce50cf1f prompt=27953 cached=26624 thinking=False effort=none tokens=128 sha=eada77f0cd90 finish=length rounds=43 accepted=84/132",
+    "content": "# Channel Registration Safety \u2014 Summary\n\n- **Per-node serialization via `asyncio.Lock`:** Each `DistributedNode` guards `register_channel` with its own `self.lock`, so concurrent registrations on the *same* node instance are serialized and the check-then-insert (`if channel_id in self.active_channels` \u2192 insert) is atomic with respect to other coroutines on that node. Duplicate `channel_id`s on a single node are correctly rejected with `False`.\n\n- **No cross-node coordination:** The lock is instance-local. Across the 75 duplicated `DistributedNode` classes",
+    "reasoning_len": 0,
+    "tool_calls": [],
+    "stagger_delay_s": 6.0
+   },
+   "worker_3": {
+    "status_code": 200,
+    "id": "chatcmpl-70aae7970e330e089c381725ecfe7722",
+    "wall_seconds": 2.6775,
+    "client_ttft_seconds": 0.9011,
+    "finish_reason": "length",
+    "tensorfold": {
+     "enable_thinking": false,
+     "reasoning_effort": "none",
+     "engine": "lanes",
+     "tokens_per_second": 71.44290750473867,
+     "seconds": 2.660155564,
+     "prefill_seconds": 0.882316142,
+     "prefill_widths": [],
+     "prefill_raised": [],
+     "time_to_first_token": 0.897848241,
+     "sampling": "exact",
+     "drafts": true,
+     "token_sha": "16ed73598feb",
+     "min_rows": 2
+    },
+    "speculative": {
+     "rounds": 46,
+     "drafted": 126,
+     "accepted": 81,
+     "acceptance_rate": 0.6428571428571429,
+     "tokens_per_round": 2.782608695652174
+    },
+    "usage": {
+     "prompt_tokens": 27953,
+     "completion_tokens": 128,
+     "total_tokens": 28081,
+     "prompt_tokens_details": {
+      "cached_tokens": 26624
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0
+     }
+    },
+    "cached_tokens": 26624,
+    "prompt_tokens": 27953,
+    "log_line": "[tensorfold] done chatcmpl-70aae7970e330e089c381725ecfe7722 prompt=27953 cached=26624 thinking=False effort=none tokens=128 sha=16ed73598feb finish=length rounds=46 accepted=81/126",
+    "content": "- **Duplicate registration is rejected atomically.** `register_channel` acquires `self.lock` before checking `channel_id in self.active_channels`, so concurrent calls for the same channel ID on a node cannot both succeed; the second returns `False`.\n\n- **Per-node locking only.** The `asyncio.Lock` is instance-scoped, so it serializes registrations within a single `DistributedNode` but provides no coordination across nodes or across the 75 duplicated module copies \u2014 each module defines its own independent `DistributedNode` class and lock.\n\n- **No validation or cleanup.** `buffer_size` is not",
+    "reasoning_len": 0,
+    "tool_calls": [],
+    "stagger_delay_s": 10.0
+   }
+  }
+ },
+ "d3_agent_loop_6turns": [
+  {
+   "turn": 1,
+   "prompt_tokens": 220,
+   "cached_tokens": 0,
+   "cache_hit_pct": 0.0,
+   "ttft_seconds": 0.313,
+   "tokens_per_second": 76.03358149849517,
+   "wall_seconds": 1.5756
+  },
+  {
+   "turn": 2,
+   "prompt_tokens": 584,
+   "cached_tokens": 0,
+   "cache_hit_pct": 0.0,
+   "ttft_seconds": 0.5035,
+   "tokens_per_second": 69.57025871439959,
+   "wall_seconds": 1.8834
+  },
+  {
+   "turn": 3,
+   "prompt_tokens": 1013,
+   "cached_tokens": 0,
+   "cache_hit_pct": 0.0,
+   "ttft_seconds": 0.6735,
+   "tokens_per_second": 65.75792862524831,
+   "wall_seconds": 2.1334
+  },
+  {
+   "turn": 4,
+   "prompt_tokens": 1503,
+   "cached_tokens": 0,
+   "cache_hit_pct": 0.0,
+   "ttft_seconds": 0.8431,
+   "tokens_per_second": 64.02988061095178,
+   "wall_seconds": 2.3424
+  },
+  {
+   "turn": 5,
+   "prompt_tokens": 2055,
+   "cached_tokens": 0,
+   "cache_hit_pct": 0.0,
+   "ttft_seconds": 1.1173,
+   "tokens_per_second": 69.4042799305957,
+   "wall_seconds": 2.5005
+  },
+  {
+   "turn": 6,
+   "prompt_tokens": 2669,
+   "cached_tokens": 2048,
+   "cache_hit_pct": 76.73285874859498,
+   "ttft_seconds": 0.511,
+   "tokens_per_second": 68.41505131128848,
+   "wall_seconds": 1.9142
+  }
+ ],
+ "d4_mixed_priority": {
+  "wall_total_s": 5.304982375004329,
+  "workers": {
+   "fg_user_1": {
+    "status_code": 200,
+    "id": "chatcmpl-159d53fcf6d33f59c623c4b9764cc08b",
+    "wall_seconds": 2.7411,
+    "client_ttft_seconds": 0.327,
+    "finish_reason": "length",
+    "tensorfold": {
+     "enable_thinking": false,
+     "reasoning_effort": "none",
+     "engine": "lanes",
+     "tokens_per_second": 26.10651855228123,
+     "seconds": 2.73431143,
+     "prefill_seconds": 0.118481907,
+     "prefill_widths": [],
+     "prefill_raised": [],
+     "time_to_first_token": 0.321715736,
+     "sampling": "exact",
+     "drafts": true,
+     "token_sha": "844d26a743cd",
+     "min_rows": 1
+    },
+    "speculative": {
+     "rounds": 31,
+     "drafted": 52,
+     "accepted": 33,
+     "acceptance_rate": 0.6346153846153846,
+     "tokens_per_round": 2.064516129032258
+    },
+    "usage": {
+     "prompt_tokens": 22,
+     "completion_tokens": 64,
+     "total_tokens": 86,
+     "prompt_tokens_details": {
+      "cached_tokens": 0
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0
+     }
+    },
+    "cached_tokens": 0,
+    "prompt_tokens": 22,
+    "log_line": "[tensorfold] done chatcmpl-159d53fcf6d33f59c623c4b9764cc08b prompt=22 cached=0 thinking=False effort=none tokens=64 sha=844d26a743cd finish=length rounds=31 accepted=33/52",
+    "content": "The primary port used for a distributed coordinator depends on which system you're referring to. Here are the most common ones:\n\n- **Hadoop/YARN ResourceManager (distributed coordinator for cluster resources):** Port **8032** is the primary ResourceManager RPC/scheduler port (8030 is the scheduler address,",
+    "reasoning_len": 0,
+    "tool_calls": [],
+    "priority": "high",
+    "delay_s": 1.5
+   },
+   "fg_user_2": {
+    "status_code": 200,
+    "id": "chatcmpl-5ad686a96f47ede4c6e1ccf34547a989",
+    "wall_seconds": 2.4497,
+    "client_ttft_seconds": 0.1508,
+    "finish_reason": "length",
+    "tensorfold": {
+     "enable_thinking": false,
+     "reasoning_effort": "none",
+     "engine": "lanes",
+     "tokens_per_second": 27.409049490813473,
+     "seconds": 2.444656782,
+     "prefill_seconds": 0.110323086,
+     "prefill_widths": [],
+     "prefill_raised": [],
+     "time_to_first_token": 0.14668366,
+     "sampling": "exact",
+     "drafts": true,
+     "token_sha": "2a333296e526",
+     "min_rows": 1
+    },
+    "speculative": {
+     "rounds": 31,
+     "drafted": 44,
+     "accepted": 32,
+     "acceptance_rate": 0.7272727272727273,
+     "tokens_per_round": 2.064516129032258
+    },
+    "usage": {
+     "prompt_tokens": 22,
+     "completion_tokens": 64,
+     "total_tokens": 86,
+     "prompt_tokens_details": {
+      "cached_tokens": 0
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0
+     }
+    },
+    "cached_tokens": 0,
+    "prompt_tokens": 22,
+    "log_line": "[tensorfold] done chatcmpl-5ad686a96f47ede4c6e1ccf34547a989 prompt=22 cached=0 thinking=False effort=none tokens=64 sha=2a333296e526 finish=length rounds=31 accepted=32/44",
+    "content": "The primary port used for the distributed coordinator in **Apache Druid** is **8081**.\n\nThis is the default port for the Coordinator service, which manages the distribution of segments across the cluster. You can verify or change this in the Druid configuration under `druid.coordinator.port` (default:",
+    "reasoning_len": 0,
+    "tool_calls": [],
+    "priority": "high",
+    "delay_s": 2.5
+   },
+   "bg_worker_2": {
+    "status_code": 200,
+    "id": "chatcmpl-d92889271655fa8621788b4a68492dff",
+    "wall_seconds": 4.8106,
+    "client_ttft_seconds": 1.5086,
+    "finish_reason": "length",
+    "tensorfold": {
+     "enable_thinking": false,
+     "reasoning_effort": "none",
+     "engine": "lanes",
+     "tokens_per_second": 38.45870085699358,
+     "seconds": 4.785110202,
+     "prefill_seconds": 0.852104551,
+     "prefill_widths": [],
+     "prefill_raised": [],
+     "time_to_first_token": 1.500252575,
+     "sampling": "exact",
+     "drafts": true,
+     "token_sha": "c389037b5721",
+     "min_rows": 2
+    },
+    "speculative": {
+     "rounds": 43,
+     "drafted": 120,
+     "accepted": 84,
+     "acceptance_rate": 0.7,
+     "tokens_per_round": 2.9767441860465116
+    },
+    "usage": {
+     "prompt_tokens": 27939,
+     "completion_tokens": 128,
+     "total_tokens": 28067,
+     "prompt_tokens_details": {
+      "cached_tokens": 26624
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0
+     }
+    },
+    "cached_tokens": 26624,
+    "prompt_tokens": 27939,
+    "log_line": "[tensorfold] done chatcmpl-d92889271655fa8621788b4a68492dff prompt=27939 cached=26624 thinking=False effort=none tokens=128 sha=c389037b5721 finish=length rounds=43 accepted=84/120",
+    "content": "This appears to be a large block of **duplicated boilerplate code** \u2014 75 nearly identical copies of the same `DistributedNode` class, each in its own \"module\" (`core/distributed_coordinator_sub_0.py` through `core/distributed_coordinator_sub_74.py`). The code is also **truncated** at the end (Section 75 cuts off mid-`__init__`).\n\nLet me give you a useful analysis rather than just echoing it back.\n\n## What this code actually does\n\nEach copy defines the same class:\n\n```python\nclass DistributedNode:\n    def __",
+    "reasoning_len": 0,
+    "tool_calls": [],
+    "priority": "low",
+    "delay_s": 0.2
+   },
+   "bg_worker_1": {
+    "status_code": 200,
+    "id": "chatcmpl-49c4613261a41824373999fd195475c0",
+    "wall_seconds": 5.2934,
+    "client_ttft_seconds": 0.8574,
+    "finish_reason": "length",
+    "tensorfold": {
+     "enable_thinking": false,
+     "reasoning_effort": "none",
+     "engine": "lanes",
+     "tokens_per_second": 28.624972990506663,
+     "seconds": 5.275260636,
+     "prefill_seconds": 0.838475837,
+     "prefill_widths": [],
+     "prefill_raised": [],
+     "time_to_first_token": 0.853446016,
+     "sampling": "exact",
+     "drafts": true,
+     "token_sha": "c37ae6ac544b",
+     "min_rows": 2
+    },
+    "speculative": {
+     "rounds": 51,
+     "drafted": 118,
+     "accepted": 77,
+     "acceptance_rate": 0.652542372881356,
+     "tokens_per_round": 2.5098039215686274
+    },
+    "usage": {
+     "prompt_tokens": 27939,
+     "completion_tokens": 128,
+     "total_tokens": 28067,
+     "prompt_tokens_details": {
+      "cached_tokens": 26624
+     },
+     "completion_tokens_details": {
+      "reasoning_tokens": 0
+     }
+    },
+    "cached_tokens": 26624,
+    "prompt_tokens": 27939,
+    "log_line": "[tensorfold] done chatcmpl-49c4613261a41824373999fd195475c0 prompt=27939 cached=26624 thinking=False effort=none tokens=128 sha=c37ae6ac544b finish=length rounds=51 accepted=77/118",
+    "content": "I can see this is a background scan output showing a large codebase with many nearly-identical Python modules. Let me analyze what's actually here and flag the important issues.\n\n## What This Code Actually Is\n\nThis is **75+ copies of the same `DistributedNode` class**, each in its own module (`distributed_coordinator_sub_0.py` through `distributed_coordinator_sub_74.py`). Every single copy is byte-for-byte identical except for the logger name and module filename.\n\n## Critical Issues\n\n### 1. Massive Code Duplication (DRY violation)\nEvery module defines the exact same",
+    "reasoning_len": 0,
+    "tool_calls": [],
+    "priority": "low",
+    "delay_s": 0.0
+   }
+  }
+ }
+}

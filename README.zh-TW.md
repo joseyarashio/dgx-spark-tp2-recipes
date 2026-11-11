@@ -128,3 +128,17 @@ sudo journalctl -u spark-ms-dtc -f
 - **[Plus-Ten](https://huggingface.co/Plus-Ten/DeepSeek-V4.1-Flash-1017-TensorFold-EXL3-2.9bpw)**：序列校準 2.9bpw 骨幹與 6-bit LM Head / MTP 草稿頭。
 - **[DeepSeek](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash-1017)**：官方開源檢查點與 43 層 FP32 路由偏置權重。
 - **[MiaAI-Lab](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks)**：上游參考修補 Patch 0048 原生工具串流。
+
+## Engram token map 修正與解碼門檻（2026-11-11）
+
+**映射檔修正。** 從 2026-10-27 起，啟動腳本傳給雙 rank 的是 `$KIT_DIR/dsv41_token_map.json`。這個檔是恆等映射（sha `d33e73ff…`），但 `engram.json` 是用壓縮映射建的（`token_map_sha256` = `de40bcdd…`），所以每次 Engram n-gram 查表都讀錯列。結果模型會把正確的程式碼（`__init__`、`async def`、`startswith`）當成錯字，反覆「更正」而陷入迴圈。現在雙 rank 都改讀 `~/.cache/dsv41-1017-rank-cache/dsv41_token_map.json`。`start-dsv41.sh` 啟動前會比對兩台的 sha，與 `engram.json` 不符，或 Node 2 的 `rank1.sh` 指向別的檔，就拒絕啟動。`post_reboot_verify.py` 開機後也會檢查同一個 sha。錯映射下學到的 NVMe Imprint 已移到 `~/.cache/dsv41-nvme-imprint.badmap_*`（兩台都是）。
+
+**同引擎、同權重、冷磁碟快取，對照同樣冷快取的 learnfix 長跑：**
+
+- 1 小時標準長跑：迴圈回覆 0/718（原 5/727）；把正確程式碼說成錯字的回覆 0（原 194）；HTTP 200 為 718/720（2 筆 429，原 727/728）；產出 243K tokens（原 247K）；TTFT p50 12.8 秒（原 13.2 秒）。
+- 5 次中位數：取樣 61 → 67 tok/s；C2 總吞吐 102–107 → 115；C4 132–137 → 142；C8 150–153 → 157。
+- 89 筆可配對請求（30 題題庫加壓測）合計 MTP 接受率 0.772 → 0.786。
+- 冷快取 32K 插隊中位數 1.49 秒。以前的 0.64 秒是快取命中造成的，因為這項測試的 32K 長文沒有加 nonce。
+- 單一 LRU 程式碼題 95 → 91 tok/s，MTP 接受率 0.80 → 0.74。原因是輸出從第 89 字元起就不同了：自適應深度多猜了（350 → 377），猜中的數量卻不變（281 → 279）。這不是引擎退步，MTP 草稿路徑也不讀 Engram。
+
+**解碼門檻。** 不要只用一道題當門檻，單題速度跟著輸出內容走：9 道程式碼題的 greedy 在 79–96 tok/s、接受率在 0.64–0.80 之間。`benchmarks/run_decode_gate.py` 改取 9 題程式碼掃描的中位數，加上 C2/C4/C8 併發。測試走 8889、先等空檔，有外部流量的樣本直接剔除。達到 `benchmarks/gates/decode_gate_baseline.json` 的 95% 才算通過。目前基準（3 輪，每題波動 < 1 tok/s）是 greedy 中位數 88.10 tok/s、MTP 0.731、C2 117.3、C4 143.4、C8 157.1。只有在刻意的變更通過完整回歸後，才用 `--write-baseline` 重設基準。

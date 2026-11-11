@@ -1,0 +1,83 @@
+{
+  "label": "tokenmapfix",
+  "time": "2026-11-11 14:58:14",
+  "reps": [
+    {
+      "short_ttft_s": 1.5555,
+      "long_ttft_s": 7.8707,
+      "status": [
+        200,
+        200
+      ],
+      "clk": [
+        2379,
+        2184
+      ],
+      "external": 0,
+      "idle_before": true
+    },
+    {
+      "short_ttft_s": 1.5127,
+      "long_ttft_s": 7.7979,
+      "status": [
+        200,
+        200
+      ],
+      "clk": [
+        2385,
+        2184
+      ],
+      "external": 0,
+      "idle_before": true
+    },
+    {
+      "short_ttft_s": 1.4918,
+      "long_ttft_s": 7.77,
+      "status": [
+        200,
+        200
+      ],
+      "clk": [
+        2392,
+        2184
+      ],
+      "external": 0,
+      "idle_before": true
+    },
+    {
+      "short_ttft_s": 1.4833,
+      "long_ttft_s": 8.15,
+      "status": [
+        200,
+        200
+      ],
+      "clk": [
+        2392,
+        2223
+      ],
+      "external": 0,
+      "idle_before": true
+    },
+    {
+      "short_ttft_s": 1.4905,
+      "long_ttft_s": 7.5214,
+      "status": [
+        200,
+        200
+      ],
+      "clk": [
+        2392,
+        2444
+      ],
+      "external": 0,
+      "idle_before": true
+    }
+  ],
+  "summary": {
+    "cutin_median_s": 1.4918,
+    "cutin_min_s": 1.4833,
+    "cutin_max_s": 1.5555,
+    "clean": 5,
+    "total": 5
+  }
+}
