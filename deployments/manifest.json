@@ -10,7 +10,7 @@
     "cpu_pinning": "5-9,15-19 (10x Cortex-X925 Super-Cores)"
   },
   "cryptographic_hashes": {
-    "recipe_commit": "7b49356275e805ae5e41e30150c1884c969caefd",
+    "recipe_commit": "9b0771507029e33fbe9ea2eeb1d9508950919ba6",
     "engine_commit": "e772dec667a5bcb1ee04d6765ab3187a6ec18b04",
     "patchset_sha256": "4aaaea1873015b80ec9d8427bb63be4cc23df477c51ed79458035816b99e7c40",
     "kernel_manifest_sha256": "23910cedc7772d855a3bbd9eccd4404c73a96f2ad4ec8cbe9865a267d7c47c33",
@@ -24,14 +24,14 @@
     "rank1_binary_synced": true
   },
   "memory_audit_ledger": {
-    "measured_at": "2026-11-15 02:00:46 +0800",
-    "rank0_engine_active_gib": 106.38,
+    "measured_at": "2026-11-15 02:04:40 +0800",
+    "rank0_engine_active_gib": 106.4,
     "parallel_slots": 8,
     "kv_pool_allocated_tokens": 2097152,
     "host_prompt_cache_budget_gib": 2.5,
     "cuda_graph_lru_cap": 128,
-    "node1_available_memory_gib": 3.22,
-    "node2_available_memory_gib": 5.95,
+    "node1_available_memory_gib": 3.14,
+    "node2_available_memory_gib": 5.86,
     "engram_mode": "O_DIRECT Linux AIO from local NVMe (203 GB tables)"
   }
 }
