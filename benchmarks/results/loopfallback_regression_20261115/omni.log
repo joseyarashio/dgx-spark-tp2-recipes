@@ -1,0 +1,172 @@
+======================================================================
+=== DGX Spark TP=2 Principal Test (OmniBench) ===
+Profile: standard | Target Ports: 8888 / 8889 | Time: 2026-11-15 00:51:44
+======================================================================
+
+--- [1/6] Quality Bench (sparkDash Aligned) ---
+  GSM8K Math Combinatorics: PASS (TTFT: 0.1871s)
+  MMLU-Pro Knowledge:   PASS (TTFT: 0.2719s)
+  IFEval Constraints:   PASS (Count: 2/2, Ends: True)
+  Python Code Assert:   PASS
+
+--- [2/6] Tool Eval Bench (PR #118 Handle Fix Check) ---
+  Tool Required Call:   PASS (Function: True, FirstTokenClean: True)
+  Tool Auto Precision:  PASS (No hallucinated tool calls)
+
+--- [3/6] Prefill Bench (Gradient Scaling & Cache Hit) ---
+  Cold 8K Prefill:      2241.6 tok/s (Tokens: 5876, Prefill: 2.621s)
+  Cached 8K Prefill:    TTFT 0.908s (Cached: 4096/5876 tokens)
+  Vision Arena Reuse:   Turn 1 TTFT: 0.4296s, Turn 2 TTFT: 0.4402s (Cached: 0)
+
+--- [4/6] Decode Bench (Greedy, MTP & Sampling) ---
+  Greedy Decode Rate:   89.49 tok/s (MTP Acceptance: 74.0%)
+  Sampling (T=0.7):     71.50 tok/s
+
+--- [5/6] Concurrency & Cut-In Scheduling Bench ---
+  Concurrency C=1:     Aggregate 74.24 tok/s (Wall: 1.72s, Tokens: 128)
+  Concurrency C=2:     Aggregate 100.70 tok/s (Wall: 2.54s, Tokens: 256)
+  Concurrency C=4:     Aggregate 129.56 tok/s (Wall: 3.95s, Tokens: 512)
+  Testing 32K Cut-in Short Request (PR #95)...
+  32K Cut-in TTFT:      PASS (0.780s, target <= 1.5s)
+
+--- [6/6] Fault Isolation (PR #119) & NVMe Storage Bench ---
+  CUDA Graph Engine:    HEALTHY (status: ok)
+  NVMe Snapshots:       INACTIVE (0 .bin files, 0.0 MB)
+
+--- Running Continuous Multi-Agent Stress Stage (3600s / 60.0 mins) ---
+Pre-generating synthetic multi-turn vision test images...
+Pre-generating high-hit shared corpora (5K, 12K, 22K tokens)...
+=== Starting Random Concurrency Experiment (Duration: 3600s / 60.0m, Concurrency: 8) ===
+  [Progress 0.5/60.0 min] Total requests completed: 8 | Recent 100 Status: {200: 8} | Cold KV count: 0, 0.0 MB
+  [Progress 1.0/60.0 min] Total requests completed: 17 | Recent 100 Status: {200: 17} | Cold KV count: 0, 0.0 MB
+  [Progress 1.5/60.0 min] Total requests completed: 23 | Recent 100 Status: {200: 23} | Cold KV count: 0, 0.0 MB
+  [Progress 2.0/60.0 min] Total requests completed: 32 | Recent 100 Status: {200: 32} | Cold KV count: 0, 0.0 MB
+  [Progress 2.5/60.0 min] Total requests completed: 44 | Recent 100 Status: {200: 44} | Cold KV count: 0, 0.0 MB
+  [Progress 3.1/60.0 min] Total requests completed: 52 | Recent 100 Status: {200: 52} | Cold KV count: 0, 0.0 MB
+  [Progress 3.6/60.0 min] Total requests completed: 64 | Recent 100 Status: {200: 64} | Cold KV count: 0, 0.0 MB
+  [Progress 4.1/60.0 min] Total requests completed: 70 | Recent 100 Status: {200: 70} | Cold KV count: 0, 0.0 MB
+  [Progress 4.6/60.0 min] Total requests completed: 76 | Recent 100 Status: {200: 76} | Cold KV count: 0, 0.0 MB
+  [Progress 5.1/60.0 min] Total requests completed: 88 | Recent 100 Status: {200: 88} | Cold KV count: 0, 0.0 MB
+  [Progress 5.6/60.0 min] Total requests completed: 96 | Recent 100 Status: {200: 96} | Cold KV count: 0, 0.0 MB
+  [Progress 6.1/60.0 min] Total requests completed: 104 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 6.6/60.0 min] Total requests completed: 111 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 7.1/60.0 min] Total requests completed: 119 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 7.6/60.0 min] Total requests completed: 130 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 8.1/60.0 min] Total requests completed: 137 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 8.6/60.0 min] Total requests completed: 145 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 9.1/60.0 min] Total requests completed: 154 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 9.7/60.0 min] Total requests completed: 161 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 10.2/60.0 min] Total requests completed: 171 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 10.7/60.0 min] Total requests completed: 180 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 11.2/60.0 min] Total requests completed: 188 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 11.7/60.0 min] Total requests completed: 198 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 12.2/60.0 min] Total requests completed: 207 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 12.7/60.0 min] Total requests completed: 216 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 13.2/60.0 min] Total requests completed: 226 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 13.7/60.0 min] Total requests completed: 236 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 14.2/60.0 min] Total requests completed: 242 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 14.7/60.0 min] Total requests completed: 252 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 15.3/60.0 min] Total requests completed: 260 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 15.8/60.0 min] Total requests completed: 267 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 16.3/60.0 min] Total requests completed: 276 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 16.8/60.0 min] Total requests completed: 282 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 17.3/60.0 min] Total requests completed: 293 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 17.8/60.0 min] Total requests completed: 302 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 18.3/60.0 min] Total requests completed: 310 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 18.8/60.0 min] Total requests completed: 318 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 19.3/60.0 min] Total requests completed: 327 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 19.8/60.0 min] Total requests completed: 335 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 20.3/60.0 min] Total requests completed: 343 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 20.8/60.0 min] Total requests completed: 350 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 21.3/60.0 min] Total requests completed: 359 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 21.8/60.0 min] Total requests completed: 368 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 22.3/60.0 min] Total requests completed: 378 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 22.8/60.0 min] Total requests completed: 384 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 23.3/60.0 min] Total requests completed: 394 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 23.9/60.0 min] Total requests completed: 401 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 24.4/60.0 min] Total requests completed: 410 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 24.9/60.0 min] Total requests completed: 419 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 25.4/60.0 min] Total requests completed: 429 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 25.9/60.0 min] Total requests completed: 441 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 26.4/60.0 min] Total requests completed: 449 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 26.9/60.0 min] Total requests completed: 458 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 27.4/60.0 min] Total requests completed: 467 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 27.9/60.0 min] Total requests completed: 472 | Recent 100 Status: {200: 99, 429: 1} | Cold KV count: 0, 0.0 MB
+  [Progress 28.4/60.0 min] Total requests completed: 481 | Recent 100 Status: {200: 98, 429: 2} | Cold KV count: 0, 0.0 MB
+  [Progress 28.9/60.0 min] Total requests completed: 488 | Recent 100 Status: {200: 98, 429: 2} | Cold KV count: 0, 0.0 MB
+  [Progress 29.4/60.0 min] Total requests completed: 495 | Recent 100 Status: {200: 98, 429: 2} | Cold KV count: 0, 0.0 MB
+  [Progress 30.0/60.0 min] Total requests completed: 501 | Recent 100 Status: {200: 98, 429: 2} | Cold KV count: 0, 0.0 MB
+  [Progress 30.5/60.0 min] Total requests completed: 505 | Recent 100 Status: {200: 98, 429: 2} | Cold KV count: 0, 0.0 MB
+  [Progress 31.0/60.0 min] Total requests completed: 512 | Recent 100 Status: {200: 97, 429: 3} | Cold KV count: 0, 0.0 MB
+  [Progress 31.5/60.0 min] Total requests completed: 521 | Recent 100 Status: {200: 97, 429: 3} | Cold KV count: 0, 0.0 MB
+  [Progress 32.0/60.0 min] Total requests completed: 524 | Recent 100 Status: {200: 97, 429: 3} | Cold KV count: 0, 0.0 MB
+  [Progress 32.5/60.0 min] Total requests completed: 530 | Recent 100 Status: {200: 97, 429: 3} | Cold KV count: 0, 0.0 MB
+  [Progress 33.0/60.0 min] Total requests completed: 538 | Recent 100 Status: {200: 97, 429: 3} | Cold KV count: 0, 0.0 MB
+  [Progress 33.5/60.0 min] Total requests completed: 546 | Recent 100 Status: {200: 97, 429: 3} | Cold KV count: 0, 0.0 MB
+  [Progress 34.0/60.0 min] Total requests completed: 554 | Recent 100 Status: {200: 97, 429: 3} | Cold KV count: 0, 0.0 MB
+  [Progress 34.5/60.0 min] Total requests completed: 563 | Recent 100 Status: {200: 97, 429: 3} | Cold KV count: 0, 0.0 MB
+  [Progress 35.0/60.0 min] Total requests completed: 566 | Recent 100 Status: {200: 97, 429: 3} | Cold KV count: 0, 0.0 MB
+  [Progress 35.5/60.0 min] Total requests completed: 573 | Recent 100 Status: {200: 97, 429: 3} | Cold KV count: 0, 0.0 MB
+  [Progress 36.0/60.0 min] Total requests completed: 585 | Recent 100 Status: {200: 98, 429: 2} | Cold KV count: 0, 0.0 MB
+  [Progress 36.5/60.0 min] Total requests completed: 592 | Recent 100 Status: {200: 98, 429: 2} | Cold KV count: 0, 0.0 MB
+  [Progress 37.0/60.0 min] Total requests completed: 600 | Recent 100 Status: {200: 98, 429: 2} | Cold KV count: 0, 0.0 MB
+  [Progress 37.5/60.0 min] Total requests completed: 606 | Recent 100 Status: {200: 98, 429: 2} | Cold KV count: 0, 0.0 MB
+  [Progress 38.1/60.0 min] Total requests completed: 611 | Recent 100 Status: {200: 99, 429: 1} | Cold KV count: 0, 0.0 MB
+  [Progress 38.6/60.0 min] Total requests completed: 621 | Recent 100 Status: {200: 98, 429: 2} | Cold KV count: 0, 0.0 MB
+  [Progress 39.1/60.0 min] Total requests completed: 622 | Recent 100 Status: {200: 97, 429: 3} | Cold KV count: 0, 0.0 MB
+  [Progress 39.6/60.0 min] Total requests completed: 628 | Recent 100 Status: {200: 96, 429: 4} | Cold KV count: 0, 0.0 MB
+  [Progress 40.1/60.0 min] Total requests completed: 633 | Recent 100 Status: {200: 96, 429: 4} | Cold KV count: 0, 0.0 MB
+  [Progress 40.6/60.0 min] Total requests completed: 640 | Recent 100 Status: {200: 96, 429: 4} | Cold KV count: 0, 0.0 MB
+  [Progress 41.1/60.0 min] Total requests completed: 645 | Recent 100 Status: {200: 96, 429: 4} | Cold KV count: 0, 0.0 MB
+  [Progress 41.6/60.0 min] Total requests completed: 652 | Recent 100 Status: {200: 96, 429: 4} | Cold KV count: 0, 0.0 MB
+  [Progress 42.1/60.0 min] Total requests completed: 660 | Recent 100 Status: {200: 96, 429: 4} | Cold KV count: 0, 0.0 MB
+  [Progress 42.6/60.0 min] Total requests completed: 666 | Recent 100 Status: {200: 95, 429: 5} | Cold KV count: 0, 0.0 MB
+  [Progress 43.1/60.0 min] Total requests completed: 672 | Recent 100 Status: {429: 5, 200: 95} | Cold KV count: 0, 0.0 MB
+  [Progress 43.6/60.0 min] Total requests completed: 679 | Recent 100 Status: {200: 96, 429: 4} | Cold KV count: 0, 0.0 MB
+  [Progress 44.1/60.0 min] Total requests completed: 685 | Recent 100 Status: {200: 96, 429: 4} | Cold KV count: 0, 0.0 MB
+  [Progress 44.6/60.0 min] Total requests completed: 693 | Recent 100 Status: {200: 96, 429: 4} | Cold KV count: 0, 0.0 MB
+  [Progress 45.2/60.0 min] Total requests completed: 700 | Recent 100 Status: {200: 96, 429: 4} | Cold KV count: 0, 0.0 MB
+  [Progress 45.7/60.0 min] Total requests completed: 705 | Recent 100 Status: {200: 96, 429: 4} | Cold KV count: 0, 0.0 MB
+  [Progress 46.2/60.0 min] Total requests completed: 712 | Recent 100 Status: {200: 96, 429: 4} | Cold KV count: 0, 0.0 MB
+  [Progress 46.7/60.0 min] Total requests completed: 718 | Recent 100 Status: {200: 97, 429: 3} | Cold KV count: 0, 0.0 MB
+  [Progress 47.2/60.0 min] Total requests completed: 728 | Recent 100 Status: {200: 99, 429: 1} | Cold KV count: 0, 0.0 MB
+  [Progress 47.7/60.0 min] Total requests completed: 736 | Recent 100 Status: {200: 99, 429: 1} | Cold KV count: 0, 0.0 MB
+  [Progress 48.2/60.0 min] Total requests completed: 737 | Recent 100 Status: {200: 99, 429: 1} | Cold KV count: 0, 0.0 MB
+  [Progress 48.7/60.0 min] Total requests completed: 747 | Recent 100 Status: {200: 99, 429: 1} | Cold KV count: 0, 0.0 MB
+  [Progress 49.2/60.0 min] Total requests completed: 751 | Recent 100 Status: {200: 99, 429: 1} | Cold KV count: 0, 0.0 MB
+  [Progress 49.7/60.0 min] Total requests completed: 755 | Recent 100 Status: {200: 99, 429: 1} | Cold KV count: 0, 0.0 MB
+  [Progress 50.2/60.0 min] Total requests completed: 763 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 50.7/60.0 min] Total requests completed: 773 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 51.2/60.0 min] Total requests completed: 781 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 51.8/60.0 min] Total requests completed: 784 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 52.3/60.0 min] Total requests completed: 790 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 52.8/60.0 min] Total requests completed: 796 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 53.3/60.0 min] Total requests completed: 805 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 53.8/60.0 min] Total requests completed: 807 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 54.3/60.0 min] Total requests completed: 814 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 54.8/60.0 min] Total requests completed: 823 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 55.3/60.0 min] Total requests completed: 829 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 55.8/60.0 min] Total requests completed: 832 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 56.3/60.0 min] Total requests completed: 838 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 56.8/60.0 min] Total requests completed: 848 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 57.4/60.0 min] Total requests completed: 854 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 57.9/60.0 min] Total requests completed: 857 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 58.4/60.0 min] Total requests completed: 868 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 58.9/60.0 min] Total requests completed: 870 | Recent 100 Status: {200: 100} | Cold KV count: 0, 0.0 MB
+  [Progress 59.4/60.0 min] Total requests completed: 875 | Recent 100 Status: {200: 99, 429: 1} | Cold KV count: 0, 0.0 MB
+  [Progress 59.9/60.0 min] Total requests completed: 883 | Recent 100 Status: {200: 98, 429: 2} | Cold KV count: 0, 0.0 MB
+  [Progress 60.4/60.0 min] Total requests completed: 889 | Recent 100 Status: {200: 97, 429: 3} | Cold KV count: 0, 0.0 MB
+
+=== 60.0-Minute Experiment Finished! Total requests: 893 ===
+Results saved to /home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/results/stress_30min_ms_dtc_experiment.json
+
+======================================================================
+OmniBench Completed in 3659.22s
+Summary Scorecard:
+  - Quality Pass Rate:     4/4
+  - PR #118 Tool Gate:     PASS
+  - Single Stream Decode:  89.49 tok/s
+  - MTP Speculative Rate:  74.0%
+======================================================================
+Report saved to: /home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/results/omni_eval_1hour_p16_tokenmapfix_loopfallback.json
+

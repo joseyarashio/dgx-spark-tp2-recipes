@@ -1,9 +1,11 @@
 import asyncio
+import codecs
 import hashlib
 import itertools
 import json
 import logging
 import os
+import re
 import sys
 import time
 from collections import deque
@@ -17,6 +19,242 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.background import BackgroundTask
 
 from cold_kv import ColdKVManager, get_host_free_memory_gib
+
+AUDIT_LOG_PATH = Path(
+    os.environ.get(
+        "SPARK_PROXY_AUDIT_LOG",
+        str(Path.home() / ".cache" / "spark-proxy-audit" / "completions.jsonl"),
+    )
+)
+AUDIT_LOG_MAX_BYTES = int(os.environ.get("SPARK_PROXY_AUDIT_MAX_BYTES", str(100 * 1024 * 1024)))
+SHADOW_LOOP_RE = re.compile(r"(.{20,600}?)\1{4,}", re.S)
+SHADOW_TAIL_WINDOW = 12000
+SHADOW_CHECK_STEP = 3000
+SHORT_NO_THINK_MAX_TOKENS = int(os.environ.get("SPARK_PROXY_SHORT_NO_THINK_MAX_TOKENS", "256"))
+DSML_CONTENT_MARKERS = ("<｜DSML｜", "</｜DSML｜", "<tool_call>")
+# Reasoning-loop fallback: thinking chat completions ask the engine for the per-request loop stop
+# ("loop_guard_stop": true). When the guard fires the engine ends the reply (finish_reason=content_filter,
+# error.code=reasoning_loop) instead of forcing the think block closed (which makes DeepSeek call read_file under
+# long context + tools). The proxy then re-sends the same request once at LOOP_FALLBACK_EFFORT (default "none",
+# thinking off) inside the same slot and splices that answer into the client's stream / reply.
+LOOP_FALLBACK_ENABLED = os.environ.get("SPARK_PROXY_LOOP_FALLBACK", "1") == "1"
+LOOP_FALLBACK_EFFORT = os.environ.get("SPARK_PROXY_LOOP_FALLBACK_EFFORT", "none")
+
+
+def _write_audit_record(rec: Dict[str, Any]) -> None:
+    try:
+        AUDIT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        if AUDIT_LOG_PATH.exists() and AUDIT_LOG_PATH.stat().st_size >= AUDIT_LOG_MAX_BYTES:
+            rot = AUDIT_LOG_PATH.with_suffix(".jsonl.1")
+            if rot.exists():
+                rot.unlink()
+            AUDIT_LOG_PATH.rename(rot)
+        line = json.dumps(rec, ensure_ascii=False, separators=(",", ":")) + "\n"
+        with open(AUDIT_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(line)
+    except Exception:
+        pass
+
+
+def _build_audit_meta(
+    request: Request,
+    path: str,
+    body_json: dict,
+    body_bytes: bytes,
+    priority: int,
+    req_id: int,
+    est_prompt_tokens: int,
+    is_warm_cache: bool,
+    orig_tool_choice: Any,
+    orig_effort: Any = None,
+    effort_rewritten: bool = False,
+) -> Dict[str, Any]:
+    msgs = body_json.get("messages") if isinstance(body_json, dict) else None
+    hist_reas = 0
+    if isinstance(msgs, list):
+        for m in msgs:
+            if isinstance(m, dict) and m.get("reasoning_content"):
+                hist_reas += 1
+    ctk = body_json.get("chat_template_kwargs") if isinstance(body_json, dict) else None
+    enable_thinking = ctk.get("enable_thinking") if isinstance(ctk, dict) else None
+    client_ip = (
+        request.headers.get("x-forwarded-for")
+        or (request.client.host if request.client else None)
+        or "unknown"
+    ).split(",")[0].strip()
+    tc_repr = None
+    if orig_tool_choice is not None:
+        tc_repr = orig_tool_choice if isinstance(orig_tool_choice, str) else str(orig_tool_choice.get("type") or "object")[:32]
+    tools = body_json.get("tools") if isinstance(body_json, dict) else None
+    max_tok = None
+    if isinstance(body_json, dict):
+        max_tok = body_json.get("max_tokens") if body_json.get("max_tokens") is not None else body_json.get("max_completion_tokens")
+    return {
+        "ts": round(time.time(), 3),
+        "req_id": req_id,
+        "client_ip": client_ip,
+        "path": path,
+        "priority": priority,
+        "stream": bool(body_json.get("stream")) if isinstance(body_json, dict) else False,
+        "model": body_json.get("model") if isinstance(body_json, dict) else None,
+        "effort": body_json.get("reasoning_effort") if isinstance(body_json, dict) else None,
+        "orig_effort": orig_effort,
+        "effort_rewritten": bool(effort_rewritten),
+        "enable_thinking": enable_thinking,
+        "thinking_budget": body_json.get("thinking_budget") if isinstance(body_json, dict) else None,
+        "temperature": body_json.get("temperature") if isinstance(body_json, dict) else None,
+        "max_tokens": max_tok,
+        "tools_count": len(tools) if isinstance(tools, list) else 0,
+        "tool_choice": tc_repr,
+        "messages_count": len(msgs) if isinstance(msgs, list) else 0,
+        "hist_reasoning_msgs": hist_reas,
+        "body_bytes": len(body_bytes),
+        "est_text_tokens": est_prompt_tokens,
+        "is_warm_cache": bool(is_warm_cache),
+        "free_ram_start_gib": round(get_host_free_memory_gib(), 3),
+        "free_ram_end_gib": None,
+        "upstream_id": None,
+        "finish_reason": None,
+        "prompt_tokens": None,
+        "cached_tokens": None,
+        "completion_tokens": None,
+        "reasoning_tokens": None,
+        "content_tokens": None,
+        "tool_calls_out": 0,
+        "dsml_in_content": False,
+        "budget_hit": False,
+        "valid_delivery": False,
+        "loop_period": None,
+        "r_chars": 0,
+        "c_chars": 0,
+        "shadow_loop_ch": None,
+        "shadow_loop_period_chars": None,
+        "shadow_loop_at_chars": None,
+        "_first_tok_t": None,
+        "_tc_indices": set(),
+        "_r_tail": "",
+        "_c_tail": "",
+        "_r_next_chk": SHADOW_CHECK_STEP,
+        "_c_next_chk": SHADOW_CHECK_STEP,
+    }
+
+
+def _check_shadow_loop(audit: Dict[str, Any], force: bool = False) -> None:
+    if audit.get("shadow_loop_ch") is not None:
+        return
+    for ch, tail_k, cnt_k, nxt_k in (
+        ("reasoning", "_r_tail", "r_chars", "_r_next_chk"),
+        ("content", "_c_tail", "c_chars", "_c_next_chk"),
+    ):
+        cnt = audit[cnt_k]
+        if (force and cnt >= 100) or (cnt >= audit[nxt_k]):
+            audit[nxt_k] = cnt + SHADOW_CHECK_STEP
+            m = SHADOW_LOOP_RE.search(audit[tail_k][-SHADOW_TAIL_WINDOW:])
+            if m:
+                audit["shadow_loop_ch"] = ch
+                audit["shadow_loop_period_chars"] = len(m.group(1))
+                audit["shadow_loop_at_chars"] = cnt
+                return
+
+
+def _finalize_audit_record(audit: Dict[str, Any], **updates: Any) -> None:
+    _check_shadow_loop(audit, force=True)
+    for k in [k for k in audit if k.startswith("_")]:
+        audit.pop(k, None)
+    audit.update(updates)
+    if audit.get("free_ram_end_gib") is None:
+        audit["free_ram_end_gib"] = round(get_host_free_memory_gib(), 3)
+    tb = audit.get("thinking_budget")
+    rtok = audit.get("reasoning_tokens")
+    if isinstance(tb, int) and tb > 0 and isinstance(rtok, int):
+        audit["budget_hit"] = (rtok >= tb)
+    fin = audit.get("finish_reason")
+    audit["valid_delivery"] = (
+        audit.get("outcome") == "ok"
+        and not audit.get("dsml_in_content")
+        and (
+            (fin == "stop" and audit.get("c_chars", 0) > 0)
+            or (fin == "tool_calls" and audit.get("tool_calls_out", 0) > 0)
+        )
+    )
+    if audit.get("dsml_in_content"):
+        logger.warning(
+            f"Audit: DSML marker leaked into content (req_id={audit.get('req_id')}, "
+            f"finish={audit.get('finish_reason')}, effort={audit.get('effort')}, budget={tb})"
+        )
+    _write_audit_record(audit)
+
+
+def _update_audit_from_obj(audit: Dict[str, Any], obj: Any, now_perf: float) -> None:
+    if not isinstance(obj, dict):
+        return
+    if audit["upstream_id"] is None and isinstance(obj.get("id"), str):
+        audit["upstream_id"] = obj["id"]
+    tf = obj.get("tensorfold")
+    if isinstance(tf, dict) and isinstance(tf.get("loop"), dict):
+        audit["loop_period"] = tf["loop"].get("period")
+    u = obj.get("usage")
+    if isinstance(u, dict):
+        if u.get("prompt_tokens") is not None:
+            audit["prompt_tokens"] = u.get("prompt_tokens")
+        ptd = u.get("prompt_tokens_details")
+        if isinstance(ptd, dict) and ptd.get("cached_tokens") is not None:
+            audit["cached_tokens"] = ptd.get("cached_tokens")
+        if u.get("completion_tokens") is not None:
+            audit["completion_tokens"] = u.get("completion_tokens")
+        ctd = u.get("completion_tokens_details")
+        if isinstance(ctd, dict) and ctd.get("reasoning_tokens") is not None:
+            audit["reasoning_tokens"] = ctd.get("reasoning_tokens")
+        if audit["completion_tokens"] is not None and audit["reasoning_tokens"] is not None:
+            audit["content_tokens"] = max(0, audit["completion_tokens"] - audit["reasoning_tokens"])
+    for ch in obj.get("choices") or []:
+        if not isinstance(ch, dict):
+            continue
+        if ch.get("finish_reason"):
+            audit["finish_reason"] = ch["finish_reason"]
+        delta = ch.get("delta")
+        msg = delta if isinstance(delta, dict) else (ch.get("message") if isinstance(ch.get("message"), dict) else None)
+        if msg is not None:
+            c_txt = msg.get("content") if isinstance(msg.get("content"), str) else ""
+            r_txt = msg.get("reasoning_content") if isinstance(msg.get("reasoning_content"), str) else ""
+            if not r_txt and isinstance(msg.get("reasoning"), str):
+                r_txt = msg["reasoning"]
+            t_txt = ch.get("text") if isinstance(ch.get("text"), str) else ""
+            if c_txt:
+                audit["c_chars"] += len(c_txt)
+                if audit.get("shadow_loop_ch") is None or not audit.get("dsml_in_content"):
+                    audit["_c_tail"] = (audit["_c_tail"] + c_txt)[-16000:]
+                if not audit.get("dsml_in_content") and any(mk in audit["_c_tail"] for mk in DSML_CONTENT_MARKERS):
+                    audit["dsml_in_content"] = True
+            if r_txt:
+                audit["r_chars"] += len(r_txt)
+                if audit.get("shadow_loop_ch") is None:
+                    audit["_r_tail"] = (audit["_r_tail"] + r_txt)[-16000:]
+            if t_txt:
+                audit["c_chars"] += len(t_txt)
+                if audit.get("shadow_loop_ch") is None or not audit.get("dsml_in_content"):
+                    audit["_c_tail"] = (audit["_c_tail"] + t_txt)[-16000:]
+                if not audit.get("dsml_in_content") and any(mk in audit["_c_tail"] for mk in DSML_CONTENT_MARKERS):
+                    audit["dsml_in_content"] = True
+            if c_txt or r_txt:
+                _check_shadow_loop(audit, force=False)
+            has_tok = (
+                len(c_txt) > 0
+                or len(r_txt) > 0
+                or (isinstance(msg.get("tool_calls"), list) and len(msg["tool_calls"]) > 0)
+                or len(t_txt) > 0
+            )
+            if has_tok and audit["_first_tok_t"] is None:
+                audit["_first_tok_t"] = now_perf
+            tcs = msg.get("tool_calls")
+            if isinstance(tcs, list) and len(tcs) > 0:
+                if isinstance(delta, dict):
+                    for tc in tcs:
+                        if isinstance(tc, dict) and tc.get("index") is not None:
+                            audit["_tc_indices"].add(tc["index"])
+                    audit["tool_calls_out"] = max(audit["tool_calls_out"], len(audit["_tc_indices"]) or len(tcs))
+                else:
+                    audit["tool_calls_out"] = len(tcs)
 
 # Setup logging
 logging.basicConfig(
@@ -715,14 +953,67 @@ async def proxy_all(request: Request, path: str):
         req_id = next(_req_id_counter)
         body_bytes = await request.body()
         body_json: dict = {}
-        # DSML Interceptor: rewrite non-standard tool_choice to "auto" for DeepSeek-V4.1
+        orig_tool_choice = None
+        orig_effort = None
+        effort_rewritten = False
+        loop_fallback_bytes: Optional[bytes] = None
+        # Request interceptors:
+        # 1. DSML Interceptor: rewrite non-standard tool_choice to "auto" for DeepSeek-V4.1
+        # 2. Short No-Think Stop-Loss: short tool-less requests (max_tokens <= 256) burn budget in <think> -> set effort="none"
         try:
             body_json = json.loads(body_bytes)
-            tc = body_json.get("tool_choice")
-            if tc is not None and tc != "auto" and tc != "none":
-                logger.info(f"DSML Interceptor: rewriting tool_choice={tc} to 'auto' for DeepSeek compatibility")
-                body_json["tool_choice"] = "auto"
-                body_bytes = json.dumps(body_json, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            if isinstance(body_json, dict):
+                body_modified = False
+                orig_tool_choice = body_json.get("tool_choice")
+                tc = orig_tool_choice
+                if tc is not None and tc != "auto" and tc != "none":
+                    logger.info(f"DSML Interceptor: rewriting tool_choice={tc} to 'auto' for DeepSeek compatibility")
+                    body_json["tool_choice"] = "auto"
+                    body_modified = True
+
+                orig_effort = body_json.get("reasoning_effort")
+                tools_val = body_json.get("tools")
+                has_tools = isinstance(tools_val, list) and len(tools_val) > 0
+                max_tok_val = body_json.get("max_tokens") if body_json.get("max_tokens") is not None else body_json.get("max_completion_tokens")
+                ctk_val = body_json.get("chat_template_kwargs")
+                enable_thinking_explicit = ctk_val.get("enable_thinking") if isinstance(ctk_val, dict) else None
+                if (
+                    SHORT_NO_THINK_MAX_TOKENS > 0
+                    and not has_tools
+                    and isinstance(max_tok_val, int)
+                    and not isinstance(max_tok_val, bool)
+                    and 0 < max_tok_val <= SHORT_NO_THINK_MAX_TOKENS
+                    and orig_effort != "none"
+                    and enable_thinking_explicit is not True
+                ):
+                    logger.info(
+                        f"Short No-Think Stop-Loss: rewriting reasoning_effort={orig_effort!r} to 'none' "
+                        f"(max_tokens={max_tok_val}, tools=0)"
+                    )
+                    body_json["reasoning_effort"] = "none"
+                    effort_rewritten = True
+                    body_modified = True
+
+                thinking_off = body_json.get("reasoning_effort") == "none" or enable_thinking_explicit is False
+                if (
+                    LOOP_FALLBACK_ENABLED
+                    and path.strip("/").endswith("chat/completions")
+                    and not thinking_off
+                    and "loop_guard_stop" not in body_json
+                    and isinstance(body_json.get("messages"), list)
+                ):
+                    fb = {k: v for k, v in body_json.items() if k not in ("thinking_budget",)}
+                    fb["reasoning_effort"] = LOOP_FALLBACK_EFFORT
+                    if LOOP_FALLBACK_EFFORT == "none":
+                        ctk_fb = dict(ctk_val) if isinstance(ctk_val, dict) else {}
+                        ctk_fb["enable_thinking"] = False
+                        fb["chat_template_kwargs"] = ctk_fb
+                    loop_fallback_bytes = json.dumps(fb, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                    body_json["loop_guard_stop"] = True
+                    body_modified = True
+
+                if body_modified:
+                    body_bytes = json.dumps(body_json, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         except Exception:
             pass
         prefix_key = compute_prefix_key(body_bytes)
@@ -763,6 +1054,19 @@ async def proxy_all(request: Request, path: str):
         now_mono = time.monotonic()
         is_warm_cache = prefix_key and (prefix_committed.get(prefix_key, 0.0) > now_mono)
         barrier_est_tokens = 512 if is_warm_cache else est_prompt_tokens
+        audit_meta = _build_audit_meta(
+            request=request,
+            path=path,
+            body_json=body_json,
+            body_bytes=body_bytes,
+            priority=priority,
+            req_id=req_id,
+            est_prompt_tokens=est_prompt_tokens,
+            is_warm_cache=bool(is_warm_cache),
+            orig_tool_choice=orig_tool_choice,
+            orig_effort=orig_effort,
+            effort_rewritten=effort_rewritten,
+        )
 
         acquired, reason = await acquire_slot(priority=priority, prefix_key=prefix_key, req_id=req_id, est_tokens=barrier_est_tokens)
         if not acquired:
@@ -774,6 +1078,7 @@ async def proxy_all(request: Request, path: str):
             logger.warning(
                 f"Fast-Fail 429 triggered: model '{curr_model}' (reason: {reason}, prio: {priority}, running: {running}/{limit}, queue: {waiting}/{state['queue_buffer']})"
             )
+            _finalize_audit_record(audit_meta, status=429, outcome="proxy_429", reject_reason=reason, wall_s=round(time.perf_counter() - req_start_t, 3))
             return JSONResponse(
                 status_code=429,
                 headers={"Retry-After": "1"},
@@ -802,10 +1107,13 @@ async def proxy_all(request: Request, path: str):
                 req_id=req_id,
                 req_start_t=req_start_t,
                 est_tokens=barrier_est_tokens,
+                audit_meta=audit_meta,
+                loop_fallback_bytes=loop_fallback_bytes,
             )
-        except BaseException:
+        except BaseException as exc:
             await release_slot(priority=priority, est_tokens=barrier_est_tokens)
             await _release_prefix(prefix_key, req_id, committed=False)
+            _finalize_audit_record(audit_meta, status=499 if isinstance(exc, asyncio.CancelledError) else 500, outcome="client_left_pre_send" if isinstance(exc, asyncio.CancelledError) else "proxy_error", wall_s=round(time.perf_counter() - req_start_t, 3))
             raise
     else:
         return await handle_forward(request, path, release_on_close=False)
@@ -821,6 +1129,8 @@ async def handle_forward(
     req_id: int = 0,
     req_start_t: float = 0.0,
     est_tokens: int = 0,
+    audit_meta: Optional[Dict[str, Any]] = None,
+    loop_fallback_bytes: Optional[bytes] = None,
 ):
     upstream_url = f"{state['upstream_url']}/{path}"
     query = request.url.query
@@ -854,8 +1164,12 @@ async def handle_forward(
             await release_slot(priority=priority)
         await _release_prefix(prefix_key, req_id, committed=False)
         if isinstance(e, asyncio.CancelledError):
+            if audit_meta is not None:
+                _finalize_audit_record(audit_meta, status=499, outcome="client_left_connect", wall_s=round(time.perf_counter() - req_start_t, 3) if req_start_t > 0 else None)
             raise
         logger.error(f"Failed to connect to upstream {upstream_url}: {e}")
+        if audit_meta is not None:
+            _finalize_audit_record(audit_meta, status=502, outcome="upstream_502", error=str(e)[:200], wall_s=round(time.perf_counter() - req_start_t, 3) if req_start_t > 0 else None)
         return JSONResponse(
             status_code=502,
             content={"error": {"message": f"Bad Gateway to Spark backend: {e}", "type": "bad_gateway", "code": 502}},
@@ -879,9 +1193,14 @@ async def handle_forward(
     prefix_notified = False
     prefill_notified = False
     resp_closed = False
+    audit_written = False
+    stream_eof = False
+    stream_err: Optional[str] = None
+    audit_sse_rem = ""
+    audit_json_buf = bytearray()
 
     async def cleanup_all():
-        nonlocal released, prefix_notified, prefill_notified, resp_closed
+        nonlocal released, prefix_notified, prefill_notified, resp_closed, audit_written
         if not released and release_on_close:
             released = True
             if est_tokens > LARGE_PREFILL_TOKEN_THRESHOLD and not prefill_notified:
@@ -898,6 +1217,39 @@ async def handle_forward(
                 await upstream_resp.aclose()
             except Exception:
                 pass
+        if audit_meta is not None and not audit_written:
+            audit_written = True
+            try:
+                now_p = time.perf_counter()
+                if not audit_meta["stream"] and audit_json_buf:
+                    _update_audit_from_obj(audit_meta, json.loads(audit_json_buf.decode("utf-8", errors="ignore")), now_p)
+                elif audit_meta["stream"] and audit_sse_rem.strip():
+                    for line in audit_sse_rem.splitlines():
+                        s = line.strip()
+                        if s.startswith("data:"):
+                            s = s[5:].strip()
+                        if s.startswith("{"):
+                            _update_audit_from_obj(audit_meta, json.loads(s), now_p)
+            except Exception:
+                pass
+            first_tok_t = audit_meta.get("_first_tok_t")
+            if upstream_resp.status_code >= 400:
+                outcome = "upstream_error"
+            elif stream_err is not None:
+                outcome = "stream_error"
+            elif stream_eof:
+                outcome = "ok"
+            else:
+                outcome = "client_left"
+            extra = {
+                "status": upstream_resp.status_code,
+                "outcome": outcome,
+                "ttft_s": round(first_tok_t - req_start_t, 4) if (first_tok_t is not None and req_start_t > 0) else None,
+                "wall_s": round(time.perf_counter() - req_start_t, 4) if req_start_t > 0 else None,
+            }
+            if stream_err is not None:
+                extra["error"] = stream_err
+            _finalize_audit_record(audit_meta, **extra)
 
     def _chunk_has_generated_token(raw_text: str) -> bool:
         for line in raw_text.splitlines():
@@ -927,9 +1279,81 @@ async def handle_forward(
                 pass
         return False
 
+    def _sse_obj(ev: str) -> Any:
+        for line in ev.splitlines():
+            t = line.strip()
+            if t.startswith("data:"):
+                t = t[5:].strip()
+                if t.startswith("{"):
+                    try:
+                        return json.loads(t)
+                    except Exception:
+                        return None
+        return None
+
+    def _is_loop_stop(obj: Any) -> bool:
+        if not isinstance(obj, dict):
+            return False
+        err = obj.get("error")
+        if isinstance(err, dict) and err.get("code") == "reasoning_loop":
+            return True
+        for ch in obj.get("choices") or []:
+            if isinstance(ch, dict) and ch.get("finish_reason") == "content_filter":
+                return True
+        return False
+
+    def _audit_feed(chunk: bytes) -> None:
+        nonlocal audit_sse_rem
+        if audit_meta is None:
+            return
+        try:
+            if not audit_meta["stream"]:
+                if len(audit_json_buf) + len(chunk) <= 2 * 1024 * 1024:
+                    audit_json_buf.extend(chunk)
+            else:
+                audit_sse_rem += chunk.decode("utf-8", errors="ignore")
+                if "\n" in audit_sse_rem:
+                    idx = audit_sse_rem.rfind("\n")
+                    ready = audit_sse_rem[:idx]
+                    audit_sse_rem = audit_sse_rem[idx + 1 :]
+                    if len(audit_sse_rem) > 262144:
+                        audit_sse_rem = ""
+                    now_p = time.perf_counter()
+                    for line in ready.splitlines():
+                        t = line.strip()
+                        if not t:
+                            continue
+                        if t.startswith("data:"):
+                            t = t[5:].strip()
+                        if not t.startswith("{"):
+                            continue
+                        _update_audit_from_obj(audit_meta, json.loads(t), now_p)
+                elif len(audit_sse_rem) > 262144:
+                    audit_sse_rem = ""
+        except Exception:
+            pass
+
+    async def _run_loop_fallback():
+        """Re-send the request at LOOP_FALLBACK_EFFORT; yields its raw body chunks. Raises on a non-200 answer."""
+        fb_req = http_client.build_request(method=request.method, url=upstream_url, headers=req_headers, content=loop_fallback_bytes)
+        fb_resp = await http_client.send(fb_req, stream=True)
+        try:
+            if fb_resp.status_code != 200:
+                raise RuntimeError(f"loop fallback upstream status {fb_resp.status_code}")
+            async for c in fb_resp.aiter_bytes():
+                yield c
+        finally:
+            await fb_resp.aclose()
+
+    gate = loop_fallback_bytes is not None and upstream_resp.status_code == 200
+
     async def stream_body():
-        nonlocal prefix_notified, prefill_notified
+        nonlocal prefix_notified, prefill_notified, stream_eof, stream_err, audit_sse_rem
         sse_rem = ""
+        dec = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        ev_buf = ""
+        held: List[str] = []
+        whole = bytearray()
         try:
             async for chunk in upstream_resp.aiter_bytes():
                 # Notify single-flight waiters ONLY after prefill completes and first non-empty generated token arrives
@@ -949,7 +1373,77 @@ async def handle_forward(
                                 async with queue_lock:
                                     state["active_large_prefills"] = max(0, state.get("active_large_prefills", 1) - 1)
                                     _wake_next_locked()
-                yield chunk
+                if upstream_resp.status_code == 200:
+                    _audit_feed(chunk)
+                if not gate:
+                    yield chunk
+                elif audit_meta is not None and not audit_meta["stream"]:
+                    whole.extend(chunk)  # a whole reply: judged once it is complete
+                else:
+                    # SSE: pass whole events through until the engine's loop stop, then hold the rest
+                    ev_buf += dec.decode(chunk)
+                    while "\n\n" in ev_buf:
+                        ev, ev_buf = ev_buf.split("\n\n", 1)
+                        ev += "\n\n"
+                        if not held and _is_loop_stop(_sse_obj(ev)):
+                            held.append(ev)
+                        elif held:
+                            held.append(ev)
+                        else:
+                            yield ev.encode("utf-8")
+            stream_eof = True
+            if gate:
+                tail = ev_buf + dec.decode(b"", final=True)
+                looped = bool(held)
+                if whole:
+                    try:
+                        looped = _is_loop_stop(json.loads(bytes(whole)))
+                    except Exception:
+                        looped = False
+                if looped:
+                    period = audit_meta.get("loop_period") if audit_meta is not None else None
+                    logger.warning(
+                        f"Loop fallback: engine stopped a reasoning loop (req_id={req_id}, period={period}); "
+                        f"re-sending at effort={LOOP_FALLBACK_EFFORT!r}"
+                    )
+                    t_fb = time.perf_counter()
+                    fb_chunks = 0
+                    try:
+                        if audit_meta is not None:
+                            audit_meta["loop_fallback"] = True
+                            audit_meta["loop_fallback_effort"] = LOOP_FALLBACK_EFFORT
+                            audit_meta["finish_reason"] = None
+                            if not audit_meta["stream"]:
+                                audit_json_buf.clear()
+                        async for c in _run_loop_fallback():
+                            fb_chunks += 1
+                            _audit_feed(c)
+                            yield c
+                        if audit_meta is not None:
+                            audit_meta["loop_fallback_ok"] = True
+                            audit_meta["loop_fallback_s"] = round(time.perf_counter() - t_fb, 3)
+                    except Exception as e:
+                        logger.error(f"Loop fallback failed (req_id={req_id}): {e}")
+                        if audit_meta is not None:
+                            audit_meta["loop_fallback_ok"] = False
+                            audit_meta["loop_fallback_error"] = str(e)[:200]
+                            audit_meta["finish_reason"] = "content_filter"
+                        if fb_chunks == 0:  # nothing of the fallback went out: the engine's own honest stop does
+                            if whole:
+                                yield bytes(whole)
+                            else:
+                                for ev in held:
+                                    yield ev.encode("utf-8")
+                                if tail:
+                                    yield tail.encode("utf-8")
+                else:
+                    if whole:
+                        yield bytes(whole)
+                    elif tail:
+                        yield tail.encode("utf-8")
+        except Exception as e:
+            stream_err = str(e)[:200]
+            raise
         finally:
             await cleanup_all()
             # Asynchronously offload session to NVMe cold storage ONLY when memory drops below high-watermark

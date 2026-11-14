@@ -1,0 +1,217 @@
+{
+  "time": "2026-11-15 02:03:55 +0800",
+  "overall_pass": true,
+  "mode": "dry-run",
+  "uptime_since": {
+    "node1": "2026-11-09 21:07:36",
+    "node2": "2026-11-09 21:07:38"
+  },
+  "recovered_by": "容器 restart policy 自動拉起",
+  "checks": [
+    {
+      "name": "Node2 SSH 可達",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Node1 已重開（boot_id 改變）",
+      "ok": true,
+      "detail": "faba4584→faba4584"
+    },
+    {
+      "name": "Node2 已重開（boot_id 改變）",
+      "ok": true,
+      "detail": "d78b249f→d78b249f"
+    },
+    {
+      "name": "8888 /health 自動恢復",
+      "ok": true,
+      "detail": "等待 0s"
+    },
+    {
+      "name": "8889 proxy /health",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "模型 ID DeepSeek-V4.1-Flash-TF",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "rank0 容器 running",
+      "ok": true,
+      "detail": "running 0 2026-11-14T16:01:28.263636569Z"
+    },
+    {
+      "name": "rank1 容器 running",
+      "ok": true,
+      "detail": "running 0 2026-11-14T16:01:25.461713233Z"
+    },
+    {
+      "name": "rank0 tensorfold-native sha256",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "rank1 tf-dsv41-lanes sha256（Node2）",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "rank0.sh / rank1.sh / start-dsv41.sh 未變",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "8889 proxy.py sha256 = manifest",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Node2 fatbins 備份完好",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Engram token map sha 雙機 = engram.json",
+      "ok": true,
+      "detail": "de40bcdd71f24430"
+    },
+    {
+      "name": "spark-fastfail-proxy.service active",
+      "ok": true,
+      "detail": "active"
+    },
+    {
+      "name": "spark-ms-dtc-governor.service active",
+      "ok": true,
+      "detail": "active"
+    },
+    {
+      "name": "spark-dsv41-cluster.timer active",
+      "ok": true,
+      "detail": "active"
+    },
+    {
+      "name": "hermes-gateway.service active",
+      "ok": true,
+      "detail": "active"
+    },
+    {
+      "name": "舊 gpu-thermal-governor 雙機未啟動",
+      "ok": true,
+      "detail": "N1=inactive N2=inactive"
+    },
+    {
+      "name": "swappiness=1 雙機",
+      "ok": true,
+      "detail": "N1=1 N2=1"
+    },
+    {
+      "name": "RoCE 位址（10.100.184/185）雙機",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "rank0 啟動參數含 --loop-guard",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "proxy 迴圈降級未被停用",
+      "ok": true,
+      "detail": "PYTHONUNBUFFERED=1"
+    },
+    {
+      "name": "迴圈攔截 → proxy 以 effort none 重送成功",
+      "ok": true,
+      "detail": "finish=length loop_period=None fallback_s=22.39 wall=42s"
+    },
+    {
+      "name": "品質題全過",
+      "ok": true,
+      "detail": "4/4"
+    },
+    {
+      "name": "工具呼叫門檻",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "32K 插隊 TTFT ≤ 1.5s",
+      "ok": true,
+      "detail": "0.7292"
+    },
+    {
+      "name": "解碼門檻 sweep_greedy_tps ≥ 基準 95%",
+      "ok": true,
+      "detail": "87.78（需 83.695，基準 88.1）"
+    },
+    {
+      "name": "解碼門檻 sweep_mtp_accept ≥ 基準 95%",
+      "ok": true,
+      "detail": "0.7309（需 0.6944，基準 0.7309）"
+    },
+    {
+      "name": "解碼門檻 c2_agg ≥ 基準 95%",
+      "ok": true,
+      "detail": "113.61（需 111.454，基準 117.32）"
+    },
+    {
+      "name": "解碼門檻 c4_agg ≥ 基準 95%",
+      "ok": true,
+      "detail": "143.42（需 136.2585，基準 143.43）"
+    },
+    {
+      "name": "解碼門檻 c8_agg ≥ 基準 95%",
+      "ok": true,
+      "detail": "156.19（需 149.207，基準 157.06）"
+    },
+    {
+      "name": "C2/C4/C8 每路都有產出",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "smoke_attempts": [
+    {
+      "file": "omni_eval_smoke_postreboot_1794679328.json",
+      "external_requests": 0,
+      "quality": "4/4",
+      "quality_all": true,
+      "tool_gate": true,
+      "greedy": 91.02,
+      "mtp": 0.7401,
+      "c2": 103.28,
+      "cut_in_s": 0.7292,
+      "cut_in_ok": true,
+      "prefill_8k_tok_s": 2298.2
+    }
+  ],
+  "gpu_clock_temp": {
+    "node1": "2392, 47",
+    "node2": "2392, 48"
+  },
+  "mem_available_gib": {
+    "node1": "3.14",
+    "node2": "5.94"
+  },
+  "governor_last": "[02:00:45] STEADY: cap=2400MHz T=59.0C (dT/dt=+0.00C/s) streams=0/8 wait=0",
+  "decode_gate": {
+    "sweep_prompts_clean": 9,
+    "sweep_greedy_tps": 87.78,
+    "sweep_mtp_accept": 0.7309,
+    "sweep_greedy_min": 78.61,
+    "sweep_greedy_max": 95.9,
+    "c2_agg": 113.61,
+    "c2_streams_ok": true,
+    "c4_agg": 143.42,
+    "c4_streams_ok": true,
+    "c8_agg": 156.19,
+    "c8_streams_ok": true
+  },
+  "perf_inconclusive": [],
+  "idle_wait_s": 0,
+  "elapsed_s": 183
+}

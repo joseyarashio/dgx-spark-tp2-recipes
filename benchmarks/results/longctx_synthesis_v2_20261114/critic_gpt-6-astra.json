@@ -1,0 +1,18 @@
+{
+  "model": "gpt-6-astra",
+  "ok": true,
+  "wall": 45.9,
+  "finish": "stop",
+  "usage": {
+    "prompt_tokens": 6605,
+    "completion_tokens": 1632,
+    "total_tokens": 8237,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 29
+    }
+  },
+  "content": "## 1. 實驗方法與數據盲點\n\n- **去重 seed 改善 A/A，但不等於消除抽樣混淆。** `seed = 8000 + 16*conv_idx + arm_index` 讓同一對話各臂使用不同 seed；配對控制的是對話，不是相同隨機抽樣。`A2_base_vs_A1_base` 的 `wall_s.mean_diff=-51.79`、`ci95=[-114.13, 5.83]` 顯示背景變異不可忽略；單次 A/A 亦不是固定的顯著性門檻。\n- **預熱未完全控制快取。** `K0_kn0` 的 `prompt_tokens_p50=84783`、`cache_hit_median=0.9835`，其他臂為 `85071`、`0.9869`；其 `ttft_p90=47.867`。中位快取命中率無法排除尾端 miss、排程與並行干擾，不能直接將 TTFT 差異歸因於移除 reasoning。\n- **這是刻意施壓的合成任務，不是品質基準。** 提示要求 exhaustive audit、完整 patch 與形式證明，且工具仍以 `tool_choice=\"auto\"` 附掛。沒有 tools 缺席對照，無法區分預算效應與工具可用性的交互作用；也沒有答案正確性、完整性或 patch 驗證結果。\n- **機制證據不完整。** runner 摘錄未展示完整請求組裝、預算傳遞、計時與 `ci95` 計算；註解描述不等同執行證明。`ok=16` 只能支持記錄層面的成功，不能代表任務成功。\n\n## 2. 可成立結論與過度推論修正\n\n- **`E_max` 在本工作負載下增加成本，且有交付風險。** 相對 `A1_base`，`wall_s.mean_diff=147.0`、`ci95=[57.31, 232.64]`；`finish_counts.length=9`、`empty_content_no_tc=6`。可反對將其直接設為此類任務的預設，但不能推論所有長上下文任務都不適合 max，亦無證據證明增加的 reasoning 改善品質。\n- **`B8_tb8k` 確實縮短本次請求，但不是已證實的等品質加速。** `wall_s.mean_diff=-253.93`、`ci95=[-356.5, -158.67]`；然而 `tool_call_reqs=8`，違反明確禁止工具的任務要求。`EB16_max_tb16k` 同樣有 `tool_call_reqs=11`。`undeclared_tc_reqs=0` 只表示工具名稱已宣告，不表示呼叫獲准；這些請求也未必已完成 synthesis。\n- **預算呈現約束跡象，不能據此定位實作。** `reas_max=8193` 與 `16385` 對應設定的 `8192` 與 `16384`，支持預算附近出現截點；是否涉及計數邊界、強制轉段或工具轉向，仍需原始串流與引擎追蹤。\n- **`EB16`、`K0` 尚無可靠 wall-time 優勢。** 前者 `wall_s.mean_diff=-55.1` 接近 A/A 的 `-51.79`，且區間跨零；後者 `ci95=[-122.41, 42.66]`。`K0` 的 completion 減少亦不能替代品質驗證。\n\n## 3. 與既有結論的交叉影響\n\n- **v1 的冷 prefill 問題，不能再當作 max 思考較慢的機制證據。** 本次 `E_max` 的 `ttft_s.ci95=[-0.28, 0.03]`，但 completion 與 wall 增加；應將首 token 延遲與生成階段成本分開解讀。\n- **不能把 `K0_kn0` 結果外推成引擎歷史裁剪效果。** 它是 client-side 移除 reasoning；服務另有條件啟用的 `--drop-reasoning-history --keep-last-n-reasoning 2`。沒有引擎旗標開關對照，也沒有實際生效設定與序列化後輸入，無法辨識兩層機制的獨立貢獻。\n- **loop guard 的有效性仍未建立。** `E_max`、`EB16` 各有 `loop_r=1`，但 `engine_loop_fired=0`；離線 `LOOP_RE` 的重複判定不等於引擎觸發條件。production shadow 樣本的 `prompt_tokens=null`、`outcome=client_left`，只能提出排查線索，不能證明 loop 導致離線或引擎失效。\n- **production 快照不能直接驗證實驗外部效度。** 外部請求主要集中於 `136` 筆的單一 client；展示的長輸出樣本為 `effort=medium`、`tools_count=5`，與本次合成條件不同。\n\n## 4. 下一步驗證與上線順序建議\n\n- **先補可稽核性：** 保存完整請求、實際生效旗標、逐請求 `cache_hit`、原始串流與計時邊界；核對預算傳遞、`reasoning_tokens` 計數、`tool_calls` 與 `ci95` 方法。重複 A/A、輪換 seed 對臂配置，避免固定 seed 配置被當成公平性的充分證據。\n- **再拆混淆：** 對 `K0` 的實際輸入另外預熱，分開比較冷／暖快取；獨立交叉測試 client-side 裁剪與引擎歷史裁剪。加入 tools 存在／缺席對照，保持任務與其餘參數一致。\n- **以完成任務為驗收單位：** 將禁止工具時的 `tool_calls`、空答案、`length` 與內容品質共同評估；若允許後續工具流程，計算直到最終答案的整段成本，而非僅比較首個請求的 `wall_s`。\n- **上線順序：** 暫留 `A1_base`；優先 shadow 驗證 `B8_tb8k`，通過工具遵循與品質檢查後才灰度。`EB16` 僅作 max 路徑的受控候選；`K0` 待快取與裁剪機制釐清；`E_max` 不宜直接升為預設。"
+}

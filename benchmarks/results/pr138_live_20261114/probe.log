@@ -1,0 +1,11 @@
+{"i": 0, "finish": "length", "completion_tokens": 4000, "wall": 33.2, "loop": {"period": 1}}
+{"i": 1, "finish": "length", "completion_tokens": 4000, "wall": 51.5, "loop": {}}
+{"i": 2, "finish": "length", "completion_tokens": 4000, "wall": 42.7, "loop": {"period": 1}}
+{"i": 3, "finish": "length", "completion_tokens": 4000, "wall": 39.1, "loop": {"period": 1}}
+{"i": 4, "finish": "length", "completion_tokens": 4000, "wall": 51.1, "loop": {"period": 2}}
+{"i": 5, "finish": "length", "completion_tokens": 4000, "wall": 33.1, "loop": {"period": 1}}
+{"i": 6, "finish": "length", "completion_tokens": 4000, "wall": 51.7, "loop": {}}
+{"i": 7, "finish": "length", "completion_tokens": 4000, "wall": 42.9, "loop": {"period": 1}}
+{"i": 8, "finish": "length", "completion_tokens": 4000, "wall": 39.1, "loop": {"period": 1}}
+{"i": 9, "finish": "length", "completion_tokens": 4000, "wall": 51.2, "loop": {"period": 2}}
+{"label": "pr138", "n": 10, "ok": 10, "guard_fired": 8, "answered": 8, "hit_max_tokens": 10, "median_tokens": 4000, "max_tokens": 4000}

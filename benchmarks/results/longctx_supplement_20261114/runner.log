@@ -1,0 +1,10 @@
+2026-11-14 10:25:32 === Phase 2 Supplement Pipeline Start ===
+2026-11-14 10:25:32 --- Running Suite S1 (85K budget controls + K0_warm, N=8, CONC=3) ---
+2026-11-14 12:31:08 S1 finished rc=0
+2026-11-14 12:31:08 --- Running Suite S2 (~200K + 5 tools x low/medium/high, N=8, CONC=2) ---
+2026-11-14 14:28:19 S2 finished rc=0
+2026-11-14 14:28:19 --- Running Suite S3b (conv_idx=11 loop capture, 4 reps x 2 arms) ---
+2026-11-14 14:56:25 S3b finished rc=0
+2026-11-14 14:56:25 --- Summarizing & Running Dual External Audit ---
+2026-11-14 14:59:32 Audit finished rc=0
+2026-11-14 14:59:32 === Phase 2 Supplement Pipeline Completed ===

@@ -1,0 +1,379 @@
+From e772dec667a5bcb1ee04d6765ab3187a6ec18b04 Mon Sep 17 00:00:00 2001
+From: Johnny Lee <6802342+joseyarashio@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 01:58:59 +0800
+Subject: [PATCH] loop guard: --loop-guard-stop and a per-request
+ "loop_guard_stop" end the reply where the guard fires
+
+Port of ashhart/TensorFold af36c7447 (#1463): with the stop policy the stream finishes at the firing token instead
+of forcing the think block closed; the reply carries finish_reason "content_filter", tensorfold.loop.stopped and an
+error with code "reasoning_loop" (Responses: incomplete/content_filter; Messages: refusal). Default unchanged.
+
+Local addition: a chat request may ask for the policy on itself with "loop_guard_stop": true (passed through the
+OpenAI and Responses routes), so a proxy can re-send a looping reply instead of letting the forced close turn into
+a read_file call under long context + tools (2026-11-14 A/B: forced close -> 0/7 answers with or without a hint).
+---
+ zig/src/core/engine_api.zig            |  2 ++
+ zig/src/core/lane_host.zig             |  1 +
+ zig/src/core/lanes/stream.zig          | 18 +++++++++++++++++-
+ zig/src/server/anthropic.zig           |  2 ++
+ zig/src/server/chat.zig                | 12 ++++++++++--
+ zig/src/server/cli.zig                 |  4 +++-
+ zig/src/server/loop_stop.zig           | 22 ++++++++++++++++++++++
+ zig/src/server/main.zig                |  2 +-
+ zig/src/server/openai.zig              |  4 +++-
+ zig/src/server/responses.zig           |  6 ++++--
+ zig/src/server/responses_translate.zig |  2 +-
+ zig/src/server/serve.zig               |  7 ++++---
+ zig/src/server/server.zig              |  2 ++
+ 13 files changed, 72 insertions(+), 12 deletions(-)
+ create mode 100644 zig/src/server/loop_stop.zig
+
+diff --git a/zig/src/core/engine_api.zig b/zig/src/core/engine_api.zig
+index d9d7406f..2d4f00b9 100644
+--- a/zig/src/core/engine_api.zig
++++ b/zig/src/core/engine_api.zig
+@@ -78,6 +78,8 @@ pub const Request = struct {
+     structure: ?Structure = null,
+     /// Stop a short exact cycle while the think block is open.
+     loop_guard: bool = false,
++    /// With ``loop_guard``: the reply ends where the guard fires, with no forced close and no answer after it.
++    loop_stop: bool = false,
+ 
+     /// What the prompt cache matches and keeps under: `cache_key`, or the prompt when it has none.
+     pub fn cacheKey(r: *const Request) []const u32 {
+diff --git a/zig/src/core/lane_host.zig b/zig/src/core/lane_host.zig
+index f310c93d..40fe9bb2 100644
+--- a/zig/src/core/lane_host.zig
++++ b/zig/src/core/lane_host.zig
+@@ -381,6 +381,7 @@ pub const LaneHost = struct {
+             .think_close = r.think_close,
+             .think_end = if (r.think_end) |t| t else -1,
+             .loop_guard = r.loop_guard,
++            .loop_stop = r.loop_stop,
+             .chunks = r.chunks,
+             .reuse = reuse,
+             .images = r.images,
+diff --git a/zig/src/core/lanes/stream.zig b/zig/src/core/lanes/stream.zig
+index 175e4bb6..88b4849a 100644
+--- a/zig/src/core/lanes/stream.zig
++++ b/zig/src/core/lanes/stream.zig
+@@ -136,6 +136,7 @@ pub const Spec = struct {
+     think_end: i64 = -1,
+     think_open: ?bool = null, // null: open when a budget is set (the server's rule)
+     loop_guard: bool = false,
++    loop_stop: bool = false, // with loop_guard: finish where it fires instead of forcing the close
+     chunks: []const u32 = &.{}, // where prefill chunks start after 0 (Python's PrefillPlan); empty: the backend's step
+     reuse: Reuse = .{},
+     images: []const Image = &.{}, // in prompt order; the caller's until the stream is released
+@@ -157,6 +158,7 @@ pub const Stream = struct {
+     think_end: i64,
+     think_open: bool,
+     loop_guard: bool,
++    loop_stop: bool = false,
+     loop_period: ?u32 = null,
+     long_loop: long_loop.Index = .{},
+     chunks: []const u32,
+@@ -214,6 +216,7 @@ pub const Stream = struct {
+             .think_end = spec.think_end,
+             .think_open = spec.think_open orelse (spec.think_budget > 0 or (spec.loop_guard and spec.think_end >= 0)),
+             .loop_guard = spec.loop_guard,
++            .loop_stop = spec.loop_stop,
+             .chunks = spec.chunks,
+             .reuse = spec.reuse,
+             .images = spec.images,
+@@ -350,7 +353,7 @@ pub const Stream = struct {
+                 if (s.emitted().len >= s.max_new) {
+                     s.finished = true;
+                     s.reason = .length;
+-                } else if (s.think_close.len == 0) {
++                } else if (s.think_close.len == 0 or s.loop_stop) {
+                     s.finished = true;
+                     s.reason = .stop;
+                 } else {
+@@ -397,6 +400,19 @@ test "loop guard stops at the cap even when no cycle fires" {
+     try std.testing.expect(guarded.finished and guarded.reason == .length);
+ }
+ 
++test "loop guard stop policy finishes the stream at the fire and forces no close (--loop-guard-stop)" {
++    const gpa = std.testing.allocator;
++    var tokens: std.ArrayList(u32) = .empty;
++    defer tokens.deinit(gpa);
++    for (0..loop_warm_in) |i| try tokens.append(gpa, @intCast(1000 + i));
++    for (0..257) |_| try tokens.append(gpa, 7);
++    var s = try Stream.init(gpa, .{ .id = "loop", .prompt = &.{1}, .max_new = 400, .think_close = &.{ 90, 91, 92 }, .think_end = 91, .loop_guard = true, .loop_stop = true });
++    defer s.deinit(gpa);
++    try std.testing.expectEqual(@as(usize, 321), try s.commit(gpa, tokens.items));
++    try std.testing.expect(s.finished and s.reason == .stop and s.loop_period.? == 1 and s.force.items.len == 0);
++    try std.testing.expectEqual(@as(usize, 0), try s.commit(gpa, &.{8}));
++}
++
+ test "loop guard fires, closes thinking, and latches once" {
+     const gpa = std.testing.allocator;
+     var tokens: std.ArrayList(u32) = .empty;
+diff --git a/zig/src/server/anthropic.zig b/zig/src/server/anthropic.zig
+index 6fc62239..659fea0c 100644
+--- a/zig/src/server/anthropic.zig
++++ b/zig/src/server/anthropic.zig
+@@ -249,6 +249,7 @@ const Reply = struct {
+             r.finished = true;
+             return;
+         };
++        if (p.has("error") and std.mem.eql(u8, r.finish, "refusal")) return; // --loop-guard-stop: the refusal says it
+         if (p.has("error")) {
+             try r.close();
+             const problem = p.get("error").?;
+@@ -386,6 +387,7 @@ const Reply = struct {
+ fn finishOf(reason: []const u8) []const u8 {
+     if (std.mem.eql(u8, reason, "tool_calls")) return "tool_use";
+     if (std.mem.eql(u8, reason, "length")) return "max_tokens";
++    if (std.mem.eql(u8, reason, @import("loop_stop.zig").finish_reason)) return "refusal";
+     return "end_turn";
+ }
+ 
+diff --git a/zig/src/server/chat.zig b/zig/src/server/chat.zig
+index 6c67542a..75c11133 100644
+--- a/zig/src/server/chat.zig
++++ b/zig/src/server/chat.zig
+@@ -71,6 +71,7 @@ pub const Reply = struct {
+     reasoning_tokens: usize,
+     runtime: Value,
+     speculative: Value,
++    loop_stop: ?u32 = null, // the loop period when --loop-guard-stop ended the reply in its reasoning
+ };
+ 
+ pub const Failure = error{ Refused, Cancelled, Failed, OutOfMemory };
+@@ -210,6 +211,8 @@ pub fn prepare(srv: *Server, cx: *Cx, input: Input, gone: anytype) Failure!Prepa
+         const budget_field = f.get("thinking_budget");
+         const budget: i64 = if (budget_field != null and budget_field.?.truthy()) budget_field.?.int64() orelse 0 else srv.config.thinking_budget;
+         if (srv.think_close.len > 0) request.loop_guard = srv.config.loop_guard;
++        // per request: "loop_guard_stop": true asks for the stop policy on this reply only (a proxy that re-sends it)
++        request.loop_stop = request.loop_guard and (srv.config.loop_stop or (flag(f, "loop_guard_stop") orelse false));
+         if ((budget > 0 or request.loop_guard) and srv.think_close.len > 0) {
+             if (budget > 0) request.think_budget = @intCast(@min(budget, std.math.maxInt(u32)));
+             request.think_close = srv.think_close;
+@@ -255,7 +258,7 @@ pub fn generate(srv: *Server, cx: *Cx, prepared: Prepared, sink: ?Sink, gone: an
+     };
+     release(srv, preparing); // a background request waits only while a foreground one prepares
+     preparing = false;
+-    var gen: Generation = .{ .last_out_ns = submitted, .srv = srv, .a = a, .box = &box, .id = id, .reply_id = input.id, .sink = sink, .thinking = thinking or reply_text.isChannel(srv.markers), .stops = .{ .strings = stops_opt.strings }, .ignore_eos = stops_opt.ignore_eos, .max_tokens = request.max_tokens, .tools = input.tools, .token_ids = input.token_ids };
++    var gen: Generation = .{ .last_out_ns = submitted, .srv = srv, .a = a, .box = &box, .id = id, .reply_id = input.id, .sink = sink, .thinking = thinking or reply_text.isChannel(srv.markers), .stops = .{ .strings = stops_opt.strings }, .ignore_eos = stops_opt.ignore_eos, .max_tokens = request.max_tokens, .tools = input.tools, .token_ids = input.token_ids, .loop_stop = request.loop_stop };
+     defer srv.noteRequest(prepared.prompt_len, gen.collected.items.len, box.stats.drafted, box.stats.accepted, box.stats.rounds, received, gen.first_ns, gen.last_ns, box.stats.prefill_seconds);
+     errdefer if (!gen.engine_done) gen.cancel(); // the engine writes to the mailbox until it says finished
+     const result: Failure!Reply = blk: {
+@@ -335,6 +338,7 @@ const Generation = struct {
+     calls: ?tool_stream.Streamer = null,
+     collected: std.ArrayList(u32) = .empty,
+     token_ids: bool = false, // the request asked for its ids back (Input.token_ids)
++    loop_stop: bool = false, // --loop-guard-stop: the engine ends the reply where the loop guard fires
+     visible: reply_text.Incremental = .{},
+     hidden: std.ArrayList(u8) = .empty, // reused for the answer without its call blocks
+     hide: reply_text.Hide = .{}, // what the stream filter read of the answer in the rounds before
+@@ -561,12 +565,14 @@ const Generation = struct {
+         const a = g.a;
+         const m = g.box;
+         if (!g.engine_done) g.drain();
+-        const reason: []const u8 = g.reason orelse switch (m.reason) {
++        const ended: []const u8 = g.reason orelse switch (m.reason) {
+             .stop => "stop",
+             .length => "length",
+             .cancelled => "cancelled",
+             .failed => return cx.other(if (m.message.len > 0) try a.dupe(u8, m.message) else "the reply failed"),
+         };
++        const stopped: ?u32 = if (g.loop_stop) m.stats.loop_period else null;
++        const reason = if (stopped != null) @import("loop_stop.zig").finish_reason else ended;
+         const finished_ns = nowNs(g.srv.io);
+         const content_tokens = if (g.ignore_eos) g.collected.items else reply_text.stripTrailing(g.collected.items, g.srv.eos);
+         const raw = try g.srv.text.decode(a, content_tokens);
+@@ -662,6 +668,7 @@ const Generation = struct {
+         if (m.stats.loop_period) |period| {
+             const loop_field = try json.newObject(a);
+             try loop_field.put(a, "period", try json.intValue(a, period));
++            if (stopped != null) try loop_field.put(a, "stopped", .{ .bool = true });
+             try runtime.put(a, "loop", .{ .object = loop_field });
+         }
+         const s = m.stats;
+@@ -689,6 +696,7 @@ const Generation = struct {
+             .reasoning_tokens = reply_text.reasoningCount(g.collected.items, think_end),
+             .runtime = .{ .object = runtime },
+             .speculative = .{ .object = spec },
++            .loop_stop = stopped,
+         };
+         if (std.mem.eql(u8, reason, "length") and thinking and reply_text.pyStrip(content).len == 0)
+             log.line("warning: a reply reached max_tokens while still thinking, so its content is empty and its text is all in reasoning_content; raise max_tokens, or send chat_template_kwargs {{\"enable_thinking\": false}} (server: --no-thinking)", .{});
+diff --git a/zig/src/server/cli.zig b/zig/src/server/cli.zig
+index e0b28200..86c57ec7 100644
+--- a/zig/src/server/cli.zig
++++ b/zig/src/server/cli.zig
+@@ -54,6 +54,7 @@ pub const flags = [_]Flag{
+     .{ .name = "--reasoning-effort", .choices = &.{ "low", "medium", "high", "xhigh" }, .native = true },
+     .{ .name = "--thinking-budget", .native = true },
+     .{ .name = "--loop-guard", .kind = .store_true, .native = true },
++    .{ .name = "--loop-guard-stop", .kind = .store_true, .native = true },
+     .{ .name = "--drop-reasoning-history", .kind = .store_true, .native = true },
+     .{ .name = "--keep-last-n-reasoning", .native = true },
+     .{ .name = "--no-drafts", .kind = .store_true, .native = true },
+@@ -128,6 +129,7 @@ pub const Args = struct {
+     reasoning_effort: ?[]const u8 = null,
+     thinking_budget: i64 = 0,
+     loop_guard: bool = false,
++    loop_guard_stop: bool = false, // the reply ends where the loop guard fires (implies --loop-guard)
+     /// Earlier assistant turns render without their reasoning_content (the template then closes an empty think block).
+     drop_reasoning_history: bool = false,
+     /// Keep the most recent N assistant turns with reasoning_content, dropping earlier ones (default 0: drop all when enabled).
+@@ -230,7 +232,7 @@ fn apply(a: Allocator, out: *Args, name: []const u8, value: ?[]const u8, u: *Usa
+     } else if (is(name, "--learn-gib")) {
+         out.learn = true;
+         out.learn_gib = try gib(u, a, name, v);
+-    } else if (is(name, "--max-tokens")) out.max_tokens = try int(u, a, name, v) else if (is(name, "--temperature")) out.temperature = try float(u, a, name, v) else if (is(name, "--top-p")) out.top_p = try float(u, a, name, v) else if (is(name, "--top-k")) out.top_k = try int(u, a, name, v) else if (is(name, "--min-p")) out.min_p = try float(u, a, name, v) else if (is(name, "--thinking")) out.thinking = true else if (is(name, "--no-thinking")) out.thinking = false else if (is(name, "--reasoning-effort")) out.reasoning_effort = v else if (is(name, "--thinking-budget")) out.thinking_budget = try int(u, a, name, v) else if (is(name, "--loop-guard")) out.loop_guard = true else if (is(name, "--drop-reasoning-history")) out.drop_reasoning_history = true else if (is(name, "--keep-last-n-reasoning")) {
++    } else if (is(name, "--max-tokens")) out.max_tokens = try int(u, a, name, v) else if (is(name, "--temperature")) out.temperature = try float(u, a, name, v) else if (is(name, "--top-p")) out.top_p = try float(u, a, name, v) else if (is(name, "--top-k")) out.top_k = try int(u, a, name, v) else if (is(name, "--min-p")) out.min_p = try float(u, a, name, v) else if (is(name, "--thinking")) out.thinking = true else if (is(name, "--no-thinking")) out.thinking = false else if (is(name, "--reasoning-effort")) out.reasoning_effort = v else if (is(name, "--thinking-budget")) out.thinking_budget = try int(u, a, name, v) else if (is(name, "--loop-guard")) out.loop_guard = true else if (is(name, "--loop-guard-stop")) out.loop_guard_stop = true else if (is(name, "--drop-reasoning-history")) out.drop_reasoning_history = true else if (is(name, "--keep-last-n-reasoning")) {
+         const n = try int(u, a, name, v);
+         out.keep_last_n_reasoning = @intCast(n);
+         out.drop_reasoning_history = true;
+diff --git a/zig/src/server/loop_stop.zig b/zig/src/server/loop_stop.zig
+new file mode 100644
+index 00000000..6b972d01
+--- /dev/null
++++ b/zig/src/server/loop_stop.zig
+@@ -0,0 +1,22 @@
++//! --loop-guard-stop (ported from ashhart/TensorFold af36c7447, #1463): the finish reason and the error a reply carries
++//! when the loop guard ended it in its reasoning.
++const std = @import("std");
++const json = @import("json.zig");
++const Allocator = std.mem.Allocator;
++
++/// OpenAI's finish reason for a reply the server ended before its answer, which OpenAI-compatible clients all parse.
++pub const finish_reason = "content_filter";
++
++/// The error's ``code``, which a client keys on.
++pub const code = "reasoning_loop";
++
++/// OpenAI's error object for a stopped reply: beside a whole reply's choices, or as a stream's last event.
++pub fn errorBody(a: Allocator, period: u32) Allocator.Error!json.Value {
++    const o = try json.newObject(a);
++    const message = "the loop guard ended the reply in its reasoning, which repeated a {d}-token cycle: no answer or tool calls follow (--loop-guard-stop)";
++    try o.put(a, "message", .{ .string = try std.fmt.allocPrint(a, message, .{period}) });
++    try o.put(a, "type", .{ .string = "server_error" });
++    try o.put(a, "param", .null);
++    try o.put(a, "code", .{ .string = code });
++    return .{ .object = o };
++}
+diff --git a/zig/src/server/main.zig b/zig/src/server/main.zig
+index 77388317..45c70d9a 100644
+--- a/zig/src/server/main.zig
++++ b/zig/src/server/main.zig
+@@ -9,7 +9,7 @@ const serve = @import("serve.zig");
+ const hf_text = @import("hf_text.zig");
+ const checkpoint_cli = @import("checkpoint_cli");
+ 
+-const usage_line = "usage: tensorfold serve [-h] [--host HOST] [--port PORT] [--name NAME] [--alias ALIAS] [--api-key API_KEY] [--api-key-file API_KEY_FILE] [--metrics-open] [--dashboard] [--context CONTEXT] [--speed-up SETTINGS] [--prompt-cache-gib PROMPT_CACHE_GIB] [--prompt-cache-over-cap] [--learn] [--learn-dir LEARN_DIR] [--learn-gib LEARN_GIB] [--max-tokens MAX_TOKENS] [--temperature TEMPERATURE] [--top-p TOP_P] [--top-k TOP_K] [--min-p MIN_P] [--thinking | --no-thinking] [--reasoning-effort {low,medium,high,xhigh}] [--thinking-budget THINKING_BUDGET] [--loop-guard] [--drop-reasoning-history] [--no-drafts] [--compact-at COMPACT_AT] [--compact-keep COMPACT_KEEP] [--compact-memory COMPACT_MEMORY] [--parallel PARALLEL] [--no-update-check] [--backend {auto,mlx,cuda}] [--device DEVICE] [--segments SEGMENTS] model\n";
++const usage_line = "usage: tensorfold serve [-h] [--host HOST] [--port PORT] [--name NAME] [--alias ALIAS] [--api-key API_KEY] [--api-key-file API_KEY_FILE] [--metrics-open] [--dashboard] [--context CONTEXT] [--speed-up SETTINGS] [--prompt-cache-gib PROMPT_CACHE_GIB] [--prompt-cache-over-cap] [--learn] [--learn-dir LEARN_DIR] [--learn-gib LEARN_GIB] [--max-tokens MAX_TOKENS] [--temperature TEMPERATURE] [--top-p TOP_P] [--top-k TOP_K] [--min-p MIN_P] [--thinking | --no-thinking] [--reasoning-effort {low,medium,high,xhigh}] [--thinking-budget THINKING_BUDGET] [--loop-guard] [--loop-guard-stop] [--drop-reasoning-history] [--no-drafts] [--compact-at COMPACT_AT] [--compact-keep COMPACT_KEEP] [--compact-memory COMPACT_MEMORY] [--parallel PARALLEL] [--no-update-check] [--backend {auto,mlx,cuda}] [--device DEVICE] [--segments SEGMENTS] model\n";
+ 
+ pub fn main(init: std.process.Init) !u8 {
+     const gpa = init.gpa;
+diff --git a/zig/src/server/openai.zig b/zig/src/server/openai.zig
+index f9baed3d..6a629def 100644
+--- a/zig/src/server/openai.zig
++++ b/zig/src/server/openai.zig
+@@ -154,7 +154,7 @@ fn plan(srv: *Server, cx: *Cx, is_chat: bool, raw: Value) errors.Refused!Plan {
+         input.temperature = if (t == .float) t.float else std.fmt.parseFloat(f64, t.int) catch 0;
+     };
+     const sampling = try json.newObject(cx.a);
+-    for ([_][]const u8{ "temperature", "top_p", "top_k", "min_p", "seed", "priority", "draft", "thinking_budget", "ignore_eos", "stop" } ++ grammar.fields) |k| if (body.get(k)) |v| try sampling.put(cx.a, k, v);
++    for ([_][]const u8{ "temperature", "top_p", "top_k", "min_p", "seed", "priority", "draft", "thinking_budget", "loop_guard_stop", "ignore_eos", "stop" } ++ grammar.fields) |k| if (body.get(k)) |v| try sampling.put(cx.a, k, v);
+     try grammar.refusal(cx, body);
+     if (input.tools.len > 0 and try tool_specs.choiceRequiresCall(cx.a, body.get("tool_choice"))) try sampling.put(cx.a, "tool_call_required", .{ .bool = true });
+     const thinking = try fields.thinkingFields(cx, body, srv.effort_levels);
+@@ -390,6 +390,7 @@ const Run = struct {
+         try o.put(a, "choices", .{ .array = list });
+         try o.put(a, "usage", try r.usage(reply));
+         try r.extras(o, reply);
++        if (reply.loop_stop) |period| try o.put(a, "error", try @import("loop_stop.zig").errorBody(a, period));
+     }
+ 
+     const StreamSink = struct {
+@@ -643,6 +644,7 @@ const Run = struct {
+             u.object.put(a, "usage", use) catch return;
+             r.emit(u) catch return;
+         }
++        if (reply.loop_stop) |period| r.emit(wrapError(a, @import("loop_stop.zig").errorBody(a, period) catch return) catch return) catch return;
+         r.out.vt.event(r.out.ctx, null) catch {};
+     }
+ };
+diff --git a/zig/src/server/responses.zig b/zig/src/server/responses.zig
+index 6e6fc8ec..bb94bdcf 100644
+--- a/zig/src/server/responses.zig
++++ b/zig/src/server/responses.zig
+@@ -417,7 +417,9 @@ const Reply = struct {
+     }
+ 
+     fn finish(r: *Reply, reason: ?[]const u8, chat_usage: ?Value, stats: ?Value) E!Value {
+-        const incomplete = reason != null and std.mem.eql(u8, reason.?, "length");
++        const length = reason != null and std.mem.eql(u8, reason.?, "length");
++        const filtered = reason != null and std.mem.eql(u8, reason.?, @import("loop_stop.zig").finish_reason);
++        const incomplete = length or filtered;
+         const status = if (incomplete) "incomplete" else "completed";
+         if (!incomplete) {
+             const all_reasoning = for (r.items.items) |item| {
+@@ -432,7 +434,7 @@ const Reply = struct {
+         try r.put(final, "usage", try r.usage(chat_usage));
+         if (incomplete) {
+             const d = try r.obj();
+-            try r.put(d, "reason", .{ .string = "max_output_tokens" });
++            try r.put(d, "reason", .{ .string = if (filtered) "content_filter" else "max_output_tokens" });
+             try r.put(final, "incomplete_details", .{ .object = d });
+         } else try r.put(final, "incomplete_details", .null);
+         if (!incomplete) try r.put(final, "completed_at", try r.int(std.Io.Clock.real.now(r.srv.io).toSeconds()));
+diff --git a/zig/src/server/responses_translate.zig b/zig/src/server/responses_translate.zig
+index 338ecbd0..dbe1e9f7 100644
+--- a/zig/src/server/responses_translate.zig
++++ b/zig/src/server/responses_translate.zig
+@@ -10,7 +10,7 @@ const Cx = errors.Cx;
+ const Allocator = std.mem.Allocator;
+ 
+ /// Fields a chat completion reads as they are: OpenAI's and this server's own.
+-const passed = [_][]const u8{ "model", "temperature", "top_p", "top_k", "min_p", "seed", "stream", "parallel_tool_calls", "stop", "draft", "thinking_budget", "ignore_eos", "priority", "return_token_ids", "chat_template_kwargs" };
++const passed = [_][]const u8{ "model", "temperature", "top_p", "top_k", "min_p", "seed", "stream", "parallel_tool_calls", "stop", "draft", "thinking_budget", "loop_guard_stop", "ignore_eos", "priority", "return_token_ids", "chat_template_kwargs" };
+ const refused = [_][2][]const u8{
+     .{ "background", "background responses are not supported: send the request and wait for it" },
+     .{ "conversation", "conversations are not supported: send previous_response_id or the items" },
+diff --git a/zig/src/server/serve.zig b/zig/src/server/serve.zig
+index 83aea4af..14540f54 100644
+--- a/zig/src/server/serve.zig
++++ b/zig/src/server/serve.zig
+@@ -118,7 +118,8 @@ pub fn run(gpa: Allocator, io: std.Io, args: cli.Args, s: Setup) u8 {
+         .enable_thinking = args.thinking,
+         .reasoning_effort = args.reasoning_effort,
+         .thinking_budget = args.thinking_budget,
+-        .loop_guard = args.loop_guard,
++        .loop_guard = args.loop_guard or args.loop_guard_stop,
++        .loop_stop = args.loop_guard_stop,
+         .drop_reasoning_history = args.drop_reasoning_history,
+         .keep_last_n_reasoning = args.keep_last_n_reasoning,
+         .keep_warm_s = args.keep_warm,
+@@ -137,8 +138,8 @@ pub fn run(gpa: Allocator, io: std.Io, args: cli.Args, s: Setup) u8 {
+         return 1;
+     };
+     defer srv.deinit();
+-    if (args.loop_guard and !srv.info.loop_guard) {
+-        std.debug.print("tensorfold: --loop-guard is not supported by this native engine\n", .{});
++    if (srv.config.loop_guard and !srv.info.loop_guard) {
++        std.debug.print("tensorfold: {s} is not supported by this native engine\n", .{if (args.loop_guard_stop) "--loop-guard-stop" else "--loop-guard"});
+         return 2;
+     }
+     if (raiseOpenFileLimit()) |r| log.line("open-file limit raised: soft {d} -> {d}", .{ r[0], r[1] });
+diff --git a/zig/src/server/server.zig b/zig/src/server/server.zig
+index 7cc1ac73..e979ac4a 100644
+--- a/zig/src/server/server.zig
++++ b/zig/src/server/server.zig
+@@ -39,6 +39,8 @@ pub const Config = struct {
+     reasoning_effort: ?[]const u8 = null,
+     thinking_budget: i64 = 0,
+     loop_guard: bool = false,
++    /// --loop-guard-stop: a guarded reply ends where the guard fires, with a loop error and no answer or calls.
++    loop_stop: bool = false,
+     /// The chat template sees no assistant turn's reasoning_content: a client that replays every turn's reasoning
+     /// (DeepSeek-V4.1's template keeps it all once tools are present) no longer feeds the model its own earlier thinking.
+     drop_reasoning_history: bool = false,
+-- 
+2.43.0
+

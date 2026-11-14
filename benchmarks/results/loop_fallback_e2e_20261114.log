@@ -1,0 +1,8 @@
+E2E {"label": "B3", "finish": "stop", "reasoning_tokens": 1861, "content_tokens": 1641, "c_chars": 5742, "tool_calls": [], "dsml_in_content": false, "engine_loop": null, "wall_s": 88.14}
+E2E {"label": "B2", "finish": "tool_calls", "reasoning_tokens": 8193, "content_tokens": 121, "c_chars": 0, "tool_calls": ["read_file", "inspect_logs"], "dsml_in_content": false, "engine_loop": null, "wall_s": 236.55}
+E2E {"label": "B1", "finish": "stop", "reasoning_tokens": 5634, "content_tokens": 4381, "c_chars": 12266, "tool_calls": [], "dsml_in_content": false, "engine_loop": null, "wall_s": 239.32}
+E2E {"label": "L10316", "finish": "stop", "reasoning_tokens": 0, "content_tokens": 2174, "c_chars": 7238, "tool_calls": [], "dsml_in_content": false, "engine_loop": null, "wall_s": 210.71}
+E2E {"label": "Q1s11", "finish": "stop", "reasoning_tokens": 0, "content_tokens": 2614, "c_chars": 8606, "tool_calls": [], "dsml_in_content": false, "engine_loop": null, "wall_s": 205.61}
+E2E {"label": "Q1s22", "finish": "stop", "reasoning_tokens": 0, "content_tokens": 3957, "c_chars": 11617, "tool_calls": [], "dsml_in_content": false, "engine_loop": null, "wall_s": 255.88}
+E2E {"label": "Q3s22", "finish": "stop", "reasoning_tokens": 0, "content_tokens": 1552, "c_chars": 5776, "tool_calls": [], "dsml_in_content": false, "engine_loop": null, "wall_s": 127.19}
+E2E {"label": "L10416", "finish": "stop", "reasoning_tokens": 15337, "content_tokens": 10248, "c_chars": 30207, "tool_calls": [], "dsml_in_content": false, "engine_loop": null, "wall_s": 474.83}

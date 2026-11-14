@@ -1,0 +1,10 @@
+S3B {"rep": 0, "arm": "E_max_rep", "seed": 8178, "finish": "stop", "reas_tok": 1909, "loop_r": false, "loop_r_period": null, "engine_loop": null, "wall_s": 39.68}
+S3B {"rep": 0, "arm": "EB16_rep", "seed": 8179, "finish": "length", "reas_tok": 16385, "loop_r": false, "loop_r_period": null, "engine_loop": null, "wall_s": 303.48}
+S3B {"rep": 1, "arm": "E_max_rep", "seed": 15008, "finish": "length", "reas_tok": 32768, "loop_r": true, "loop_r_period": 433, "engine_loop": null, "wall_s": 290.81}
+S3B {"rep": 1, "arm": "EB16_rep", "seed": 15009, "finish": "tool_calls", "reas_tok": 16385, "loop_r": false, "loop_r_period": null, "engine_loop": null, "wall_s": 152.31}
+S3B {"rep": 2, "arm": "E_max_rep", "seed": 15016, "finish": "length", "reas_tok": 32768, "loop_r": false, "loop_r_period": null, "engine_loop": null, "wall_s": 296.01}
+S3B {"rep": 2, "arm": "EB16_rep", "seed": 15017, "finish": "tool_calls", "reas_tok": 16385, "loop_r": false, "loop_r_period": null, "engine_loop": null, "wall_s": 154.74}
+S3B {"rep": 3, "arm": "E_max_rep", "seed": 15024, "finish": "length", "reas_tok": 32768, "loop_r": false, "loop_r_period": null, "engine_loop": null, "wall_s": 294.65}
+S3B {"rep": 3, "arm": "EB16_rep", "seed": 15025, "finish": "tool_calls", "reas_tok": 16385, "loop_r": true, "loop_r_period": 212, "engine_loop": null, "wall_s": 152.75}
+E_max_rep      ok= 4/ 4 valid= 1 fin={'stop': 1, 'length': 3} tc= 0 dsml= 0 loop_r= 1 | reas_p50=32768 cont_p50=0 | cache_med=0.9765 ttft_p50=1.284 ttft_p90=1.284 wall_p50=294.65
+EB16_rep       ok= 4/ 4 valid= 0 fin={'length': 1, 'tool_calls': 3} tc= 3 dsml= 0 loop_r= 1 | reas_p50=16385 cont_p50=76 | cache_med=0.9765 ttft_p50=1.35 ttft_p90=1.35 wall_p50=154.74

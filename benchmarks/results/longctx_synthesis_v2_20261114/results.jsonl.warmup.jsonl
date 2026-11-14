@@ -1,0 +1,16 @@
+{"conv_idx": 0, "high": {"prompt": 85101, "cached": 83968, "s": 1.0}, "max": {"prompt": 85101, "cached": 83968, "s": 2.4}}
+{"conv_idx": 2, "high": {"prompt": 84485, "cached": 83968, "s": 1.6}, "max": {"prompt": 84485, "cached": 83968, "s": 2.4}}
+{"conv_idx": 1, "high": {"prompt": 85084, "cached": 83968, "s": 2.5}, "max": {"prompt": 85084, "cached": 83968, "s": 2.4}}
+{"conv_idx": 3, "high": {"prompt": 83894, "cached": 81920, "s": 2.9}, "max": {"prompt": 83894, "cached": 81920, "s": 1.3}}
+{"conv_idx": 4, "high": {"prompt": 86277, "cached": 0, "s": 49.4}, "max": {"prompt": 86277, "cached": 0, "s": 48.9}}
+{"conv_idx": 5, "high": {"prompt": 85678, "cached": 0, "s": 46.6}, "max": {"prompt": 85678, "cached": 0, "s": 47.1}}
+{"conv_idx": 6, "high": {"prompt": 85071, "cached": 0, "s": 46.7}, "max": {"prompt": 85071, "cached": 0, "s": 49.1}}
+{"conv_idx": 7, "high": {"prompt": 85074, "cached": 0, "s": 47.0}, "max": {"prompt": 85074, "cached": 0, "s": 46.7}}
+{"conv_idx": 8, "high": {"prompt": 84507, "cached": 0, "s": 48.2}, "max": {"prompt": 84507, "cached": 0, "s": 45.9}}
+{"conv_idx": 9, "high": {"prompt": 84494, "cached": 0, "s": 46.6}, "max": {"prompt": 84494, "cached": 0, "s": 47.5}}
+{"conv_idx": 10, "high": {"prompt": 85071, "cached": 0, "s": 46.2}, "max": {"prompt": 85071, "cached": 0, "s": 48.0}}
+{"conv_idx": 11, "high": {"prompt": 83890, "cached": 0, "s": 50.5}, "max": {"prompt": 83890, "cached": 0, "s": 49.9}}
+{"conv_idx": 12, "high": {"prompt": 85101, "cached": 0, "s": 50.9}, "max": {"prompt": 85101, "cached": 0, "s": 52.7}}
+{"conv_idx": 13, "high": {"prompt": 83904, "cached": 0, "s": 46.4}, "max": {"prompt": 83904, "cached": 0, "s": 47.9}}
+{"conv_idx": 14, "high": {"prompt": 84485, "cached": 0, "s": 50.0}, "max": {"prompt": 84485, "cached": 0, "s": 49.5}}
+{"conv_idx": 15, "high": {"prompt": 85660, "cached": 0, "s": 50.6}, "max": {"prompt": 85660, "cached": 0, "s": 46.9}}

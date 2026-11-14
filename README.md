@@ -164,10 +164,10 @@ Both nodes persist `vm.swappiness = 1` in `/etc/sysctl.d/99-ai-swappiness.conf`.
 
 ## Engine source
 
-The serving engine is pinned in the fork [joseyarashio/TensorFold](https://github.com/joseyarashio/TensorFold), branch `dgx-spark-tp2-p16`, tag `dgx-spark-tp2-p16-consolidated` (commit `c976abd7`, upstream base `bertholomus/TensorFold@fbbc9713`). Rebuild:
+The serving engine is pinned in the fork [joseyarashio/TensorFold](https://github.com/joseyarashio/TensorFold), branch `dgx-spark-tp2-p17`, tag `dgx-spark-tp2-p17-loop-fallback` (commit `e772dec6`; p16 base `c976abd7`, upstream base `bertholomus/TensorFold@fbbc9713`). The p17 rank0 binary is attached to that release. Rebuild:
 
 ```bash
-git clone -b dgx-spark-tp2-p16 https://github.com/joseyarashio/TensorFold.git TensorFold-dsv41-zig
+git clone -b dgx-spark-tp2-p17 https://github.com/joseyarashio/TensorFold.git TensorFold-dsv41-zig
 cd TensorFold-dsv41-zig
 zig build native -Doptimize=fast -Dfatbins=$PWD/fatbins -p out   # tensorfold-native (rank 0)
 zig build        -Doptimize=fast -Dfatbins=$PWD/fatbins -p out   # tf-dsv41-lanes (rank 1)
@@ -195,3 +195,30 @@ The same release also has the exact production binaries (`tensorfold-dsv41-p16-p
 - The single LRU code prompt went 95 → 91 tok/s and its MTP acceptance 0.80 → 0.74. Its output now differs from character 89, and the adaptive depth drafted more (350 → 377) while accepting the same count (281 → 279). It is not an engine regression. The MTP draft path does not read Engram.
 
 **Decode gate.** Do not gate decode on one prompt. Its speed follows its text: across 9 code prompts, greedy spans 79–96 tok/s and acceptance spans 0.64–0.80. `benchmarks/run_decode_gate.py` takes the median over a 9-prompt code sweep plus the C2/C4/C8 ladder. It runs through 8889, waits for an idle window, and drops samples that overlap external traffic. A run passes at ≥ 95% of `benchmarks/gates/decode_gate_baseline.json`. The current baseline (3 reps, per-prompt spread < 1 tok/s) is 88.10 tok/s median greedy, MTP 0.731, C2 117.3, C4 143.4, C8 157.1. Re-baseline with `--write-baseline` only after an intended change that has passed the full regression.
+
+## Reasoning loops: long-loop guard and proxy fallback (p17, 2026-11-15)
+
+**Problem.** The engine's `--loop-guard` only caught cycles of at most 8 tokens. On 85K-token agent turns with tools, DeepSeek-V4.1 also repeats whole passages (periods of 14 to 2,846 tokens). Those replies ran to 32,768 tokens with no answer.
+
+**Engine (fork branch `dgx-spark-tp2-p17`, patches `0066`, `0067`).**
+- `0066` backports the long-loop guard (MiaAI-Lab PR #138 = upstream `ashhart/TensorFold` `e9ba70f4b` + `0ce409c75`). A passage of 9 or more tokens repeated verbatim for at least 1,024 tokens closes the think block. On the four loops the old guard missed, it fired at token 1,772 to 6,220 and saved 13K to 31K tokens each. Replies without a loop are byte-identical (same `token_sha`).
+- `0067` ports `--loop-guard-stop` (upstream `af36c7447`) and adds a per-request `"loop_guard_stop": true`. With it, a reply that loops ends at the fire with `finish_reason: "content_filter"` and `error.code: "reasoning_loop"`, instead of a forced close.
+
+**Why not force the close and let the model answer.** Under long context with tools, the forced close made the model call `read_file` instead of answering. Two fixes were measured on 12 paired cases and rejected:
+- A "write the final answer now" hint at the close: 6/12 vs 6/12 answers.
+- `--loop-guard-stop` with a retry on another seed: the retries looped again (3/3).
+
+**Proxy fallback (`proxy/proxy.py`).** For thinking requests on `/v1/chat/completions`, the proxy adds `loop_guard_stop`. When the engine stops a loop, the proxy re-sends the same request once with `reasoning_effort: "none"` in the same slot and splices that answer into the client's stream or reply. Clients see one normal reply. Disable it with `SPARK_PROXY_LOOP_FALLBACK=0`. Audit records carry `loop_fallback`, `loop_fallback_ok` and `loop_fallback_s`.
+
+**Evidence.**
+- Effort probe on the five cases that looped (two seeds each): `high` answered 3/13 (10 loops), `medium` 6/10, `low` 8/10, `none` 10/10 with no loops.
+- Blind judging (Claude Fable 5.2 and GPT-6 Astra, answers anonymized as X/Y): `none` preferred in 4 of 6 verdicts; mean score 4.0 vs 3.6 for `high`. The sample is small, so read this as "not worse".
+- End to end through 8889 on 8 real looping cases: 7/8 answered. The fallback fired 4 times and succeeded 4 times, adding 38 to 89 s. No DSML leaked into content. The one miss hit `thinking_budget` 8192 and called `read_file`; budget cuts are not covered.
+
+**Regression (rank0 `tensorfold-native` md5 `af133ae9`, proxy md5 `07defdb3`).**
+- 30-question bank 28/30, same two misses.
+- Decode gate passes: median 87.0 tok/s (needs 83.7), MTP 0.726, C2 118.6, C4 141.8, C8 156.8.
+- 1 h standard marathon: 893 requests, 882 × 200 and 11 × 429 (queue timeouts), TTFT p50 10.3 s.
+- During that run, external clients sent 16 requests holding the GPU for 805 s, versus 357 s in the p16 run.
+
+`scripts/post_reboot_verify.py` now also checks the proxy hash against `deployments/manifest.json`, checks that `--loop-guard` is set, and runs one looping prompt to confirm the fallback fires and succeeds after boot.

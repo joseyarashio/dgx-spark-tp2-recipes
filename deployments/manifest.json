@@ -10,28 +10,28 @@
     "cpu_pinning": "5-9,15-19 (10x Cortex-X925 Super-Cores)"
   },
   "cryptographic_hashes": {
-    "recipe_commit": "52c4df5e34cf20e6b4f29d8dde3e892b3f6455ca",
-    "engine_commit": "6e0a623ddbfbb8f68b8c8efbbe116d297e001d4e",
-    "patchset_sha256": "ed98863d757cd11ece3251029cc0aeeef58781297e4db7dbd066b0a7a8dc962b",
+    "recipe_commit": "7b49356275e805ae5e41e30150c1884c969caefd",
+    "engine_commit": "e772dec667a5bcb1ee04d6765ab3187a6ec18b04",
+    "patchset_sha256": "4aaaea1873015b80ec9d8427bb63be4cc23df477c51ed79458035816b99e7c40",
     "kernel_manifest_sha256": "23910cedc7772d855a3bbd9eccd4404c73a96f2ad4ec8cbe9865a267d7c47c33",
-    "launch_config_sha256": "f2debeace94444809bc17c065cf396dfc7d2c5f07e0814b9719926f8b42cb991",
-    "proxy_sha256": "421079a34f61482df269b02a90639ef80cf74cf66201c3131789170bdcae1679"
+    "launch_config_sha256": "be2c5b3ab3ea065e355cc0bbd4801dfb117fc2f97215a421c2aaaaac0c3486b0",
+    "proxy_sha256": "e2039614da2029411ad4c208f672bf262d37d8087028089830f96ba1f20d2e03"
   },
   "engine_binaries": {
-    "rank0_tensorfold_native_sha256": "b6b89c6a920093ce71dd0ad4247f7ebebd5a4363db271fa5272a7c4be13b2699",
+    "rank0_tensorfold_native_sha256": "10d41f91174b005eca43108ac0d894c34473492422bf03688b5e720db253433b",
     "rank1_tf_dsv41_lanes_sha256": "c35d6a8342a80b3c836065f115df659f8858113f727ed2db7515ea7367290aed",
     "node2_tf_dsv41_lanes_sha256": "c35d6a8342a80b3c836065f115df659f8858113f727ed2db7515ea7367290aed",
     "rank1_binary_synced": true
   },
   "memory_audit_ledger": {
-    "measured_at": "2026-11-11 18:54:25 +0800",
-    "rank0_engine_active_gib": 106.23,
+    "measured_at": "2026-11-15 02:00:46 +0800",
+    "rank0_engine_active_gib": 106.38,
     "parallel_slots": 8,
     "kv_pool_allocated_tokens": 2097152,
     "host_prompt_cache_budget_gib": 2.5,
     "cuda_graph_lru_cap": 128,
-    "node1_available_memory_gib": 3.59,
-    "node2_available_memory_gib": 5.41,
+    "node1_available_memory_gib": 3.22,
+    "node2_available_memory_gib": 5.95,
     "engram_mode": "O_DIRECT Linux AIO from local NVMe (203 GB tables)"
   }
 }

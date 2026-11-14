@@ -18,7 +18,7 @@ exec /home/joseyarashio/TensorFold-dsv41-zig/out/native/bin/tensorfold-native se
   --host 0.0.0.0 --port 8888 --name DeepSeek-V4.1-Flash-1017-TF \
   --alias DeepSeek-V4.1-Flash-TF \
   --alias current \
-  --context 1048576 --parallel 8 --thinking --max-tokens 32768 \
+  --context 1048576 --parallel 8 --thinking --max-tokens 32768 --loop-guard \
   $DROP_REASONING_FLAG \
   --prompt-cache-gib 2.5 \
   --learn --learn-dir /home/joseyarashio/.cache/dsv41-nvme-imprint --learn-gib 186.26 \

@@ -73,6 +73,7 @@ def arm():
             "lanes_sha256": m["engine_binaries"]["rank1_tf_dsv41_lanes_sha256"],
             "rank0_sh": sha(f"{LOGS}/rank0.sh"), "rank1_sh": sha(f"{LOGS}/rank1.sh"),
             "start_sh": sha(f"{HOME}/start-dsv41.sh"),
+            "proxy_sha256": m["cryptographic_hashes"]["proxy_sha256"],
             "fatbins_concat": fat2.split()[0] if fat2 else None,
         },
     }
@@ -135,6 +136,8 @@ def run(require_reboot=True):
         _, l2 = n2(f"sha256sum {ENGINE}/out/bin/tf-dsv41-lanes")
         add("rank1 tf-dsv41-lanes sha256（Node2）", l2.split()[0:1] == [e["lanes_sha256"]])
         add("rank0.sh / rank1.sh / start-dsv41.sh 未變", sha(f"{LOGS}/rank0.sh") == e["rank0_sh"] and sha(f"{LOGS}/rank1.sh") == e["rank1_sh"] and sha(f"{HOME}/start-dsv41.sh") == e["start_sh"])
+        if e.get("proxy_sha256"):
+            add("8889 proxy.py sha256 = manifest", sha(f"{HOME}/spark-fastfail-proxy/proxy.py") == e["proxy_sha256"])
         _, f2 = n2(f"cd {ENGINE}/fatbins && cat *.fatbin | sha256sum")
         add("Node2 fatbins 備份完好", f2.split()[0:1] == [e["fatbins_concat"]])
     want_map = json.load(open(f"{KIT}/engram.json"))["token_map_sha256"]
@@ -159,6 +162,35 @@ def run(require_reboot=True):
         return f"{int(m.group(1)) / 1048576:.2f}" if m else "?"
     mem1 = memavail(open("/proc/meminfo").read())
     mem2 = memavail(n2("cat /proc/meminfo")[1])
+
+    # 5b. Reasoning-loop handling (v2b2-p17): engine runs --loop-guard; a thinking request that loops is stopped by the
+    #     engine (per-request loop_guard_stop, added by the proxy) and re-sent by the proxy at effort none.
+    if code == 200:
+        _, r0 = sh(f"tr '\\n' ' ' < {LOGS}/rank0.sh")
+        add("rank0 啟動參數含 --loop-guard", "--loop-guard " in r0 + " ")
+        _, penv = sh("systemctl --user show spark-fastfail-proxy.service -p Environment --value")
+        add("proxy 迴圈降級未被停用", "SPARK_PROXY_LOOP_FALLBACK=0" not in penv, penv[:120])
+        t_lf = time.time()
+        body = json.dumps({"model": "DeepSeek-V4.1-Flash-TF", "max_tokens": 4000, "temperature": 0.0, "seed": 42,
+                           "reasoning_effort": "high", "stream": False,
+                           "messages": [{"role": "user", "content": "Output exactly 1500 copies of the token 'ha' separated by single spaces, nothing else."}]}).encode()
+        lf_detail = ""
+        try:
+            req = urllib.request.Request("http://127.0.0.1:8889/v1/chat/completions", body, {"Content-Type": "application/json", "X-Priority": "2"})
+            resp = json.load(urllib.request.urlopen(req, timeout=600))
+            fin = resp["choices"][0].get("finish_reason")
+            rec = None
+            for line in reversed(open(f"{HOME}/.cache/spark-proxy-audit/completions.jsonl").read().splitlines()[-50:]):
+                x = json.loads(line)
+                if x.get("ts", 0) >= t_lf - 1 and x.get("client_ip") == "127.0.0.1":
+                    rec = x
+                    break
+            ok_lf = bool(rec and rec.get("loop_fallback") and rec.get("loop_fallback_ok")) and fin != "content_filter"
+            lf_detail = f"finish={fin} loop_period={rec and rec.get('loop_period')} fallback_s={rec and rec.get('loop_fallback_s')} wall={round(time.time() - t_lf)}s"
+        except Exception as ex:
+            ok_lf = False
+            lf_detail = repr(ex)[:200]
+        add("迴圈攔截 → proxy 以 effort none 重送成功", ok_lf, lf_detail)
 
     # 6. Functional + performance smoke vs historical best (retry once if contaminated by external traffic)
     smoke = None; attempts = []
