@@ -8,6 +8,7 @@ export TF_FILL_FIRST=2
 export TF_FILL_CUT_IN=8192
 export TF_DS_STREAMS=8
 export TF_DS_WINDOW=2097152
+export MALLOC_ARENA_MAX=4  # glibc kept 49 x 64 MiB per-thread arenas (1.6 GiB RSS) on rank0 after a day of requests; rank1 uses 75 MiB
 export TF_LEARN_TTL_S=0  # no time expiry; the 200 GB (--learn-gib 186.26) LRU cap is the only eviction
 DROP_REASONING_FLAG=""
 if [ "${DROP_REASONING_HISTORY:-1}" = "1" ]; then
@@ -20,6 +21,6 @@ exec /home/joseyarashio/TensorFold-dsv41-zig/out/native/bin/tensorfold-native se
   --alias current \
   --context 1048576 --parallel 8 --thinking --max-tokens 32768 --loop-guard \
   $DROP_REASONING_FLAG \
-  --prompt-cache-gib 2.5 \
+  --prompt-cache-gib 2.0 \
   --learn --learn-dir /home/joseyarashio/.cache/dsv41-nvme-imprint --learn-gib 186.26 \
   --temperature 0.30 --top-p 0.95 --top-k 20 --backend cuda
