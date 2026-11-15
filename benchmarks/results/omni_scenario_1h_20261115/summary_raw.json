@@ -1,0 +1,57 @@
+{
+ "env": {
+  "pilot": false,
+  "start": "2026-11-15 15:10:31",
+  "proxy_sha": "820be1d6",
+  "imprint_files": 3506
+ },
+ "preflight": {
+  "int_effort_400": true,
+  "xhigh_200": true,
+  "xhigh_engine": {
+   "prompt": 40,
+   "cached": 0,
+   "thinking": true,
+   "effort": "xhigh",
+   "tokens": 15,
+   "finish": "stop"
+  },
+  "over_context_4xx": true,
+  "over_context_status": 400,
+  "malformed_json_4xx": true,
+  "malformed_json_status": 400,
+  "cancel_32k_release_s": 12.6,
+  "cancel_32k_cancelled": "prefill",
+  "cancel_100k_release_s": 5.84,
+  "cancel_100k_cancelled": "prefill",
+  "bad_lines": 0
+ },
+ "standard": {
+  "omni_standard": {
+   "rc": 0,
+   "s": 31.2
+  },
+  "full_eval": {
+   "rc": 0,
+   "s": 275.2
+  }
+ },
+ "final": {
+  "close_wait_8888_8889": 0,
+  "probes": [
+   0.095,
+   0.087,
+   0.087,
+   0.086,
+   0.095
+  ],
+  "cutin_short_ttft": 0.839,
+  "n1_mem": 2.9483985900878906,
+  "n1_swap": 361.953125,
+  "n2_mem": 5.86474609375,
+  "n2_swap": 0.03515625,
+  "imprint_files": 3744
+ },
+ "abort": [],
+ "elapsed_min": 50.1
+}

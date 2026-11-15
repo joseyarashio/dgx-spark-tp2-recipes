@@ -1,0 +1,42 @@
+INFO:     Started server process [3776118]
+INFO:     Waiting for application startup.
+2026-11-15 15:16:42 [INFO] spark-fastfail-proxy: Starting proxy with upstream: http://127.0.0.1:18888 (limit=6, bg_max=7, queue_buffer=8, tiered_timeouts=[25.0, 22.0, 19.0, 16.0, 13.0, 10.0, 7.0, 4.0], anti_herd_extension=5.0s, cold_kv=enabled)
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:18889 (Press CTRL+C to quit)
+2026-11-15 15:16:42 [INFO] httpx: HTTP Request: GET http://127.0.0.1:18888/v1/models "HTTP/1.1 200 OK"
+2026-11-15 15:16:42 [INFO] spark-fastfail-proxy: Detected upstream model: 'DeepSeek-V4.1-Flash-1017-TF' -> Concurrency limit set to 8 (was: unknown with limit 6, bg_max=7)
+INFO:     127.0.0.1:43908 - "GET /proxy/status HTTP/1.1" 200 OK
+2026-11-15 15:16:45 [INFO] httpx: HTTP Request: GET http://127.0.0.1:18888/v1/models "HTTP/1.1 200 OK"
+2026-11-15 15:16:46 [INFO] spark-fastfail-proxy: Direct GPU execution [running: 1/8, bg: 0/7, prio: 1, est_tok: 0] (model: DeepSeek-V4.1-Flash-1017-TF)
+2026-11-15 15:16:46 [INFO] httpx: HTTP Request: POST http://127.0.0.1:18888/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:43932 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+2026-11-15 15:16:46 [WARNING] spark-fastfail-proxy: Loop fallback: engine stopped a reasoning loop (req_id=1, period=7); re-sending at effort='none'
+2026-11-15 15:16:46 [INFO] httpx: HTTP Request: POST http://127.0.0.1:18888/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 15:16:46 [INFO] spark-fastfail-proxy: Direct GPU execution [running: 1/8, bg: 0/7, prio: 1, est_tok: 0] (model: DeepSeek-V4.1-Flash-1017-TF)
+2026-11-15 15:16:46 [INFO] httpx: HTTP Request: POST http://127.0.0.1:18888/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:43940 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+2026-11-15 15:16:46 [WARNING] spark-fastfail-proxy: Loop fallback: engine stopped a reasoning loop (req_id=2, period=None); re-sending at effort='none'
+2026-11-15 15:16:46 [INFO] httpx: HTTP Request: POST http://127.0.0.1:18888/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 15:16:46 [INFO] spark-fastfail-proxy: Direct GPU execution [running: 1/8, bg: 0/7, prio: 1, est_tok: 0] (model: DeepSeek-V4.1-Flash-1017-TF)
+2026-11-15 15:16:46 [INFO] httpx: HTTP Request: POST http://127.0.0.1:18888/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:43948 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+2026-11-15 15:16:46 [WARNING] spark-fastfail-proxy: Loop fallback: engine stopped a reasoning loop (req_id=3, period=7); re-sending at effort='none'
+2026-11-15 15:16:46 [INFO] httpx: HTTP Request: POST http://127.0.0.1:18888/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 15:16:46 [INFO] spark-fastfail-proxy: Direct GPU execution [running: 1/8, bg: 0/7, prio: 1, est_tok: 0] (model: DeepSeek-V4.1-Flash-1017-TF)
+2026-11-15 15:16:46 [INFO] httpx: HTTP Request: POST http://127.0.0.1:18888/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:43964 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+2026-11-15 15:16:46 [WARNING] spark-fastfail-proxy: Loop fallback: engine stopped a reasoning loop (req_id=4, period=7); re-sending at effort='none'
+2026-11-15 15:16:46 [INFO] httpx: HTTP Request: POST http://127.0.0.1:18888/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 15:16:46 [INFO] spark-fastfail-proxy: Direct GPU execution [running: 1/8, bg: 0/7, prio: 1, est_tok: 0] (model: DeepSeek-V4.1-Flash-1017-TF)
+2026-11-15 15:16:46 [INFO] httpx: HTTP Request: POST http://127.0.0.1:18888/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:43970 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+2026-11-15 15:16:46 [INFO] spark-fastfail-proxy: Direct GPU execution [running: 1/8, bg: 0/7, prio: 1, est_tok: 0] (model: DeepSeek-V4.1-Flash-1017-TF)
+2026-11-15 15:16:46 [INFO] httpx: HTTP Request: POST http://127.0.0.1:18888/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:43980 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+2026-11-15 15:16:46 [INFO] spark-fastfail-proxy: Direct GPU execution [running: 1/8, bg: 0/7, prio: 1, est_tok: 0] (model: DeepSeek-V4.1-Flash-1017-TF)
+2026-11-15 15:16:46 [INFO] httpx: HTTP Request: POST http://127.0.0.1:18888/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:43982 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [3776118]
