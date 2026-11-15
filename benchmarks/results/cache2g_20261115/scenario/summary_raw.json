@@ -1,0 +1,57 @@
+{
+ "env": {
+  "pilot": false,
+  "start": "2026-11-15 22:17:02",
+  "proxy_sha": "dbc02a5c",
+  "imprint_files": 4030
+ },
+ "preflight": {
+  "int_effort_400": true,
+  "xhigh_200": true,
+  "xhigh_engine": {
+   "prompt": 40,
+   "cached": 0,
+   "thinking": true,
+   "effort": "xhigh",
+   "tokens": 15,
+   "finish": "stop"
+  },
+  "over_context_4xx": true,
+  "over_context_status": 400,
+  "malformed_json_4xx": true,
+  "malformed_json_status": 400,
+  "cancel_32k_release_s": 12.87,
+  "cancel_32k_cancelled": "prefill",
+  "cancel_100k_release_s": 6.05,
+  "cancel_100k_cancelled": "prefill",
+  "bad_lines": 0
+ },
+ "standard": {
+  "omni_standard": {
+   "rc": 0,
+   "s": 31.6
+  },
+  "full_eval": {
+   "rc": 0,
+   "s": 275.2
+  }
+ },
+ "final": {
+  "close_wait_8888_8889": 0,
+  "probes": [
+   0.095,
+   0.084,
+   0.097,
+   0.092,
+   0.09
+  ],
+  "cutin_short_ttft": 0.881,
+  "n1_mem": 3.427417755126953,
+  "n1_swap": 353.29296875,
+  "n2_mem": 5.926055908203125,
+  "n2_swap": 0.03515625,
+  "imprint_files": 4098
+ },
+ "abort": [],
+ "elapsed_min": 52.7
+}

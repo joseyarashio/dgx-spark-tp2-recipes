@@ -1,0 +1,3 @@
+[tensorfold] CUDA sm_121 device 0 (NVIDIA GB10, memory shared with the host): model 105.43 GiB; 8 streams at once, 0.00 GiB each at a 1048576-token window, of 0.0 GiB left after a 12.2 GiB reserve; prompts in 2048-row chunks
+[tensorfold] serving DeepSeek-V4.1-Flash-1017-TF at http://0.0.0.0:8888/v1 (sampling: temperature 0.3, top_p 0.95, top_k 20; drafts: on; context: 1048576; loaded in 24.9s)
+MALLOC_ARENA_MAX=4

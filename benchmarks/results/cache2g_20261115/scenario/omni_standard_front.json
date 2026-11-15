@@ -1,0 +1,188 @@
+{
+  "benchmark": "OmniBench-Principal-Test",
+  "profile": "standard",
+  "timestamp": "2026-11-15 22:17:53",
+  "system_before": {
+    "time": "2026-11-15 22:17:53",
+    "engine_8888": {
+      "status": "ok",
+      "model": "DeepSeek-V4.1-Flash-1017-TF",
+      "model_ids": [
+        "DeepSeek-V4.1-Flash-1017-TF",
+        "DeepSeek-V4.1-Flash-TF",
+        "current"
+      ],
+      "max_batch_size": 8,
+      "warming": false,
+      "memory": {
+        "active": 113214311716,
+        "cache": 0,
+        "peak": 113214311716
+      },
+      "live": {
+        "connections": 0,
+        "waiting": 0,
+        "decode_tokens_per_second": 0.0,
+        "prefill_tokens_per_second": 0.0
+      }
+    },
+    "proxy_8889": {
+      "status": "ok",
+      "model": "DeepSeek-V4.1-Flash-1017-TF",
+      "model_ids": [
+        "DeepSeek-V4.1-Flash-1017-TF",
+        "DeepSeek-V4.1-Flash-TF",
+        "current"
+      ],
+      "max_batch_size": 8,
+      "warming": false,
+      "memory": {
+        "active": 113214311716,
+        "cache": 0,
+        "peak": 113214311716
+      },
+      "live": {
+        "connections": 0,
+        "waiting": 0,
+        "decode_tokens_per_second": 0.0,
+        "prefill_tokens_per_second": 0.0
+      }
+    }
+  },
+  "dimensions": {
+    "quality": {
+      "math_gsm8k": {
+        "passed": true,
+        "ttft": 0.1871,
+        "wall_s": 4.9038
+      },
+      "mmlu_moe": {
+        "passed": true,
+        "ttft": 0.2766,
+        "wall_s": 0.3252
+      },
+      "ifeval_rules": {
+        "passed": true,
+        "interconnect_count": 2,
+        "ends_done": true
+      },
+      "python_code": {
+        "passed": true
+      }
+    },
+    "tool_eval": {
+      "tool_choice_required": {
+        "passed": true,
+        "tool_called": true,
+        "clean_token": true
+      },
+      "tool_choice_auto_plain": {
+        "passed": true
+      }
+    },
+    "prefill": {
+      "prefill_8k_cold": {
+        "prompt_tokens": 5876,
+        "prefill_s": 2.644454606,
+        "tok_s": 2222.0
+      },
+      "prefill_8k_cached": {
+        "cached_tokens": 4096,
+        "ttft_s": 0.9143
+      },
+      "vision_scratch_arena": {
+        "turn1_ttft": 0.7112,
+        "turn2_ttft": 0.4477,
+        "turn2_cached": 0
+      }
+    },
+    "decode": {
+      "decode_greedy": {
+        "tokens_per_second": 89.69193566125523,
+        "mtp_acceptance": 0.7401
+      },
+      "decode_sampling": {
+        "tokens_per_second": 71.82894945804672
+      }
+    },
+    "concurrency": {
+      "concurrency_c1": {
+        "wall_s": 1.75,
+        "total_tokens": 128,
+        "aggregate_tok_s": 73.32
+      },
+      "concurrency_c2": {
+        "wall_s": 2.52,
+        "total_tokens": 256,
+        "aggregate_tok_s": 101.5
+      },
+      "concurrency_c4": {
+        "wall_s": 3.95,
+        "total_tokens": 512,
+        "aggregate_tok_s": 129.75
+      },
+      "cut_in_32k": {
+        "short_ttft_s": 0.7154,
+        "passed": true
+      }
+    },
+    "fault_and_storage": {
+      "cuda_graph_stability": {
+        "engine_healthy": true
+      },
+      "nvme_cold_storage": {
+        "imprint_active": false,
+        "snapshot_files": 0,
+        "total_mb": 0.0
+      }
+    }
+  },
+  "system_after": {
+    "time": "2026-11-15 22:18:25",
+    "engine_8888": {
+      "status": "ok",
+      "model": "DeepSeek-V4.1-Flash-1017-TF",
+      "model_ids": [
+        "DeepSeek-V4.1-Flash-1017-TF",
+        "DeepSeek-V4.1-Flash-TF",
+        "current"
+      ],
+      "max_batch_size": 8,
+      "warming": false,
+      "memory": {
+        "active": 113236249892,
+        "cache": 0,
+        "peak": 113236249892
+      },
+      "live": {
+        "connections": 0,
+        "waiting": 0,
+        "decode_tokens_per_second": 55.0,
+        "prefill_tokens_per_second": 155.5
+      }
+    },
+    "proxy_8889": {
+      "status": "ok",
+      "model": "DeepSeek-V4.1-Flash-1017-TF",
+      "model_ids": [
+        "DeepSeek-V4.1-Flash-1017-TF",
+        "DeepSeek-V4.1-Flash-TF",
+        "current"
+      ],
+      "max_batch_size": 8,
+      "warming": false,
+      "memory": {
+        "active": 113236249892,
+        "cache": 0,
+        "peak": 113236249892
+      },
+      "live": {
+        "connections": 0,
+        "waiting": 0,
+        "decode_tokens_per_second": 55.0,
+        "prefill_tokens_per_second": 155.5
+      }
+    }
+  },
+  "total_elapsed_seconds": 31.56
+}

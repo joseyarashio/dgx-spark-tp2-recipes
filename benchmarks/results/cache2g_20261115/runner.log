@@ -1,0 +1,7 @@
+2026-11-15 22:15:12 === cache2g start; before restart: n1 2.43 GiB, n2 5.55 GiB ===
+2026-11-15 22:16:01 restart rc=0 (=== DeepSeek-V4.1-Flash-1017-TF is LIVE on port 8888! ===)
+2026-11-15 22:17:02 after restart idle 60 s: n1 5.42 GiB, n2 8.45 GiB
+2026-11-15 23:09:42 scenario rc=0 ([23:09:42 + 52.7m] run_done {"elapsed_min": 52.7, "abort": []})
+2026-11-15 23:13:44 decode gate rc=0 ({"verdict": "pass", "sweep_prompts_clean": 9, "sweep_greedy_tps": 86.99, "sweep_mtp_accept": 0.7309, "sweep_greedy_min": 78.1, "sweep_greedy_max": 94.52, "c2_ag)
+2026-11-15 23:23:44 idle tail end: n1 3.54 GiB, n2 5.92 GiB
+2026-11-15 23:23:48 === done ===
