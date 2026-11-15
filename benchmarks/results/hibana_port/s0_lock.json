@@ -1,0 +1,18 @@
+{
+ "time": "2026-11-15 03:18:31",
+ "recipes_head": "227f615a6558ee48f6fbc8effd40ef9166c65550",
+ "engine_head": "e772dec667a5bcb1ee04d6765ab3187a6ec18b04",
+ "rank0_tensorfold_native": "10d41f91174b005eca43108ac0d894c34473492422bf03688b5e720db253433b",
+ "rank1_lanes_node1": "c35d6a8342a80b3c836065f115df659f8858113f727ed2db7515ea7367290aed",
+ "rank0_sh": "340cdaaf05eb0ceaa6e2fec42234a892cf51fdfcb386094c321e80d855f01b3a",
+ "rank1_sh_node1": "cd6ff5c80e4e1c33d05556c35bc295f30280a860c04cb287619188f800f8c619",
+ "start_dsv41_sh": "8a47102d2799240e16c0e73bb1845820ba1be5fbf19913b0f805b9a35d836993",
+ "proxy_py": "e2039614da2029411ad4c208f672bf262d37d8087028089830f96ba1f20d2e03",
+ "baseline_refs": {
+  "bank": "full_eval_stage2b2_p16_tokenmapfix_loopfallback.json (28/30)",
+  "decode_gate": "decode_gate_loopfallback.json",
+  "marathon_1h": "omni_eval_1hour_p16_tokenmapfix_loopfallback.json"
+ },
+ "node2_lanes": "c35d6a8342a80b3c836065f115df659f8858113f727ed2db7515ea7367290aed",
+ "node2_rank1_sh": "cd6ff5c80e4e1c33d05556c35bc295f30280a860c04cb287619188f800f8c619"
+}

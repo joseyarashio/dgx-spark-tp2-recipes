@@ -1,0 +1,7 @@
+rank0 bin: 4b60c2bb398c80a5
+rank1 bin: 004e47511d0ce961
+rank0.sh env: export TF_DS_MOE_BUDGET=4:48:5
+rank1.sh env: export TF_DS_MOE_BUDGET=4:48:5
+HEALTHY
+info: moe budget: keep 4, cap 48, from 5 streams (rank 0; verify rounds only)
+info: moe budget: keep 4, cap 48, from 5 streams (rank 1; verify rounds only)

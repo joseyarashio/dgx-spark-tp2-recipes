@@ -1,0 +1,1 @@
+{"rank": 0, "rounds": 6400, "calls": 256000, "fired": 116122, "sum_streams": 1772400, "sum_union_before": 12327659, "sum_union_after": 11457612, "dropped_slots": 888618, "dropped_weight_e6": 77667118826, "max_rescale_e6": 2543651}

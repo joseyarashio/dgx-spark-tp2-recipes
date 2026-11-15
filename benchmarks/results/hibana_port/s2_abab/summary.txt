@@ -1,0 +1,6 @@
+A1 {"verdict": "pass", "sweep_prompts_clean": 9, "sweep_greedy_tps": 87.88, "sweep_mtp_accept": 0.7309, "sweep_greedy_min": 78.67, "sweep_greedy_max": 95.93, "c2_agg": 112.32, "c2_streams_ok": true, "c4_agg": 144.87, "c4_streams_ok": true, "c8_agg": 158.51, "c8_s
+B1 {"verdict": "pass", "sweep_prompts_clean": 9, "sweep_greedy_tps": 87.47, "sweep_mtp_accept": 0.7309, "sweep_greedy_min": 78.59, "sweep_greedy_max": 95.14, "c2_agg": 113.99, "c2_streams_ok": true, "c4_agg": 145.27, "c4_streams_ok": true, "c8_agg": 168.09, "c8_s
+A2 {"verdict": "pass", "sweep_prompts_clean": 9, "sweep_greedy_tps": 87.32, "sweep_mtp_accept": 0.7309, "sweep_greedy_min": 78.46, "sweep_greedy_max": 95.17, "c2_agg": 113.61, "c2_streams_ok": true, "c4_agg": 144.1, "c4_streams_ok": true, "c8_agg": 157.95, "c8_st
+B2 {"verdict": "pass", "sweep_prompts_clean": 9, "sweep_greedy_tps": 86.97, "sweep_mtp_accept": 0.7309, "sweep_greedy_min": 78.29, "sweep_greedy_max": 94.7, "c2_agg": 114.24, "c2_streams_ok": true, "c4_agg": 142.94, "c4_streams_ok": true, "c8_agg": 168.18, "c8_st
+restored: 10d41f91174b005e
+DONE

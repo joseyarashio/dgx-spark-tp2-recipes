@@ -1,0 +1,12 @@
+{"label": "A1_gsm8k", "set": "gsm8k", "n": 500, "correct": 489, "status_ok": 500, "finish_length": 4, "mean_tokens": 202.056, "wall_s": 680.8, "gen_tok_s": 148.4, "mtp_accept": 0.9626, "tokens_per_round": 2.266, "metrics_delta": {"tensorfold:mtp_drafted_total": 58541.0, "tensorfold:mtp_accepted_total": 56353.0, "tensorfold:generation_tokens_total": 101028.0, "tensorfold:decode_rounds_total": 44582.0}}
+{"label": "A1_aime", "set": "aime", "n": 30, "correct": 22, "status_ok": 24, "finish_length": 2, "mean_tokens": 2827.2, "wall_s": 507.4, "gen_tok_s": 167.15, "mtp_accept": 0.851, "tokens_per_round": 2.244, "metrics_delta": {"tensorfold:mtp_drafted_total": 55251.0, "tensorfold:mtp_accepted_total": 47021.0, "tensorfold:generation_tokens_total": 84816.0, "tensorfold:decode_rounds_total": 37789.0}}
+A1 done 09:38:04
+{"label": "B1_gsm8k", "set": "gsm8k", "n": 500, "correct": 487, "status_ok": 500, "finish_length": 3, "mean_tokens": 201.29, "wall_s": 660.8, "gen_tok_s": 152.3, "mtp_accept": 0.9636, "tokens_per_round": 2.268, "metrics_delta": {"tensorfold:mtp_drafted_total": 58293.0, "tensorfold:mtp_accepted_total": 56174.0, "tensorfold:generation_tokens_total": 100645.0, "tensorfold:decode_rounds_total": 44378.0}}
+{"label": "B1_aime", "set": "aime", "n": 30, "correct": 17, "status_ok": 20, "finish_length": 2, "mean_tokens": 2619.3, "wall_s": 476.2, "gen_tok_s": 165.03, "mtp_accept": 0.8402, "tokens_per_round": 2.193, "metrics_delta": {"tensorfold:mtp_drafted_total": 50874.0, "tensorfold:mtp_accepted_total": 42744.0, "tensorfold:generation_tokens_total": 78579.0, "tensorfold:decode_rounds_total": 35830.0}}
+B1 done 09:57:58
+{"label": "C1_gsm8k", "set": "gsm8k", "n": 500, "correct": 487, "status_ok": 500, "finish_length": 4, "mean_tokens": 203.246, "wall_s": 595.4, "gen_tok_s": 170.69, "mtp_accept": 0.9614, "tokens_per_round": 2.266, "metrics_delta": {"tensorfold:mtp_drafted_total": 58962.0, "tensorfold:mtp_accepted_total": 56689.0, "tensorfold:generation_tokens_total": 101623.0, "tensorfold:decode_rounds_total": 44849.0}}
+C1 done 10:08:50
+{"label": "A2_gsm8k", "set": "gsm8k", "n": 500, "correct": 489, "status_ok": 500, "finish_length": 4, "mean_tokens": 202.056, "wall_s": 681.9, "gen_tok_s": 148.16, "mtp_accept": 0.9643, "tokens_per_round": 2.268, "metrics_delta": {"tensorfold:mtp_drafted_total": 58482.0, "tensorfold:mtp_accepted_total": 56394.0, "tensorfold:generation_tokens_total": 101028.0, "tensorfold:decode_rounds_total": 44541.0}}
+A2 done 10:21:06
+restored 10d41f91174b005e
+DONE

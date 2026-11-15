@@ -1,0 +1,8 @@
+rank0 bin: 64bc1faf8d392127
+rank1 bin: 08588e333bd9b3b1
+rank0.sh env: export TF_DS_MOE_BUDGET=4:48:5
+bash: 列 1: EXPERT_STATS：指令找不到
+rank1.sh env: none
+HEALTHY
+info: moe budget: keep 4, cap 48, from 5 streams (rank 0; verify rounds only)
+info: moe budget: keep 4, cap 48, from 5 streams (rank 1; verify rounds only)

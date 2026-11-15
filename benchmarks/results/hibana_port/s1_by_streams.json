@@ -1,0 +1,35 @@
+{
+ "1 stream": [
+  "keep 6 cap  0 per  0: experts read 17.8 (100% of union) | drop mean 0.000 p95 0.000 | rows losing 0%",
+  "keep 5 cap  0 per 20: experts read 16.9 (95% of union) | drop mean 0.022 p95 0.123 | rows losing 22%",
+  "keep 5 cap  0 per 16: experts read 16.1 (90% of union) | drop mean 0.041 p95 0.133 | rows losing 39%",
+  "keep 4 cap  0 per 20: experts read 16.5 (93% of union) | drop mean 0.030 p95 0.189 | rows losing 21%",
+  "keep 4 cap  0 per 16: experts read 15.0 (84% of union) | drop mean 0.069 p95 0.250 | rows losing 45%",
+  "keep 4 cap  0 per 12: experts read 13.4 (75% of union) | drop mean 0.115 p95 0.270 | rows losing 71%",
+  "keep 3 cap  0 per 12: experts read 12.1 (68% of union) | drop mean 0.155 p95 0.392 | rows losing 72%",
+  "keep 4 cap 48 per  0: experts read 17.8 (100% of union) | drop mean 0.000 p95 0.000 | rows losing 0%",
+  "keep 4 cap 32 per  0: experts read 17.8 (100% of union) | drop mean 0.000 p95 0.000 | rows losing 0%"
+ ],
+ "2-4 streams": [
+  "keep 6 cap  0 per  0: experts read 36.6 (100% of union) | drop mean 0.000 p95 0.000 | rows losing 0%",
+  "keep 5 cap  0 per 20: experts read 36.4 (100% of union) | drop mean 0.001 p95 0.000 | rows losing 2%",
+  "keep 5 cap  0 per 16: experts read 35.9 (98% of union) | drop mean 0.007 p95 0.082 | rows losing 7%",
+  "keep 4 cap  0 per 20: experts read 36.4 (99% of union) | drop mean 0.002 p95 0.000 | rows losing 1%",
+  "keep 4 cap  0 per 16: experts read 35.6 (97% of union) | drop mean 0.009 p95 0.088 | rows losing 6%",
+  "keep 4 cap  0 per 12: experts read 32.9 (90% of union) | drop mean 0.035 p95 0.204 | rows losing 25%",
+  "keep 3 cap  0 per 12: experts read 32.5 (89% of union) | drop mean 0.038 p95 0.233 | rows losing 24%",
+  "keep 4 cap 48 per  0: experts read 35.5 (97% of union) | drop mean 0.009 p95 0.091 | rows losing 7%",
+  "keep 4 cap 32 per  0: experts read 30.5 (83% of union) | drop mean 0.061 p95 0.236 | rows losing 43%"
+ ],
+ "5-8 streams": [
+  "keep 6 cap  0 per  0: experts read 51.9 (100% of union) | drop mean 0.000 p95 0.000 | rows losing 0%",
+  "keep 5 cap  0 per 20: experts read 51.9 (100% of union) | drop mean 0.000 p95 0.000 | rows losing 0%",
+  "keep 5 cap  0 per 16: experts read 51.9 (100% of union) | drop mean 0.000 p95 0.000 | rows losing 0%",
+  "keep 4 cap  0 per 20: experts read 51.9 (100% of union) | drop mean 0.000 p95 0.000 | rows losing 0%",
+  "keep 4 cap  0 per 16: experts read 51.9 (100% of union) | drop mean 0.000 p95 0.000 | rows losing 0%",
+  "keep 4 cap  0 per 12: experts read 51.9 (100% of union) | drop mean 0.000 p95 0.000 | rows losing 0%",
+  "keep 3 cap  0 per 12: experts read 51.9 (100% of union) | drop mean 0.000 p95 0.000 | rows losing 0%",
+  "keep 4 cap 48 per  0: experts read 46.1 (89% of union) | drop mean 0.036 p95 0.190 | rows losing 28%",
+  "keep 4 cap 32 per  0: experts read 37.4 (72% of union) | drop mean 0.111 p95 0.266 | rows losing 73%"
+ ]
+}

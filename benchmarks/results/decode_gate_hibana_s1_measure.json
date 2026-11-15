@@ -1,0 +1,284 @@
+{
+  "label": "hibana_s1_measure",
+  "time": "2026-11-15 03:53:41",
+  "sweep": [
+    {
+      "tps": 87.915625624957,
+      "accepted": 279,
+      "drafted": 374,
+      "rounds": 104,
+      "tokens": 384,
+      "sha": "da1be55357e4",
+      "clk": [
+        2392,
+        2476
+      ],
+      "external": 0,
+      "idle_before": true,
+      "status": 200,
+      "prompt": 0,
+      "rep": 0
+    },
+    {
+      "tps": 91.07916041163885,
+      "accepted": 284,
+      "drafted": 373,
+      "rounds": 99,
+      "tokens": 384,
+      "sha": "a23a55be3770",
+      "clk": [
+        2476,
+        2476
+      ],
+      "external": 0,
+      "idle_before": true,
+      "status": 200,
+      "prompt": 1,
+      "rep": 0
+    },
+    {
+      "tps": 82.0962640458908,
+      "accepted": 268,
+      "drafted": 381,
+      "rounds": 115,
+      "tokens": 384,
+      "sha": "01c7bfbd078d",
+      "clk": [
+        2463,
+        2476
+      ],
+      "external": 0,
+      "idle_before": true,
+      "status": 200,
+      "prompt": 2,
+      "rep": 0
+    },
+    {
+      "tps": 84.4789421770432,
+      "accepted": 274,
+      "drafted": 380,
+      "rounds": 110,
+      "tokens": 384,
+      "sha": "9d9ab0811119",
+      "clk": [
+        2476,
+        2476
+      ],
+      "external": 0,
+      "idle_before": true,
+      "status": 200,
+      "prompt": 3,
+      "rep": 0
+    },
+    {
+      "tps": 87.01269989999207,
+      "accepted": 277,
+      "drafted": 379,
+      "rounds": 107,
+      "tokens": 384,
+      "sha": "635b97b1df78",
+      "clk": [
+        2476,
+        2470
+      ],
+      "external": 0,
+      "idle_before": true,
+      "status": 200,
+      "prompt": 4,
+      "rep": 0
+    },
+    {
+      "tps": 92.72771683206892,
+      "accepted": 287,
+      "drafted": 358,
+      "rounds": 96,
+      "tokens": 384,
+      "sha": "819d0820362a",
+      "clk": [
+        2470,
+        2476
+      ],
+      "external": 0,
+      "idle_before": true,
+      "status": 200,
+      "prompt": 5,
+      "rep": 0
+    },
+    {
+      "tps": 81.40750610832083,
+      "accepted": 270,
+      "drafted": 397,
+      "rounds": 113,
+      "tokens": 384,
+      "sha": "7e72d7079aa8",
+      "clk": [
+        2476,
+        2476
+      ],
+      "external": 0,
+      "idle_before": true,
+      "status": 200,
+      "prompt": 6,
+      "rep": 0
+    },
+    {
+      "tps": 85.02970274782135,
+      "accepted": 275,
+      "drafted": 372,
+      "rounds": 109,
+      "tokens": 384,
+      "sha": "04362bf4fa07",
+      "clk": [
+        2476,
+        2476
+      ],
+      "external": 0,
+      "idle_before": true,
+      "status": 200,
+      "prompt": 7,
+      "rep": 0
+    },
+    {
+      "tps": 76.49310701768997,
+      "accepted": 260,
+      "drafted": 404,
+      "rounds": 123,
+      "tokens": 384,
+      "sha": "067e98f62da1",
+      "clk": [
+        2476,
+        2476
+      ],
+      "external": 0,
+      "idle_before": true,
+      "status": 200,
+      "prompt": 8,
+      "rep": 0
+    }
+  ],
+  "c2": [
+    {
+      "agg_tps": 108.47397471908268,
+      "wall": 7.0800392627716064,
+      "tokens": [
+        384,
+        384
+      ],
+      "accept": 0.7784172661870503,
+      "statuses": [
+        200,
+        200
+      ],
+      "clk": [
+        2476,
+        2476
+      ],
+      "external": 0,
+      "idle_before": true
+    }
+  ],
+  "c4": [
+    {
+      "agg_tps": 145.02529715161168,
+      "wall": 10.59125566482544,
+      "tokens": [
+        384,
+        384,
+        384,
+        384
+      ],
+      "accept": 0.8368962787015044,
+      "statuses": [
+        200,
+        200,
+        200,
+        200
+      ],
+      "clk": [
+        2476,
+        2476
+      ],
+      "external": 0,
+      "idle_before": true
+    }
+  ],
+  "c8": [
+    {
+      "agg_tps": 157.53349027953502,
+      "wall": 19.50061535835266,
+      "tokens": [
+        384,
+        384,
+        384,
+        384,
+        384,
+        384,
+        384,
+        384
+      ],
+      "accept": 0.9400593471810089,
+      "statuses": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ],
+      "clk": [
+        2476,
+        2385
+      ],
+      "external": 0,
+      "idle_before": true
+    }
+  ],
+  "summary": {
+    "sweep_prompts_clean": 9,
+    "sweep_greedy_tps": 85.03,
+    "sweep_mtp_accept": 0.7309,
+    "sweep_greedy_min": 76.49,
+    "sweep_greedy_max": 92.73,
+    "c2_agg": 108.47,
+    "c2_streams_ok": true,
+    "c4_agg": 145.03,
+    "c4_streams_ok": true,
+    "c8_agg": 157.53,
+    "c8_streams_ok": true
+  },
+  "checks": {
+    "sweep_greedy_tps": {
+      "value": 85.03,
+      "need": 83.695,
+      "baseline": 88.1,
+      "ok": true
+    },
+    "sweep_mtp_accept": {
+      "value": 0.7309,
+      "need": 0.6944,
+      "baseline": 0.7309,
+      "ok": true
+    },
+    "c2_agg": {
+      "value": 108.47,
+      "need": 111.454,
+      "baseline": 117.32,
+      "ok": false
+    },
+    "c4_agg": {
+      "value": 145.03,
+      "need": 136.2585,
+      "baseline": 143.43,
+      "ok": true
+    },
+    "c8_agg": {
+      "value": 157.53,
+      "need": 149.207,
+      "baseline": 157.06,
+      "ok": true
+    }
+  },
+  "verdict": "fail"
+}

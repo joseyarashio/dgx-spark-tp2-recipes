@@ -1,0 +1,19 @@
+{
+ "label": "A1_gsm8k",
+ "set": "gsm8k",
+ "n": 500,
+ "correct": 489,
+ "status_ok": 500,
+ "finish_length": 4,
+ "mean_tokens": 202.056,
+ "wall_s": 680.8,
+ "gen_tok_s": 148.4,
+ "mtp_accept": 0.9626,
+ "tokens_per_round": 2.266,
+ "metrics_delta": {
+  "tensorfold:mtp_drafted_total": 58541.0,
+  "tensorfold:mtp_accepted_total": 56353.0,
+  "tensorfold:generation_tokens_total": 101028.0,
+  "tensorfold:decode_rounds_total": 44582.0
+ }
+}

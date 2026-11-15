@@ -1,0 +1,13 @@
+sweep 0 0 87.2 279/374 ext 0
+sweep 0 1 90.6 284/373 ext 0
+sweep 0 2 81.6 268/381 ext 0
+sweep 0 3 84.0 274/380 ext 0
+sweep 0 4 86.3 277/379 ext 0
+sweep 0 5 92.3 287/358 ext 0
+sweep 0 6 80.9 270/397 ext 0
+sweep 0 7 84.4 275/372 ext 0
+sweep 0 8 76.0 260/404 ext 0
+c2 0 111.1 2/2 streams ok ext 0
+c4 0 142.4 4/4 streams ok ext 0
+c8 0 155.4 8/8 streams ok ext 0
+{"verdict": "fail", "sweep_prompts_clean": 9, "sweep_greedy_tps": 84.39, "sweep_mtp_accept": 0.7309, "sweep_greedy_min": 76.02, "sweep_greedy_max": 92.33, "c2_agg": 111.11, "c2_streams_ok": true, "c4_agg": 142.39, "c4_streams_ok": true, "c8_agg": 155.37, "c8_streams_ok": true, "checks": {"sweep_greedy_tps": {"value": 84.39, "need": 83.695, "baseline": 88.1, "ok": true}, "sweep_mtp_accept": {"value": 0.7309, "need": 0.6944, "baseline": 0.7309, "ok": true}, "c2_agg": {"value": 111.11, "need": 111.454, "baseline": 117.32, "ok": false}, "c4_agg": {"value": 142.39, "need": 136.2585, "baseline": 143.43, "ok": true}, "c8_agg": {"value": 155.37, "need": 149.207, "baseline": 157.06, "ok": true}}}

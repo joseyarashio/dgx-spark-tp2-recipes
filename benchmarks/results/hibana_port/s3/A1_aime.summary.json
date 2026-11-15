@@ -1,0 +1,19 @@
+{
+ "label": "A1_aime",
+ "set": "aime",
+ "n": 30,
+ "correct": 22,
+ "status_ok": 24,
+ "finish_length": 2,
+ "mean_tokens": 2827.2,
+ "wall_s": 507.4,
+ "gen_tok_s": 167.15,
+ "mtp_accept": 0.851,
+ "tokens_per_round": 2.244,
+ "metrics_delta": {
+  "tensorfold:mtp_drafted_total": 55251.0,
+  "tensorfold:mtp_accepted_total": 47021.0,
+  "tensorfold:generation_tokens_total": 84816.0,
+  "tensorfold:decode_rounds_total": 37789.0
+ }
+}
