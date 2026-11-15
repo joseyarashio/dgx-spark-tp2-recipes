@@ -918,7 +918,11 @@ def worker(i, t_end):
     while time.time() < t_end and not STOP_ADMIT.is_set():
         f = rnd.choices([f for f, _ in SCEN], weights=[w for _, w in SCEN])[0]
         try:
-            f()
+            row = f()
+            # honour the proxy's Retry-After: 1 like a real client. Without it, after burst2 (8/8 running, queue 8/8)
+            # six workers re-sent at once and logged 187 429s in 2 s (cache2g run, t=2272-2273).
+            if isinstance(row, dict) and row.get("status") == 429:
+                time.sleep(1.0)
         except Exception as e:
             write("errors.jsonl", {"t": now_rel(), "worker": i, "err": repr(e)[:300]})
             time.sleep(1)
