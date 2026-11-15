@@ -22,6 +22,11 @@ DSML = ("<｜DSML｜", "</｜DSML｜", "<tool_call>")
 # Node1 runs at ~3.2-3.6 GiB MemAvailable in steady state with --prompt-cache-gib 2.5 (the reviewers' 4/6 GiB lines
 # would abort an idle healthy cluster); the proxy prefill ladder bottoms out at 2.65 GiB.
 ABORT_N1_GIB, ABORT_N2_GIB, GATE_N1_GIB = 2.5, 3.0, 2.8
+# A reading below the line must persist this many consecutive 1 s samples before the run aborts: a healthy cluster dips
+# 0.3-0.5 GiB for 10-15 s while 3-4 contexts of 100K-200K tokens run with Imprint writes (2026-11-15 queue2 run tripped
+# on one 2.47 GiB sample). Below the hard floor the run aborts at once.
+ABORT_SUSTAIN_S = 20
+HARD_N1_GIB, HARD_N2_GIB = 2.0, 2.5
 SWAP_GROWTH_ABORT_MIB = 512
 
 ap = argparse.ArgumentParser()
@@ -135,6 +140,7 @@ telem = []
 def telemetry_loop():
     swap0 = None
     bad_health = 0
+    low1 = low2 = 0
     cl = httpx.Client(timeout=2.0)
     while not STOP_TELEM.is_set():
         t = time.time()
@@ -166,10 +172,19 @@ def telemetry_loop():
         bad_health = bad_health + 1 if not row.get("eng_ok") else 0
         if bad_health >= 5:
             trip("engine /health not ok for 5 s")
-        if row.get("n1_mem") is not None and row["n1_mem"] < ABORT_N1_GIB:
-            trip(f"Node1 MemAvailable {row['n1_mem']:.2f} GiB < {ABORT_N1_GIB}")
-        if row.get("n2_mem") is not None and row["n2_mem"] < ABORT_N2_GIB:
-            trip(f"Node2 MemAvailable {row['n2_mem']:.2f} GiB < {ABORT_N2_GIB}")
+        m1, m2 = row.get("n1_mem"), row.get("n2_mem")
+        low1 = low1 + 1 if (m1 is not None and m1 < ABORT_N1_GIB) else 0
+        low2 = low2 + 1 if (m2 is not None and m2 < ABORT_N2_GIB) else 0
+        if low1 == 1:
+            event("mem_dip_n1", gib=round(m1, 2), long_inflight=long_inflight[0], long_tokens=long_tokens[0])
+        if m1 is not None and m1 < HARD_N1_GIB:
+            trip(f"Node1 MemAvailable {m1:.2f} GiB < hard floor {HARD_N1_GIB}")
+        elif low1 >= ABORT_SUSTAIN_S:
+            trip(f"Node1 MemAvailable < {ABORT_N1_GIB} GiB for {low1} s (now {m1:.2f})")
+        if m2 is not None and m2 < HARD_N2_GIB:
+            trip(f"Node2 MemAvailable {m2:.2f} GiB < hard floor {HARD_N2_GIB}")
+        elif low2 >= ABORT_SUSTAIN_S:
+            trip(f"Node2 MemAvailable < {ABORT_N2_GIB} GiB for {low2} s (now {m2:.2f})")
         if swap0 and row.get("n1_swap") is not None and row["n1_swap"] - swap0[0] > SWAP_GROWTH_ABORT_MIB:
             trip(f"Node1 swap grew {row['n1_swap'] - swap0[0]:.0f} MiB")
         if swap0 and row.get("n2_swap") is not None and row["n2_swap"] - swap0[1] > SWAP_GROWTH_ABORT_MIB:
@@ -715,28 +730,45 @@ class Session:
 inflight_tokens = [0]
 cold_long = [0]
 BUDGET_TOKENS = 1_600_000   # sum of (prompt + max_tokens) in flight; the shared KV pool is 2,097,152 positions
+# Long-context cap (plan A after the queue2 run): at most LONG_MAX requests with a prompt above LONG_THRESHOLD tokens
+# in flight at once, and at most LONG_TOKENS_MAX prompt tokens across them. 3-4 concurrent 100K-200K contexts plus
+# Imprint writes pushed Node1 MemAvailable 0.3-0.5 GiB under its idle level.
+LONG_THRESHOLD, LONG_MAX, LONG_TOKENS_MAX = 80_000, 2, 450_000
+long_inflight = [0]
+long_tokens = [0]
 pause_cold = threading.Event()
 
 
-def reserve(n, cold_big=False, wait=60):
+def reserve(n, cold_big=False, wait=60, prompt=0):
+    """Reserve n in-flight tokens; a prompt above LONG_THRESHOLD also takes one long-context slot."""
+    is_long = prompt > LONG_THRESHOLD
     t = time.time()
     while True:
         with lock:
-            if inflight_tokens[0] + n <= BUDGET_TOKENS and (not cold_big or (cold_long[0] < 1 and not pause_cold.is_set())):
+            ok = inflight_tokens[0] + n <= BUDGET_TOKENS and (not cold_big or (cold_long[0] < 1 and not pause_cold.is_set()))
+            if is_long:
+                ok = ok and long_inflight[0] < LONG_MAX and long_tokens[0] + prompt <= LONG_TOKENS_MAX
+            if ok:
                 inflight_tokens[0] += n
                 if cold_big:
                     cold_long[0] += 1
+                if is_long:
+                    long_inflight[0] += 1
+                    long_tokens[0] += prompt
                 return True
         if time.time() - t > wait or ABORT.is_set():
             return False
         time.sleep(0.5)
 
 
-def release(n, cold_big=False):
+def release(n, cold_big=False, prompt=0):
     with lock:
         inflight_tokens[0] -= n
         if cold_big:
             cold_long[0] -= 1
+        if prompt > LONG_THRESHOLD:
+            long_inflight[0] -= 1
+            long_tokens[0] -= prompt
 
 
 SESSIONS = []
@@ -747,18 +779,28 @@ def s1():
     free = [s for s in SESSIONS if s.name not in REVISIT and s.busy.acquire(blocking=False)]
     if not free:
         return s3a()
-    s = free[0]
-    for o in free[1:]:
-        o.busy.release()
+    # a free session that fits now: long ones only while a long-context slot is open, else a short one, else S3a
+    pick = None
+    for s in free:
+        p = s.est_tokens()
+        if p <= LONG_THRESHOLD or reserve(p + 33000, s.turns == 0 and s.base > 50000, wait=0, prompt=p):
+            pick = (s, p, p > LONG_THRESHOLD)
+            break
+    for o in free:
+        if pick is None or o is not pick[0]:
+            o.busy.release()
+    if pick is None:
+        return s3a()
+    s, p, reserved = pick
+    big_cold = s.turns == 0 and s.base > 50000
+    n = p + 33000
     try:
-        big_cold = s.turns == 0 and s.base > 50000
-        n = s.est_tokens() + 33000
-        if not reserve(n, big_cold):
+        if not reserved and not reserve(n, big_cold, prompt=p):
             return None
         try:
             return s.turn()
         finally:
-            release(n, big_cold)
+            release(n, big_cold, prompt=p)
     finally:
         s.busy.release()
 
@@ -931,15 +973,15 @@ def needle_220k():
         cut = int(len(body_txt) * 0.6)
         text = f"[{nonce}]\n" + body_txt[:cut] + f"\n# NOTE: the deployment secret is {code}\n" + body_txt[cut:]
         n = len(text) // 4 + 128
-        if not reserve(n, cold_big=False, wait=180):
-            event("needle_skipped", reason="token budget")
+        if not reserve(n, cold_big=False, wait=240, prompt=n):
+            event("needle_skipped", reason="token budget / long-context cap")
             return None
-        event("needle_start", est_tokens=n)
+        event("needle_start", est_tokens=n, long_inflight=long_inflight[0])
         try:
             r = chat({"messages": [{"role": "user", "content": text + "\n\nWhat is the deployment secret written in the NOTE comment? Reply with it only."}],
                       "max_tokens": 64, "reasoning_effort": "none"}, priority=1, scenario="NEEDLE", timeout=900)
         finally:
-            release(n)
+            release(n, prompt=n)
         u = r.get("usage") or {}
         rec = record(r, valid=valid(r, allow_length=True), found=code in r["content"], prompt_tokens=u.get("prompt_tokens"),
                      cached=(u.get("prompt_tokens_details") or {}).get("cached_tokens"))
@@ -953,13 +995,14 @@ def needle_220k():
 def cancel_100k(after):
     nonce = time.time_ns()
     n = 100000
-    if not reserve(n + 300, wait=120):
+    if not reserve(n + 300, wait=180, prompt=n):
+        event("cancel100k_skipped", reason="long-context cap")
         return None
     try:
         body = {"messages": [{"role": "user", "content": f"[{nonce}]\n" + code_corpus(n, nonce) + "\nSummarize."}], "max_tokens": 256, "reasoning_effort": "none"}
         r = chat(body, priority=1, prefill_cancel_at=after, scenario="CANCEL100K", tag=f"after{after}s")
     finally:
-        release(n + 300)
+        release(n + 300, prompt=n)
     tc = r.get("t_cancel_abs") or time.time()
     c0 = telem[-1].get("eng_conn") if telem else None
     event("cancel100k_done", after=after, cancelled=r["cancelled"], status=r["status"], wall=r.get("wall"), eng_conn_at_cancel=c0, bad_lines=len(bad_lines))
@@ -970,7 +1013,15 @@ def revisit(sess):
     idle = round(time.time() - sess.last_used)
     d0 = len(disk_reads)
     with sess.busy:
-        r = sess.turn(max_tokens=3000)
+        p = sess.est_tokens()
+        if not reserve(p + 3000, wait=240, prompt=p):
+            event("revisit_skipped", session=sess.name, reason="long-context cap")
+            REVISIT.pop(sess.name, None)
+            return None
+        try:
+            r = sess.turn(max_tokens=3000)
+        finally:
+            release(p + 3000, prompt=p)
     reads = disk_reads[d0:]
     event("revisit_done", session=sess.name, idle_s=idle, prompt=r.get("prompt_tokens"), cached=r.get("cached_tokens"), ttft=r.get("ttft"), disk_reads=reads)
     REVISIT.pop(sess.name, None)

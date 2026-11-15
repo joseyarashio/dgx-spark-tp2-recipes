@@ -1,0 +1,5 @@
+2026-11-15 19:26:30 === plan A start (proxy sha dbc02a5c) ===
+2026-11-15 19:33:56 pilot rc=0 ([19:33:56 +  7.4m] run_done {"elapsed_min": 7.4, "abort": []})
+2026-11-15 20:17:17 scenario rc=0 ([20:17:17 + 43.4m] run_done {"elapsed_min": 43.4, "abort": ["Node1 MemAvailable < 2.5 GiB for 20 s (now 2.45)"]})
+2026-11-15 20:21:29 decode gate rc=0 ({"verdict": "pass", "sweep_prompts_clean": 9, "sweep_greedy_tps": 86.94, "sweep_mtp_accept": 0.7309, "sweep_greedy_min": 78.32, "sweep_greedy_max": 93.67, "c2_a)
+2026-11-15 20:26:32 === done ===
