@@ -1,0 +1,45 @@
+======================================================================
+=== DGX Spark TP=2 Principal Test (OmniBench) ===
+Profile: standard | Target Ports: 8888 / 8889 | Time: 2026-11-15 17:08:36
+======================================================================
+
+--- [1/6] Quality Bench (sparkDash Aligned) ---
+  GSM8K Math Combinatorics: PASS (TTFT: 0.1879s)
+  MMLU-Pro Knowledge:   PASS (TTFT: 0.2892s)
+  IFEval Constraints:   PASS (Count: 2/2, Ends: True)
+  Python Code Assert:   PASS
+
+--- [2/6] Tool Eval Bench (PR #118 Handle Fix Check) ---
+  Tool Required Call:   PASS (Function: True, FirstTokenClean: True)
+  Tool Auto Precision:  PASS (No hallucinated tool calls)
+
+--- [3/6] Prefill Bench (Gradient Scaling & Cache Hit) ---
+  Cold 8K Prefill:      1625.3 tok/s (Tokens: 5876, Prefill: 3.615s)
+  Cached 8K Prefill:    TTFT 0.994s (Cached: 4096/5876 tokens)
+  Vision Arena Reuse:   Turn 1 TTFT: 0.4623s, Turn 2 TTFT: 0.4601s (Cached: 0)
+
+--- [4/6] Decode Bench (Greedy, MTP & Sampling) ---
+  Greedy Decode Rate:   87.86 tok/s (MTP Acceptance: 74.0%)
+  Sampling (T=0.7):     71.45 tok/s
+
+--- [5/6] Concurrency & Cut-In Scheduling Bench ---
+  Concurrency C=1:     Aggregate 72.28 tok/s (Wall: 1.77s, Tokens: 128)
+  Concurrency C=2:     Aggregate 98.18 tok/s (Wall: 2.61s, Tokens: 256)
+  Concurrency C=4:     Aggregate 124.57 tok/s (Wall: 4.11s, Tokens: 512)
+  Testing 32K Cut-in Short Request (PR #95)...
+  32K Cut-in TTFT:      PASS (0.761s, target <= 1.5s)
+
+--- [6/6] Fault Isolation (PR #119) & NVMe Storage Bench ---
+  CUDA Graph Engine:    HEALTHY (status: ok)
+  NVMe Snapshots:       INACTIVE (0 .bin files, 0.0 MB)
+
+======================================================================
+OmniBench Completed in 33.16s
+Summary Scorecard:
+  - Quality Pass Rate:     4/4
+  - PR #118 Tool Gate:     PASS
+  - Single Stream Decode:  87.86 tok/s
+  - MTP Speculative Rate:  74.0%
+======================================================================
+Report saved to: /home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/results/queue2_memprobe_20261115/scenario/omni_standard_front.json
+

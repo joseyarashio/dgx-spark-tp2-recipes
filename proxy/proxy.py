@@ -767,9 +767,11 @@ async def acquire_slot(priority: int = 1, prefix_key: str = "", req_id: int = 0,
             bg_max = state.get("background_max_slots", 5)
 
             # Background queue buffer partition:
-            # Low-priority background tasks (prio >= 2) cannot consume more than queue_max - 1 spots!
-            # Always preserve at least 1 queue spot for interactive P0 / normal P1!
-            if priority >= 2 and len(waiting_queue) >= max(1, queue_max - 1):
+            # Low-priority background tasks (prio >= 2) cannot consume more than queue_max - 2 spots,
+            # so at least 2 queue spots stay free for interactive P0 / normal P1. With 1 spot (the old rule) a P2
+            # burst that filled 7/8 left room for one queued P0, and the next P0 got queue_full (OmniScenario-1h
+            # 2026-11-15 burst1: 16 P2 + 2 P0 -> 1 P0 rejected).
+            if priority >= 2 and len(waiting_queue) >= max(1, queue_max - 2):
                 return False, "bg_queue_capacity_reached"
 
             # 1. Direct GPU execution if eligible and nobody waiting ahead with better unified score

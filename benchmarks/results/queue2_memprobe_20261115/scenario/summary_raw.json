@@ -1,0 +1,59 @@
+{
+ "env": {
+  "pilot": false,
+  "start": "2026-11-15 17:07:46",
+  "proxy_sha": "dbc02a5c",
+  "imprint_files": 3750
+ },
+ "preflight": {
+  "int_effort_400": true,
+  "xhigh_200": true,
+  "xhigh_engine": {
+   "prompt": 40,
+   "cached": 0,
+   "thinking": true,
+   "effort": "xhigh",
+   "tokens": 15,
+   "finish": "stop"
+  },
+  "over_context_4xx": true,
+  "over_context_status": 400,
+  "malformed_json_4xx": true,
+  "malformed_json_status": 400,
+  "cancel_32k_release_s": 12.87,
+  "cancel_32k_cancelled": "prefill",
+  "cancel_100k_release_s": 5.64,
+  "cancel_100k_cancelled": "prefill",
+  "bad_lines": 0
+ },
+ "standard": {
+  "omni_standard": {
+   "rc": 0,
+   "s": 33.2
+  },
+  "full_eval": {
+   "rc": 0,
+   "s": 282.6
+  }
+ },
+ "final": {
+  "close_wait_8888_8889": 0,
+  "probes": [
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  "cutin_short_ttft": null,
+  "n1_mem": 3.016399383544922,
+  "n1_swap": 361.47265625,
+  "n2_mem": 6.036407470703125,
+  "n2_swap": 0.03515625,
+  "imprint_files": 3834
+ },
+ "abort": [
+  "Node1 MemAvailable 2.47 GiB < 2.5"
+ ],
+ "elapsed_min": 28.7
+}
