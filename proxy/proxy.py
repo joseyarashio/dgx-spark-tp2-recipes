@@ -41,6 +41,46 @@ LOOP_FALLBACK_ENABLED = os.environ.get("SPARK_PROXY_LOOP_FALLBACK", "1") == "1"
 LOOP_FALLBACK_EFFORT = os.environ.get("SPARK_PROXY_LOOP_FALLBACK_EFFORT", "none")
 
 
+def _thinking_switch(body_json: Any) -> Optional[bool]:
+    """The explicit thinking switch exactly as the engine reads it (zig/src/server/fields.zig thinkingFields), or None.
+    chat_template_kwargs counts only when truthy; when it is an object, a present "enable_thinking" key decides (by
+    truthiness, even when null/false); without that key the "thinking" alias decides (a bool, or an object whose type is
+    "enabled"/"disabled"). The proxy used to read only enable_thinking, so {"thinking": true} with max_tokens <= 256
+    was rewritten to effort none and then switched back on by the engine at the template's default effort."""
+    if not isinstance(body_json, dict):
+        return None
+    kw = body_json.get("chat_template_kwargs")
+    if not kw or not isinstance(kw, dict):
+        return None
+    if "enable_thinking" in kw:
+        return bool(kw.get("enable_thinking"))
+    alias = kw.get("thinking")
+    if isinstance(alias, bool):
+        return alias
+    if isinstance(alias, dict) and isinstance(alias.get("type"), str):
+        if alias["type"] == "enabled":
+            return True
+        if alias["type"] == "disabled":
+            return False
+    return None
+
+
+def _thinking_on(body_json: Any) -> bool:
+    """Whether the engine will think for this body (server runs with --thinking): the explicit switch, else the effort
+    (top-level reasoning_effort first, then chat_template_kwargs.reasoning_effort) is anything but "none"."""
+    sw = _thinking_switch(body_json)
+    if sw is not None:
+        return sw
+    if not isinstance(body_json, dict):
+        return True
+    eff = body_json.get("reasoning_effort")
+    if eff is None:
+        kw = body_json.get("chat_template_kwargs")
+        if isinstance(kw, dict) and kw:
+            eff = kw.get("reasoning_effort")
+    return eff != "none"
+
+
 def _write_audit_record(rec: Dict[str, Any]) -> None:
     try:
         AUDIT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -101,6 +141,7 @@ def _build_audit_meta(
         "orig_effort": orig_effort,
         "effort_rewritten": bool(effort_rewritten),
         "enable_thinking": enable_thinking,
+        "thinking_on": _thinking_on(body_json),
         "thinking_budget": body_json.get("thinking_budget") if isinstance(body_json, dict) else None,
         "temperature": body_json.get("temperature") if isinstance(body_json, dict) else None,
         "max_tokens": max_tok,
@@ -976,7 +1017,8 @@ async def proxy_all(request: Request, path: str):
                 has_tools = isinstance(tools_val, list) and len(tools_val) > 0
                 max_tok_val = body_json.get("max_tokens") if body_json.get("max_tokens") is not None else body_json.get("max_completion_tokens")
                 ctk_val = body_json.get("chat_template_kwargs")
-                enable_thinking_explicit = ctk_val.get("enable_thinking") if isinstance(ctk_val, dict) else None
+                # the switch as the engine reads it: enable_thinking, else the "thinking" alias
+                thinking_switch = _thinking_switch(body_json)
                 if (
                     SHORT_NO_THINK_MAX_TOKENS > 0
                     and not has_tools
@@ -984,7 +1026,7 @@ async def proxy_all(request: Request, path: str):
                     and not isinstance(max_tok_val, bool)
                     and 0 < max_tok_val <= SHORT_NO_THINK_MAX_TOKENS
                     and orig_effort != "none"
-                    and enable_thinking_explicit is not True
+                    and thinking_switch is not True
                 ):
                     logger.info(
                         f"Short No-Think Stop-Loss: rewriting reasoning_effort={orig_effort!r} to 'none' "
@@ -994,7 +1036,7 @@ async def proxy_all(request: Request, path: str):
                     effort_rewritten = True
                     body_modified = True
 
-                thinking_off = body_json.get("reasoning_effort") == "none" or enable_thinking_explicit is False
+                thinking_off = not _thinking_on(body_json)  # same switch/effort precedence as the engine
                 if (
                     LOOP_FALLBACK_ENABLED
                     and path.strip("/").endswith("chat/completions")

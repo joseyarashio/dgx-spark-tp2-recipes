@@ -1,0 +1,19 @@
+external requests 387 span 2026-11-13 21:26:13.724000 -> 2026-11-15 12:29:24.819000
+paths {'v1/chat/completions': 387} stream {True: 386, False: 1}
+with tools 269 returned tool_calls 188
+tool_choice {'None': 291, 'function': 94, 'none': 2}
+prompt tokens p50/p90/p99/max 16509 113204 208349 220182  >50K: 123
+messages p50/p90 2 105
+max_tokens [(None, 121), (120, 94), (3000, 94), (32768, 55), (1024, 12), (4096, 11)]
+outcome {'ok': 341, 'client_left': 45, 'proxy_429': 1} finish {'stop': 103, 'None': 46, 'length': 50, 'tool_calls': 188}
+hist_reasoning_msgs>0 114
+effort=none 55 reasoning tok p50/p90/max 0 0 0 finish [('stop', 54), ('None', 1)]
+effort=low 157 reasoning tok p50/p90/max 120 1078 3000 finish [('length', 50), ('None', 42), ('stop', 36), ('tool_calls', 29)]
+effort=medium 57 reasoning tok p50/p90/max 60 1892 5073 finish [('tool_calls', 52), ('stop', 4), ('None', 1)]
+effort=high 118 reasoning tok p50/p90/max 130 910 3280 finish [('tool_calls', 107), ('stop', 9), ('None', 2)]
+proxy effort_rewritten (low->none short output) 54
+loop_fallback fired 0 shadow loop detections 4
+low + named function tool_choice + finish=length (all 3000 tokens in reasoning, 0 content, no tool call): 10
+>100K prompts cached fraction p50 0.97 ttft p50/max 4.8732 125.4782
+engine log last 6h effort values seen: high 54, low 19, none 24 (no medium/max)
+external requests by hour [(0, 24), (1, 39), (2, 76), (3, 38), (4, 3), (10, 29), (11, 50), (12, 38), (13, 59), (21, 2), (22, 25), (23, 4)]

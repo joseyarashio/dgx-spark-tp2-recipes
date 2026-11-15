@@ -1,0 +1,44 @@
+======================================================================
+=== DGX Spark TP=2 Principal Test (OmniBench) ===
+Profile: smoke | Target Ports: 8888 / 8889 | Time: 2026-11-15 14:48:21
+======================================================================
+
+--- [1/6] Quality Bench (sparkDash Aligned) ---
+  GSM8K Math Combinatorics: PASS (TTFT: 0.1813s)
+  MMLU-Pro Knowledge:   PASS (TTFT: 0.2796s)
+  IFEval Constraints:   PASS (Count: 2/2, Ends: True)
+  Python Code Assert:   PASS
+
+--- [2/6] Tool Eval Bench (PR #118 Handle Fix Check) ---
+  Tool Required Call:   PASS (Function: True, FirstTokenClean: True)
+  Tool Auto Precision:  PASS (No hallucinated tool calls)
+
+--- [3/6] Prefill Bench (Gradient Scaling & Cache Hit) ---
+  Cold 8K Prefill:      2228.6 tok/s (Tokens: 5876, Prefill: 2.637s)
+  Cached 8K Prefill:    TTFT 0.916s (Cached: 4096/5876 tokens)
+  Vision Arena Reuse:   Turn 1 TTFT: 0.4345s, Turn 2 TTFT: 0.4402s (Cached: 0)
+
+--- [4/6] Decode Bench (Greedy, MTP & Sampling) ---
+  Greedy Decode Rate:   89.95 tok/s (MTP Acceptance: 74.0%)
+  Sampling (T=0.7):     72.29 tok/s
+
+--- [5/6] Concurrency & Cut-In Scheduling Bench ---
+  Concurrency C=1:     Aggregate 73.75 tok/s (Wall: 1.74s, Tokens: 128)
+  Concurrency C=2:     Aggregate 102.06 tok/s (Wall: 2.51s, Tokens: 256)
+  Testing 32K Cut-in Short Request (PR #95)...
+  32K Cut-in TTFT:      PASS (0.766s, target <= 1.5s)
+
+--- [6/6] Fault Isolation (PR #119) & NVMe Storage Bench ---
+  CUDA Graph Engine:    HEALTHY (status: ok)
+  NVMe Snapshots:       INACTIVE (0 .bin files, 0.0 MB)
+
+======================================================================
+OmniBench Completed in 27.15s
+Summary Scorecard:
+  - Quality Pass Rate:     4/4
+  - PR #118 Tool Gate:     PASS
+  - Single Stream Decode:  89.95 tok/s
+  - MTP Speculative Rate:  74.0%
+======================================================================
+Report saved to: /home/joseyarashio/dgx-spark-tp2-recipes/benchmarks/results/omni_eval_smoke_thinkalias.json
+

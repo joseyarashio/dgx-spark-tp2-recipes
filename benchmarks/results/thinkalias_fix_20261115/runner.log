@@ -1,0 +1,6 @@
+2026-11-15 14:41:26 === thinkalias regression start (proxy sha 820be1d6) ===
+2026-11-15 14:41:26 truth table rc=1 (ModuleNotFoundError: No module named 'cold_kv')
+2026-11-15 14:43:48 loop fallback check rc=0 ({"case": "5_stream_loop_effort_none", "stream": true, "finish": "length", "content_chars": 11999, "reasoning_chars": 0, "tool_calls": [], "error": null, "tensorfold_loop": null, "events": 672, "role_deltas": 1, "wall_s": 22.6, "content_head": "ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha ha "})
+2026-11-15 14:48:21 full_eval rc=0
+2026-11-15 14:48:49 smoke rc=0
+2026-11-15 14:48:49 === thinkalias regression done ===

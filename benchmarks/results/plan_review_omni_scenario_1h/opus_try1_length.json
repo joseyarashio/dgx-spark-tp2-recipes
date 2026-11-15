@@ -1,0 +1,18 @@
+{
+ "model": "anthropic/claude-opus-5-5",
+ "ok": true,
+ "wall": 252.9,
+ "finish": "length",
+ "usage": {
+  "prompt_tokens": 13094,
+  "completion_tokens": 24000,
+  "total_tokens": 37094,
+  "prompt_tokens_details": {
+   "cached_tokens": 0
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 24000
+  }
+ },
+ "content": ""
+}

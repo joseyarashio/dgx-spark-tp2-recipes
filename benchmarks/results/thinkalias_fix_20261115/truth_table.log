@@ -1,0 +1,21 @@
+ok   {} -> True want True
+ok   {'reasoning_effort': 'none'} -> False want False
+ok   {'reasoning_effort': 'low'} -> True want True
+ok   {'chat_template_kwargs': {'enable_thinking': True}} -> True want True
+ok   {'chat_template_kwargs': {'enable_thinking': False}} -> False want False
+ok   {'chat_template_kwargs': {'enable_thinking': None}} -> False want False
+ok   {'chat_template_kwargs': {'enable_thinking': 0}} -> False want False
+ok   {'chat_template_kwargs': {'thinking': True}} -> True want True
+ok   {'chat_template_kwargs': {'thinking': False}} -> False want False
+ok   {'chat_template_kwargs': {'thinking': {'type': 'enabled'}}} -> True want True
+ok   {'chat_template_kwargs': {'thinking': {'type': 'disabled'}}} -> False want False
+ok   {'chat_template_kwargs': {'thinking': 'yes'}} -> True want True
+ok   {'chat_template_kwargs': {'enable_thinking': False, 'thinking': True}} -> False want False
+ok   {'reasoning_effort': 'none', 'chat_template_kwargs': {'enable_thinking': True}} -> True want True
+ok   {'reasoning_effort': 'high', 'chat_template_kwargs': {'enable_thinking': False}} -> False want False
+ok   {'reasoning_effort': 'none', 'chat_template_kwargs': {'thinking': True}} -> True want True
+ok   {'chat_template_kwargs': {'reasoning_effort': 'none'}} -> False want False
+ok   {'reasoning_effort': 'high', 'chat_template_kwargs': {'reasoning_effort': 'none'}} -> True want True
+ok   {'chat_template_kwargs': {}} -> True want True
+ok   {'chat_template_kwargs': 'x'} -> True want True
+20/20 pass
