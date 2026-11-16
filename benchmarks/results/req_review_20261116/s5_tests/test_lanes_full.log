@@ -1,0 +1,69 @@
+1/57 lanes.test_0...OK
+2/57 engine_test.test.drafted rounds commit the one-token decode, greedy and sampled...OK
+3/57 engine_test.test.shared rounds commit what each stream commits alone...OK
+4/57 engine_test.test.the thinking budget's forced close is the same drafted, plain and shared...OK
+5/57 engine_test.test.the loop guard matches drafted and plain, reports its period, and answers after close...OK
+6/57 engine_test.test.a cycle in the answer does not refire or reclose...OK
+7/57 long_loop.test.a repeated passage fires once a whole period and 1,024 tokens repeat, at the same token in windows...OK
+8/57 long_loop.test.no long cycle in text that does not repeat, or that repeats less than the rule asks...OK
+9/57 long_loop_test.test.the loop guard closes a long repeated passage's reasoning at one token, a token at a time or in windows...OK
+10/57 long_loop_backport_test.test.history is not indexed or rewritten and healthy output is unchanged...OK
+11/57 long_loop_backport_test.test.disabled guard does not allocate an index or change output...OK
+12/57 long_loop_backport_test.test.index vector failure preserves stream state and retry...OK
+13/57 long_loop_backport_test.test.index map failure preserves stream state and retry...OK
+14/57 long_loop_backport_test.test.empty and finished commits allocate no detector storage...OK
+15/57 long_loop_backport_test.test.answer after the think closer is not watched by the guard...OK
+16/57 gpu_full_test.test.the Metal engine draws top_k off and above 1,024 with tf_sample_full, the rest as before...OK
+17/57 gpu_full_test.test.with top_k off and top_p 1.0 the whole vocabulary is drawn, not tf_gpu_sample's 1,024...OK
+18/57 gpu_full_test.test.a nucleus past 1,024 tokens ends where its mass reaches top_p...OK
+19/57 gpu_full_test.test.top_k above 1,024 keeps its top_k tokens and cuts its nucleus over them...OK
+20/57 gpu_full_test.test.min_p keeps every token within ln(min_p) of the max, past 1,024 too...OK
+21/57 gpu_full_test.test.where tf_gpu_sample's 1,024 hold the kept tokens both rules draw the same token...OK
+22/57 gpu_full_test.test.a uniform that rounds to 1.0 does not win the race from the tail...OK
+23/57 structure_test.test.a json_object reply is the same drafted, plain and shared, greedy and sampled...OK
+24/57 structure_test.test.a json_schema reply and a choice reply are the same drafted, plain and shared, greedy and sampled...OK
+25/57 structure_test.test.the first token is drawn again when the grammar refuses the prompt row's pick...OK
+26/57 structure_test.test.under the thinking budget's close the grammar starts after </think>, its next token masked...OK
+27/57 structure_test.test.a forced token the grammar refuses fails only its stream...OK
+28/57 structure_test.test.an engine whose rounds run ahead, or whose backend cannot redraw, refuses a structured stream...OK
+29/57 table.test.table get and put...OK
+30/57 allocate.test.allocate takes the widest round when no cost is timed...OK
+31/57 allocate.test.extendCosts interpolates and extrapolates...OK
+32/57 accept.test.accept path follows matching children...OK
+33/57 accept.test.sanitize drops orphans...OK
+34/57 proposer.test.suffix lookup copies the continuation after a repeated n-gram...OK
+35/57 sampling.test.seeds keep 63 bits and uniforms fall in (0, 1]...OK
+36/57 fill.test.suffix candidates find what followed earlier occurrences, longest match first...OK
+37/57 fill.test.graft without a trunk keeps shared prefixes once and respects the budget...OK
+38/57 fill.test.graft extends the head's chain and leaves it only at the head's own ranked tokens...OK
+39/57 shape.test.odds that only the head's first choice lands give a chain...OK
+40/57 shape.test.a second choice joins once it beats the chain's next lane, and lanes follow their parents...OK
+41/57 shape.test.observed lanes move the odds from the prior...OK
+42/57 plan_lanes.test.a cheap wide window picks the widest tree, a costly one a short chain...OK
+43/57 plan_lanes.test.a pick whose own rounds run past its table price loses to one that does not...OK
+44/57 plan_lanes.test.grafts that keep landing win the round when they add more rows than the head would...OK
+45/57 gpu_rule.test.key order and uniform range...OK
+46/57 depth.test.depth picks the most tokens a ms and probes deeper...OK
+47/57 config.test.setup derives widths like Python...OK
+48/57 config.test.solo allowance is opt-in and preserved by setup...OK
+49/57 config.test.solo allowance rejects invalid costs before allocating...OK
+50/57 config.test.copy windows stay on unless a backend opts out...OK
+51/57 stream.test.commit stops at eos and length...OK
+52/57 stream.test.loop guard stops at the cap even when no cycle fires...OK
+53/57 stream.test.loop guard stop policy finishes the stream at the fire and forces no close (--loop-guard-stop)...OK
+54/57 stream.test.loop guard fires, closes thinking, and latches once...OK
+55/57 events.test.lines sort keys like json.dumps(sort_keys=True)...OK
+56/57 windows.test.fixed cost excludes shared, copied, forced and unconfigured windows...OK
+57/57 windows.test.copy opt-out only closes the copy gate...OK
+All 57 tests passed.
+1/4 lanes_units.test.depth rule, costs and allocation (depth.jsonl)...SKIP
+2/4 lanes_units.test.suffix proposer (proposer.jsonl)...SKIP
+3/4 lanes_units.test.keyed host sampler (sampling.jsonl)...SKIP
+4/4 lanes_units.test.stream commits, thinking cuts and room (stream.jsonl)...SKIP
+0 passed; 4 skipped; 0 failed.
+1/5 lanes_replay.test.greedy one stream...SKIP
+2/5 lanes_replay.test.sampled one stream (temperature 0.7, top-p 0.95)...SKIP
+3/5 lanes_replay.test.two concurrent streams...SKIP
+4/5 lanes_replay.test.drafts off...SKIP
+5/5 lanes_replay.test.GPU sampler rule on recorded rows...SKIP
+0 passed; 5 skipped; 0 failed.

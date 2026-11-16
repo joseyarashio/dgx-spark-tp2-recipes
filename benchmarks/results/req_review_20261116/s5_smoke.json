@@ -1,0 +1,204 @@
+{
+  "exact": [
+    {
+      "name": "greedy_chat_nothink",
+      "status": 200,
+      "sha": "889af629b112",
+      "p17": "889af629b112",
+      "equal": true
+    },
+    {
+      "name": "greedy_code_nothink",
+      "status": 200,
+      "sha": "a5c88d7bef40",
+      "p17": "a5c88d7bef40",
+      "equal": true
+    },
+    {
+      "name": "greedy_think",
+      "status": 200,
+      "sha": "7300d07033ec",
+      "p17": "7300d07033ec",
+      "equal": true
+    },
+    {
+      "name": "sampled_seed_nothink",
+      "status": 200,
+      "sha": "e1b812065df7",
+      "p17": "e1b812065df7",
+      "equal": true
+    },
+    {
+      "name": "greedy_tools",
+      "status": 200,
+      "sha": "185a84a5cecc",
+      "p17": "185a84a5cecc",
+      "equal": true
+    }
+  ],
+  "so": [
+    {
+      "name": "macbook_replay_json_object_nothink",
+      "port": 8889,
+      "status": 200,
+      "wall_s": 0.26,
+      "finish": "stop",
+      "valid": true,
+      "keys": [
+        "city",
+        "country"
+      ],
+      "tool_calls": false,
+      "content": "{\"city\": \"Taipei\", \"country\": \"Taiwan\"}",
+      "error": null,
+      "reasoning_chars": 0,
+      "tps": 97.05598486614346,
+      "tokens": 15
+    },
+    {
+      "name": "json_schema_greedy_nothink",
+      "port": 8889,
+      "status": 200,
+      "wall_s": 0.77,
+      "finish": "stop",
+      "valid": true,
+      "keys": [
+        "age",
+        "confidence",
+        "name",
+        "tags"
+      ],
+      "tool_calls": false,
+      "content": "{\n  \"name\": \"Dr. Elara Voss\",\n  \"age\": 34,\n  \"tags\": [\"engineer\", \"fictional\"],\n  \"confidence\": 0.95\n}",
+      "error": null,
+      "reasoning_chars": 0,
+      "tps": 67.17861228328621,
+      "tokens": 47
+    },
+    {
+      "name": "json_schema_sampled_T030",
+      "port": 8889,
+      "status": 200,
+      "wall_s": 0.78,
+      "finish": "stop",
+      "valid": true,
+      "keys": [
+        "age",
+        "confidence",
+        "name",
+        "tags"
+      ],
+      "tool_calls": false,
+      "content": "{\n  \"name\": \"Dr. Elara Voss\",\n  \"age\": 34,\n  \"tags\": [\"engineer\", \"fictional\"],\n  \"confidence\": 0.95\n}",
+      "error": null,
+      "reasoning_chars": 0,
+      "tps": 65.74017391302907,
+      "tokens": 47
+    },
+    {
+      "name": "json_schema_thinking_low",
+      "port": 8889,
+      "status": 200,
+      "wall_s": 3.36,
+      "finish": "stop",
+      "valid": true,
+      "keys": [
+        "age",
+        "confidence",
+        "name",
+        "tags"
+      ],
+      "tool_calls": false,
+      "content": "{\n  \"name\": \"Dr. Mira Voss\",\n  \"age\": 37,\n  \"tags\": [\"fictional\", \"engineer\"],\n  \"confidence\": 0.99\n}",
+      "error": null,
+      "reasoning_chars": 723,
+      "tps": 63.2662962770583,
+      "tokens": 203
+    },
+    {
+      "name": "guided_choice",
+      "port": 8889,
+      "status": 200,
+      "wall_s": 0.14,
+      "finish": "stop",
+      "valid": true,
+      "keys": null,
+      "tool_calls": false,
+      "content": "yes",
+      "error": null,
+      "reasoning_chars": 0,
+      "tps": 27.02154530489031,
+      "tokens": 2
+    },
+    {
+      "name": "json_schema_with_tools_auto",
+      "port": 8889,
+      "status": 200,
+      "wall_s": 1.1,
+      "finish": "stop",
+      "valid": true,
+      "keys": [
+        "age",
+        "confidence",
+        "name",
+        "tags"
+      ],
+      "tool_calls": false,
+      "content": "{\n  \"name\": \"Dr. Elara Voss\",\n  \"age\": 38,\n  \"tags\": [\"engineer\", \"fictional\"],\n  \"confidence\": 0.95\n}",
+      "error": null,
+      "reasoning_chars": 0,
+      "tps": 68.65793289301698,
+      "tokens": 47
+    },
+    {
+      "name": "json_schema_loop_guard_stop",
+      "port": 8888,
+      "status": 200,
+      "wall_s": 2.97,
+      "finish": "stop",
+      "valid": true,
+      "keys": [
+        "age",
+        "confidence",
+        "name",
+        "tags"
+      ],
+      "tool_calls": false,
+      "content": "{\n  \"name\": \"Mira Voss\",\n  \"age\": 34,\n  \"tags\": [\"fictional\", \"engineer\"],\n  \"confidence\": 0.99\n}",
+      "error": null,
+      "reasoning_chars": 648,
+      "tps": 65.22861669365682,
+      "tokens": 184
+    },
+    {
+      "name": "refuse_regex",
+      "port": 8888,
+      "status": 400,
+      "wall_s": 0.0,
+      "finish": null,
+      "valid": null,
+      "keys": null,
+      "tool_calls": false,
+      "content": "",
+      "error": "guided_regex: this engine enforces json_object, json_schema and choice, not regex",
+      "reasoning_chars": 0,
+      "tps": null,
+      "tokens": null
+    },
+    {
+      "name": "refuse_pattern",
+      "port": 8888,
+      "status": 400,
+      "wall_s": 0.0,
+      "finish": null,
+      "valid": null,
+      "keys": null,
+      "tool_calls": false,
+      "content": "",
+      "error": "response_format: the schema cannot be enforced: #/properties/s: pattern: it is not enforced by this engine",
+      "reasoning_chars": 0,
+      "tps": null,
+      "tokens": null
+    }
+  ]
+}

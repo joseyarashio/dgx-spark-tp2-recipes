@@ -1,0 +1,166 @@
+1/152 root.test_0...OK
+2/152 json.test_0...OK
+3/152 fields.test.efforts and numbers...OK
+4/152 reply_text.test.splits and holds...OK
+5/152 reply_text.test.a reply that writes its own think opener keeps the tag out of its reasoning...OK
+6/152 reply_text.test.DeepSeek-V4.1's calls take their two newlines: text streams without them, and they wait for the next token...OK
+7/152 tool_stream.test.a streamed call its end token left open completes as its closing markup completes it...OK
+8/152 tool_stream.test.a streamed call cut inside a value stays open...OK
+9/152 tool_stream.test.a one-call reply drops an unoffered call and still hides an unclosed one...OK
+10/152 tool_stream.test.DSML calls stream as the parse reads them, at every split: escapes, a split character, a name to strip, odd parameters...OK
+11/152 tool_stream.test.DSML calls stream as the parse reads them: an empty name, a bad invoke line, a far quote, a quoted opener, two blocks...OK
+12/152 tool_stream.test.a DSML call's brace waits for its block's closer; a block left open sends none...OK
+13/152 tool_stream.test.where the parse drops or changes what already went out, the stream says so: the finish then follows the parse...OK
+14/152 tool_stream.test.a closer inside a value: the pieces before it go out as they decode, the rest waits until the text says where the block ends...OK
+15/152 tool_stream.test.a block's second call and the first call's brace wait for the block's closer; a block cut before it sends no whole call...OK
+16/152 tool_stream.test.a text that does not extend the one read turns the streamer off instead of reading past its end...OK
+17/152 tool_stream.test.a long value streams in time linear in its length: the search for the block's closer goes on where it stopped...OK
+18/152 dsml_stream_test.test.a long Write streams its arguments as they decode, the parse's bytes joined (quotes, backslashes, CRLF, split characters)...OK
+19/152 dsml_stream_test.test.an Edit streams its strings and sends its boolean when the parameter closes, as the parse writes it...OK
+20/152 dsml_stream_test.test.two calls stream one after the other: a Bash command with a number, then a TodoWrite whose array the parse re-writes...OK
+21/152 dsml_stream_test.test.a call to a tool the request did not offer streams as the parse returns it, under its own name...OK
+22/152 dsml_stream_test.test.DSML written in the reasoning, or quoted in the answer, is no call: no tool delta, the same content...OK
+23/152 dsml_stream_test.test.a call cut by max_tokens ends as the whole reply reports it: length, its content, no brace for the open call...OK
+24/152 dsml_stream_test.test.without tools, without a call, or with the one-call policy, a stream is event for event what it was before the patch...OK
+25/152 dsml_stream_test.test.the engine's Messages route streams a DSML call as input_json_delta pieces that join to the chat reply's arguments...OK
+26/152 dsml_stream_test.test.a call in another form after the DSML block goes out when the reply ends, under the next index...OK
+27/152 dsml_stream_test.test.TENSORFOLD_TOOL_STREAM: one #14 reply and one reply cut by max_tokens, live and hold...OK
+28/152 dsml_stream_test.test.thinking off, a Harmony marker in a string value and the reply cut inside it: no read past the text, the call stays open...OK
+29/152 dsml_stream_test.test.thinking off, a Harmony marker in a whole block: the parse takes no call, and the stream stops at the marker...OK
+30/152 dsml_stream_test.test.prose after a block, in the round that closes it, goes out after the call's last piece...OK
+31/152 dsml_stream_test.test.a block cut in its second invoke sends no whole call: the first call's brace and the second call wait for the block's closer...OK
+32/152 dsml_stream_test.test.an XML call after a DSML block that the end token leaves open goes out once, under the next index...OK
+33/152 dsml_stream_test.test.a reply holding a too-short DSML tool-call block: no call, no error, the content each client got before, and the server answers the next request...OK
+34/152 dsml_stream_test.test.the same too-short block over HTTP through the chat, Responses and Messages routes: 200, no call, a normal end, and the next request answered...OK
+35/152 dsml_stream_test.test.a DSML value holding its block's own closer: the call keeps its whole value, whole and streamed alike, at every split...OK
+36/152 dsml_stream_test.test.a DSML value holding its closer and then a call in another form: the parse keeps that call on a tie, and no stream completes a call the parse does not return...OK
+37/152 dsml_stream_test.test.over HTTP, the tie: no route's stream completes a call the whole reply does not return...OK
+38/152 dsml_stream_test.test.a DSML value holding its block's own closer over HTTP through the chat, Responses and Messages routes: the call with its whole value, whole and streamed...OK
+39/152 dsml_stream_test.test.random DSML replies through the chat route: a stream gets the whole reply's calls and content, at random rounds...OK
+40/152 dsml_stream_test.test.thinking off, a call only the text before the Harmony split holds, its opener held back by a stop string's start: no call in either...OK
+41/152 dsml_stream_test.test.leading whitespace, a block that is no call, then text: the stream shows the text around the block, the whole reply the block as well...OK
+42/152 dsml_stream_test.test.the keep-alive pings while a value waits past a closer inside it, and leaves the call as it was...OK
+43/152 dsml_stream_test.test.a call form the stream filter does not hide, before a DSML block: its markup streamed as prose, the text after the block still goes out, and the calls are the whole reply's...OK
+44/152 dsml_stream_test.test.over HTTP, a value holding its closer: events in order and the whole call; cut by max_tokens after the closer, the header went out and each route ends as cut...OK
+45/152 dsml_stream_test.test.keep-alive on the wire while a value waits past a closer inside it: chat completions, Responses and Messages each get pings...OK
+46/152 dsml_stream_test.test.one-call policy, a later block holding its closer inside a value: the same call, the stream's content without the block's tail that the parse keeps...OK
+47/152 dsml_stream_test.test.thinking off, a closer in a value and then a Harmony marker, cut one byte at a time: the stream ends as the whole reply, no read past the text...OK
+48/152 dsml_stream_test.test.over HTTP, a whole call then a block cut by max_tokens before, at and after its header: each route's stream ends as cut, its text the whole reply's...OK
+49/152 dsml_stream_test.test.over HTTP, max_tokens: live mode ends every route as cut, whatever the calls; ended by the model, as a call; hold as the whole reply...OK
+50/152 dsml_stream_test.test.over HTTP, live mode, a block the parse keeps as text: which text each route's stream ends with...OK
+51/152 dsml_stream_test.test.over HTTP, the end of a stream sends a reply's text at most once, on every route, however the reply ends...OK
+52/152 dsml_stream_test.test.over the chat route, a 256 KiB value holding its block's closer near its start streams in time linear in its length...OK
+53/152 dsml_stream_test.test.over HTTP, prose with leading whitespace, then a DSML call cut by max_tokens: each route's stream ends with the whole reply's text...OK
+54/152 dsml_hold_test.test.a long Write goes out when the reply ends, the parse's bytes (quotes, backslashes, CRLF, split characters)...OK
+55/152 dsml_hold_test.test.an Edit goes out with its strings and its boolean as the parse writes them...OK
+56/152 dsml_hold_test.test.two calls go out one after the other: a Bash command with a number, then a TodoWrite whose array the parse re-writes...OK
+57/152 dsml_hold_test.test.a call to a tool the request did not offer goes out as the parse returns it, under its own name...OK
+58/152 dsml_hold_test.test.DSML written in the reasoning, or quoted in the answer, is no call: no tool delta, the same content...OK
+59/152 dsml_hold_test.test.a call cut by max_tokens ends as the whole reply reports it: length, its content, no call...OK
+60/152 dsml_hold_test.test.without tools, without a call, or with the one-call policy, a stream is event for event what it was before the patch...OK
+61/152 dsml_hold_test.test.the engine's Messages route sends each DSML call as one input_json_delta, the chat reply's arguments...OK
+62/152 dsml_hold_test.test.a call in another form after the DSML block goes out when the reply ends, under the next index...OK
+63/152 dsml_hold_test.test.thinking off, a Harmony marker in a string value and the reply cut inside it: no read past the text, no call...OK
+64/152 dsml_hold_test.test.thinking off, a Harmony marker in a whole block: the parse takes no call, and the stream sends none...OK
+65/152 dsml_hold_test.test.prose after a block goes out when the reply ends, before the calls, as the whole reply's content...OK
+66/152 dsml_hold_test.test.a block cut in its second invoke sends no call; whole, both calls go out at the end...OK
+67/152 dsml_hold_test.test.an XML call after a DSML block that the end token leaves open goes out once, under the next index...OK
+68/152 dsml_hold_test.test.a reply holding a too-short DSML tool-call block: no call, no error, the whole reply's content, and the server answers the next request...OK
+69/152 dsml_hold_test.test.the same too-short block over HTTP through the chat, Responses and Messages routes: 200, no call, a normal end, and the next request answered...OK
+70/152 dsml_hold_test.test.a DSML value holding its block's own closer: the call keeps its whole value, whole and streamed alike, at every split...OK
+71/152 dsml_hold_test.test.a DSML value holding its closer and then a call in another form: the parse keeps that call on a tie, and the stream sends it, never the DSML call...OK
+72/152 dsml_hold_test.test.a DSML value holding its block's own closer over HTTP through the chat, Responses and Messages routes: the call with its whole value, whole and streamed...OK
+73/152 dsml_hold_test.test.random DSML replies through the chat route: a stream gets the whole reply's calls and content, at random rounds...OK
+74/152 dsml_hold_test.test.thinking off, a call only the text before the Harmony split holds, its opener held back by a stop string's start: no call in either...OK
+75/152 dsml_hold_test.test.leading whitespace that streamed before a held block that is no call: the rest of the reply's text still goes out...OK
+76/152 dsml_hold_test.test.the keep-alive pings while queued rounds come in, a held answer's included, and leaves the reply as it was...OK
+77/152 dsml_hold_test.test.a call form the stream filter does not hide, before a held block: its markup streamed as prose, the text after the block still goes out, and the calls are the whole reply's...OK
+78/152 dsml_hold_test.test.a held reply over HTTP: Messages and Responses events in order, text before the call, and a reply cut by max_tokens ends as max_tokens with no tool_use...OK
+79/152 dsml_hold_test.test.a held reply's keep-alive on the wire: chat completions, Responses and Messages each get pings...OK
+80/152 dsml_hold_test.test.hold mode streams what 0065 as first built streams, event for event, on every route...OK
+81/152 dsml_fuzz_test.test.random well-formed DSML replies stream the parse's calls byte for byte at random splits...OK
+82/152 dsml_fuzz_test.test.random well-formed replies whose values hold the block's own closer stream the parse's calls byte for byte at random splits...OK
+83/152 dsml_fuzz_test.test.random replies with odd markup, closers inside values, or a cut anywhere send no whole call the parse does not return...OK
+84/152 dsml_fuzz_test.test.the stream filter, going on from the round before, hides what it hides reading each round's text whole...OK
+85/152 tool_params.test.decode parameters...OK
+86/152 pyrepr.test.reprs...OK
+87/152 metrics.test.edges and numbers...OK
+88/152 metrics.test.metrics record rounds prefill and per-token timing...OK
+89/152 metrics.test.render exposes live counters, rounds, prefill and TPOT without cache family...OK
+90/152 metrics.test.metrics snapshot allocation failure releases the mutex...OK
+91/152 metrics.test.request counter append failure frees its label...OK
+92/152 http_conn.test.versions and repr...OK
+93/152 auth.test.gates and digests...OK
+94/152 auth.test.the key file: refused while others can read it, read at 0600, reread after an edit...OK
+95/152 cli.test.parse and capabilities share the table...OK
+96/152 cli.test.--device and --segments: CUDA builds serve them, values checked...OK
+97/152 live.test.status line...OK
+98/152 listener.test.the descriptor log fires once per burst...OK
+99/152 listener.test.peer text...OK
+100/152 hub.test.repo ids...OK
+101/152 chunk_plan.test.a harness cut joins the starts, nearer ones go...OK
+102/152 chunk_plan.test.chunk starts match PrefillPlan.chunks...OK
+103/152 status_routes.test.stats snapshot exposes counters and omits unknown memory...OK
+104/152 log.test.a request's refused and ended lines...OK
+105/152 messages.test.base64 as Python's b64decode reads it...OK
+106/152 messages.test.a conversation with a user query stays byte-identical under the rule...OK
+107/152 messages.test.a conversation with no user query gains one placeholder turn after its last tool run...OK
+108/152 messages.test.a user message whose content is wholly a tool block does not count as a query...OK
+109/152 messages.test.a conversation keeps its shape when the template does not need the rule...OK
+110/152 messages.test.a message's own text holding the image placeholder is escaped...OK
+111/152 messages.test.maskControls marks a client's control spellings in every string, and copies nothing when there are none...OK
+112/152 stream_preflight_test.test.a streamed chat over the window reports context_length_exceeded after the role chunk...OK
+113/152 stream_preflight_test.test.a streamed chat with tools over the window reports the context error with no role chunk...OK
+114/152 stream_preflight_test.test.a streamed Messages request over the window reports the context error in the stream...OK
+115/152 stream_preflight_test.test.a streamed Responses request over the window reports the context error in the stream...OK
+116/152 stream_preflight_test.test.a valid streamed chat still opens with the role chunk and gives the preparing count back...OK
+117/152 stream_preflight_test.test.a stream whose client is gone when it opens gives the preparing count back...OK
+118/152 stream_preflight_test.test.a reply labels a greedy request greedy and a sampled one exact...OK
+119/152 stream_preflight_test.test.pure DSML call never streams framing whitespace...OK
+120/152 stream_preflight_test.test.leading indentation in ordinary prose is retained with tools...OK
+121/152 stream_preflight_test.test.whitespace only answer is retained when no call is parsed...OK
+122/152 stream_preflight_test.test.whitespace with tools disabled is unchanged...OK
+123/152 stream_preflight_test.test.prose before a call retains its leading whitespace...OK
+124/152 late_system_test.test.a mid-conversation system message renders the same prompt on Messages and on chat...expected 400, found 200
+FAIL (TestExpectedEqual)
+/home/joseyarashio/.local/share/zig-0.17.0/lib/std/testing.zig:93:17: 0x14429cb in expectEqualInner__func_1862 (root)
+                return error.TestExpectedEqual;
+                ^
+/home/joseyarashio/.local/share/zig-0.17.0/lib/std/testing.zig:57:5: 0x14b7dc3 in expectEqual (root)
+    return expectEqualInner(T, expected, actual);
+    ^
+/home/joseyarashio/TensorFold-dsv41-zig/zig/src/server/late_system_test.zig:208:5: 0x14b7f1b in test.a mid-conversation system message renders the same prompt on Messages and on chat (root)
+    try std.testing.expectEqual(@as(u16, 400), misplaced.status);
+    ^
+125/152 late_system_test.test.context_management takes any clear_thinking edit and still refuses other edits...OK
+126/152 effort_values_test.test.an engine's effort numbers: every name passes as asked and the template hears its number...OK
+127/152 effort_values_test.test.without effort numbers the template hears the nearest name it quotes, as before...OK
+128/152 compact_test.test.auto reserve, note budget and keep tokens...OK
+129/152 compact_test.test.off leaves the runtime object unchanged and a short request only reports the window...OK
+130/152 compact_test.test.the kept span never starts between a tool call and its results...OK
+131/152 compact_test.test.the compacted prompt fits and the same request compacts the same way...OK
+132/152 compact_test.test.a request that cannot fit after compaction is still context_length_exceeded...OK
+133/152 compact_test.test.a split turn is summarized on its own and placed before the kept reply...OK
+134/152 compact_test.test.the files section is filled from tool call arguments...OK
+135/152 compact_test.test.a returned note is updated from the new middle...OK
+136/152 compact_test.test.a long cut is summarized in chunks...OK
+137/152 compact_test.test.an incremental request summarizes only the new middle and a user edit is the next note...OK
+138/152 compact_test.test.a stream compacts before it opens...OK
+139/152 decisions_test.test.a decisions body is refused with 0.6.6's sentences...OK
+140/152 decisions_test.test.the engine hook scores a choice and a missing hook is refused...OK
+141/152 decisions_test.test.a prompt past the context window is refused before scoring...OK
+142/152 decisions_test.test.an engine with no score hook refuses after the checks pass...OK
+143/152 hf_text.test.model EOS does not hide a different tokenizer chat end...OK
+144/152 serve.test.the targets are the hard limit, or the fallbacks under an unlimited one...OK
+145/152 serve.test.the raise lifts a low soft limit, and a second raise does nothing...OK
+146/152 serve.test.TENSORFOLD_TOOL_STREAM: unset is live, hold is hold, another value stops the server from starting...tensorfold: TENSORFOLD_TOOL_STREAM=fast: use live or hold (lower case); unset, empty or blank means live
+OK
+147/152 tool_streaming.test.TENSORFOLD_TOOL_STREAM: live by default, live or hold, anything else refused...OK
+148/152 json_parse.test.python messages...OK
+149/152 json_write.test.float repr...OK
+150/152 json_write.test.dumps...OK
+151/152 json_write.test.a UTF-8 sequence cut short at the string's end is U+FFFD, not a slice past it...OK
+152/152 prompt.test.an image span's key depends on the image and the position, never on the vocabulary...OK
+151 passed; 0 skipped; 1 failed.
+error: the following test command failed with exit code 1:
+.zig-cache/o/b5b3e7f270a9850ffe8e0e1f471368e9/root --seed=0x7322fee8

@@ -1,0 +1,5 @@
+2026-11-16 12:29:22 === so-stage start; engine 3378db64; n1 5.04 GiB, n2 8.11 GiB ===
+2026-11-16 13:21:36 scenario rc=0 ([13:21:36 + 52.2m] run_done {"elapsed_min": 52.2, "abort": []})
+2026-11-16 13:25:35 decode gate rc=0 ({"verdict": "pass", "sweep_prompts_clean": 9, "sweep_greedy_tps": 87.03, "sweep_mtp_accept": 0.7309, "sweep_greedy_min": 77.94, "sweep_greedy_max": 94.73, "c2_a)
+2026-11-16 13:35:35 idle tail end: n1 3.66 GiB, n2 6.08 GiB
+2026-11-16 13:35:37 === done ===

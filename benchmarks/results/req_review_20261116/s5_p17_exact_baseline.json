@@ -1,0 +1,51 @@
+[
+  {
+    "name": "greedy_chat_nothink",
+    "finish_reason": "stop",
+    "token_sha": "889af629b112",
+    "token_sha256": null,
+    "content": "Binary search finds a target value in a sorted array by repeatedly halving the search interval. It compares the target to the middle element, then discards the half that cannot contain the target. This gives O(log n) time complexity, far faster than linear search.",
+    "tool_calls": null
+  },
+  {
+    "name": "greedy_code_nothink",
+    "finish_reason": "stop",
+    "token_sha": "a5c88d7bef40",
+    "token_sha256": null,
+    "content": "```python\ndef is_prime(n):\n    if n < 2:\n        return False\n    if n < 4:\n        return True\n    if n % 2 == 0 or n % 3 == 0:\n        return False\n    i = 5\n    while i * i <= n:\n        if n % i == 0 or n % (i + 2) == 0:\n            return False\n        i += 6\n    return True\n```",
+    "tool_calls": null
+  },
+  {
+    "name": "greedy_think",
+    "finish_reason": "stop",
+    "token_sha": "7300d07033ec",
+    "token_sha256": null,
+    "content": "391",
+    "tool_calls": null
+  },
+  {
+    "name": "sampled_seed_nothink",
+    "finish_reason": "stop",
+    "token_sha": "e1b812065df7",
+    "token_sha256": null,
+    "content": "Here are three prime numbers over 50:\n\n- **53**\n- **59**\n- **61**",
+    "tool_calls": null
+  },
+  {
+    "name": "greedy_tools",
+    "finish_reason": "tool_calls",
+    "token_sha": "185a84a5cecc",
+    "token_sha256": null,
+    "content": null,
+    "tool_calls": [
+      {
+        "id": "call_c8339931bcbbf01c6ebe7784",
+        "type": "function",
+        "function": {
+          "name": "get_weather",
+          "arguments": "{\"city\":\"Taipei\"}"
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,36 @@
+{
+  "T0.0": {
+    "alone": "685a635a1cce",
+    "draft_false": "685a635a1cce",
+    "concurrent_so": [
+      "685a635a1cce",
+      "685a635a1cce",
+      "685a635a1cce",
+      "685a635a1cce"
+    ],
+    "concurrent_plain": [
+      "889af629b112",
+      "889af629b112",
+      "889af629b112",
+      "889af629b112"
+    ],
+    "all_valid": true
+  },
+  "T0.3": {
+    "alone": "685a635a1cce",
+    "draft_false": "685a635a1cce",
+    "concurrent_so": [
+      "685a635a1cce",
+      "685a635a1cce",
+      "685a635a1cce",
+      "685a635a1cce"
+    ],
+    "concurrent_plain": [
+      "889af629b112",
+      "889af629b112",
+      "889af629b112",
+      "889af629b112"
+    ],
+    "all_valid": true
+  }
+}

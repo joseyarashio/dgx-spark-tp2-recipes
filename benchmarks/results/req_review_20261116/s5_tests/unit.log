@@ -1,0 +1,35 @@
+== grammar module
+43/46 json_test.test.random walks over accepted bytes never stall, and every finished walk parses with std.json as an object...OK
+44/46 json_test.test.no state the matcher reaches is a dead end: something is always allowed until the object closes...OK
+45/46 xgrammar_test.test.every verdict equals xgrammar 0.2.8's on the frozen corpus...OK
+46/46 xgrammar_schema_test.test.every verdict equals xgrammar 0.2.8's on the frozen schema and choice corpus...OK
+All 46 tests passed.
+rc=0
+== tool_parse
+33/34 tool_stream.test.a long value streams in time linear in its length: the search for the block's closer goes on where it stopped...OK
+34/34 tool_streaming.test.TENSORFOLD_TOOL_STREAM: live by default, live or hold, anything else refused...OK
+All 34 tests passed.
+== lanes
+const grammar = @import("grammar");
+                        ^~~~~~~~~
+zig/src/core/lanes/structure_test.zig:3:25: error: no module named 'grammar' available within module 'test'
+const grammar = @import("grammar");
+                        ^~~~~~~~~
+== test_lanes.sh
+4/4 lanes_units.test.stream commits, thinking cuts and room (stream.jsonl)...SKIP
+0 passed; 4 skipped; 0 failed.
+1/5 lanes_replay.test.greedy one stream...SKIP
+2/5 lanes_replay.test.sampled one stream (temperature 0.7, top-p 0.95)...SKIP
+3/5 lanes_replay.test.two concurrent streams...SKIP
+4/5 lanes_replay.test.drafts off...SKIP
+5/5 lanes_replay.test.GPU sampler rule on recorded rows...SKIP
+0 passed; 5 skipped; 0 failed.
+== server zig_test.sh
+154/158 json_parse.test.python messages...OK
+155/158 json_write.test.float repr...OK
+156/158 json_write.test.dumps...OK
+157/158 json_write.test.a UTF-8 sequence cut short at the string's end is U+FFFD, not a slice past it...OK
+158/158 prompt.test.an image span's key depends on the image and the position, never on the vocabulary...OK
+157 passed; 0 skipped; 1 failed.
+error: the following test command failed with exit code 1:
+.zig-cache/o/b2b23b59be8f030d0f6076a0a72f6917/root --seed=0xd6ae7387

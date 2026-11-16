@@ -9,7 +9,7 @@ Usage:
 The boot-time unit spark-post-reboot-verify.timer starts `run` 2 min after boot only when the arm marker exists.
 The report is written to STATE/deliver.md; the Hermes cron job spark-reboot-report posts it to Slack once.
 """
-import hashlib, json, os, re, subprocess, sys, time, urllib.request
+import hashlib, json, os, re, subprocess, sys, time, urllib.error, urllib.request
 
 HOME = "/home/joseyarashio"
 REPO = f"{HOME}/dgx-spark-tp2-recipes"
@@ -191,6 +191,37 @@ def run(require_reboot=True):
             ok_lf = False
             lf_detail = repr(ex)[:200]
         add("迴圈攔截 → proxy 以 effort none 重送成功", ok_lf, lf_detail)
+
+    # 5c. Structured output (v2b2-p18): rank0 keeps response_format replies inside the grammar; a request the engine
+    #     cannot enforce (regex) is refused with 400 before any token.
+    if code == 200:
+        so_detail = ""
+        try:
+            sch = {"type": "object", "properties": {"city": {"type": "string"}, "pop_m": {"type": "number", "minimum": 0}},
+                   "required": ["city", "pop_m"], "additionalProperties": False}
+            body = json.dumps({"model": "DeepSeek-V4.1-Flash-TF", "max_tokens": 200, "temperature": 0.0, "seed": 7,
+                               "chat_template_kwargs": {"enable_thinking": False},
+                               "response_format": {"type": "json_schema", "json_schema": {"name": "c", "strict": True, "schema": sch}},
+                               "messages": [{"role": "user", "content": "Taipei as JSON with its population in millions."}]}).encode()
+            req = urllib.request.Request("http://127.0.0.1:8889/v1/chat/completions", body, {"Content-Type": "application/json"})
+            resp = json.load(urllib.request.urlopen(req, timeout=120))
+            obj = json.loads(resp["choices"][0]["message"]["content"])
+            ok_so = set(obj) == {"city", "pop_m"} and isinstance(obj["pop_m"], (int, float)) and obj["pop_m"] >= 0
+            so_detail = json.dumps(obj, ensure_ascii=False)[:120]
+        except Exception as ex:
+            ok_so = False
+            so_detail = repr(ex)[:200]
+        add("structured output json_schema 合法", ok_so, so_detail)
+        try:
+            body = json.dumps({"model": "DeepSeek-V4.1-Flash-TF", "max_tokens": 8, "guided_regex": "[a-z]+",
+                               "messages": [{"role": "user", "content": "x"}]}).encode()
+            urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:8888/v1/chat/completions", body,
+                                                          {"Content-Type": "application/json"}), timeout=30)
+            add("structured output 不支援的 regex 回 400", False, "got 200")
+        except urllib.error.HTTPError as ex:
+            add("structured output 不支援的 regex 回 400", ex.code == 400, f"HTTP {ex.code}")
+        except Exception as ex:
+            add("structured output 不支援的 regex 回 400", False, repr(ex)[:200])
 
     # 6. Functional + performance smoke vs historical best (retry once if contaminated by external traffic)
     smoke = None; attempts = []
