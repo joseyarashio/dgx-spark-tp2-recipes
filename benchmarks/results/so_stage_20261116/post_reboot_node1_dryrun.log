@@ -1,0 +1,10 @@
+*DGX Spark 雙機重開機自主驗證（dry-run）：✅ 全部通過*
+• 開機時間：Node1 2026-11-16 18:04:51，Node2 2026-11-16 16:58:15；服務恢復方式：容器 restart policy 自動拉起
+• 驗證共 30 項，耗時 180s
+• smoke：品質 4/4、工具 PASS、單題單流 92.28 tok/s（僅參考）、32K 插隊 0.7321s、8K 預填 2051.3 tok/s；測試期間外部請求 0 次
+• 解碼門檻（pass）：9 題程式碼中位 *89.17 tok/s*（80.01–97.08）、MTP 0.7309、C2 113.67、C4 148.96、C8 162.3
+• GPU 時脈,溫度：Node1 2392, 45，Node2 2392, 45；可用記憶體：Node1 5.42 GiB，Node2 8.62 GiB
+• 等待外部流量空檔：0s
+• 通過項目：Node2 SSH 可達、8888 /health 自動恢復、8889 proxy /health、模型 ID DeepSeek-V4.1-Flash-TF、rank0 容器 running、rank1 容器 running、Engram token map sha 雙機 = engram.json、spark-fastfail-proxy.service active、spark-ms-dtc-governor.service active、spark-dsv41-cluster.timer active、hermes-gateway.service active、舊 gpu-thermal-governor 雙機未啟動、swappiness=1 雙機、RoCE 位址（10.100.184/185）雙機、nvidia 模組檔與 srcversion 雙機一致、RoCE v2 GID index 雙機一致且為服務所用、rank0 啟動參數含 --loop-guard、proxy 迴圈降級未被停用、迴圈攔截 → proxy 以 effort none 重送成功、structured output json_schema 合法、structured output 不支援的 regex 回 400、品質題全過、工具呼叫門檻、32K 插隊 TTFT ≤ 1.5s、解碼門檻 sweep_greedy_tps ≥ 基準 95%、解碼門檻 sweep_mtp_accept ≥ 基準 95%、解碼門檻 c2_agg ≥ 基準 95%、解碼門檻 c4_agg ≥ 基準 95%、解碼門檻 c8_agg ≥ 基準 95%、C2/C4/C8 每路都有產出
+• 報告：`benchmarks/results/post_reboot_verify_20261116_181232.json`
+RC=0
