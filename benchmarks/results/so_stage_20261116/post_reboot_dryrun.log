@@ -1,0 +1,13 @@
+*DGX Spark 雙機重開機自主驗證（dry-run）：❌ 3 項失敗*
+• 開機時間：Node1 2026-11-09 21:07:36，Node2 2026-11-09 21:07:38；服務恢復方式：watchdog 介入
+• 驗證共 35 項，耗時 184s
+• smoke：品質 4/4、工具 PASS、單題單流 90.2 tok/s（僅參考）、32K 插隊 0.7099s、8K 預填 2003.9 tok/s；測試期間外部請求 0 次
+• 解碼門檻（pass）：9 題程式碼中位 *86.88 tok/s*（78.4–94.57）、MTP 0.7309、C2 112.49、C4 140.97、C8 156.15
+• GPU 時脈,溫度：Node1 2392, 45，Node2 2392, 47；可用記憶體：Node1 5.03 GiB，Node2 8.24 GiB
+• 等待外部流量空檔：0s
+• 失敗項目：
+  – rank0 tensorfold-native sha256：
+  – rank0.sh / rank1.sh / start-dsv41.sh 未變：
+  – 8889 proxy.py sha256 = manifest：
+• 報告：`benchmarks/results/post_reboot_verify_20261116_134324.json`
+RC=1
