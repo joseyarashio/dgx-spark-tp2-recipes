@@ -14,6 +14,7 @@ METRICS_URL="${METRICS_URL:-http://127.0.0.1:8888/metrics}"
 CHAT_URL="${CHAT_URL:-http://127.0.0.1:8888/v1/chat/completions}"
 RANK1_INSPECT="${RANK1_INSPECT:-ssh -o BatchMode=yes -o ConnectTimeout=10 joseyarashio@10.100.184.1 docker inspect -f '{{.State.Status}}_{{.RestartCount}}_{{.State.StartedAt}}' dsv41-rank1}"
 PROBE_S="${PROBE_S:-90}"
+RANK0_STARTED="${RANK0_STARTED:-docker inspect -f '{{.State.StartedAt}}' dsv41-rank0}"
 LOG="${LOG:-/home/joseyarashio/.cache/dsv41-1017-logs/cluster_watchdog.log}"
 STATE="${STATE:-/home/joseyarashio/.cache/dsv41-1017-logs/cluster_watchdog.rank1}"
 log() { echo "[$(date '+%F %T')] [WATCHDOG] $*" >> "$LOG"; }
@@ -56,9 +57,15 @@ if [ -n "$now" ]; then
     heal "rank1 container is $st (RestartCount $rc) while rank0 /health is 200"
   fi
   # A grown counter means docker restarted rank1 in place. start-dsv41.sh recreates the container, which resets
-  # the counter to 0, so a manual restart never looks like growth.
+  # the counter to 0, so a manual restart never looks like growth. A rank1 that restarted *before* rank0 started
+  # is fine: rebooting Node1 crashes rank1 (peer gone), docker restarts it, and the new rank0 then forms the ring
+  # with it (2026-11-16 18:04). Only a restart after rank0 started leaves a rank1 that cannot rejoin.
   if [ -n "$prc" ] && [ "$rc" -gt "$prc" ] 2>/dev/null; then
-    heal "rank1 restarted since the last check (RestartCount $prc -> $rc, started $started) while rank0 /health is 200"
+    r0started="$(eval "$RANK0_STARTED" 2>/dev/null)"
+    if [ -n "$r0started" ] && [[ "${started:0:19}" > "${r0started:0:19}" ]]; then
+      heal "rank1 restarted after rank0 started (RestartCount $prc -> $rc, rank1 $started > rank0 $r0started) while rank0 /health is 200"
+    fi
+    log "rank1 RestartCount $prc -> $rc, but it started ($started) before rank0 ($r0started); ring formed after, no heal."
   fi
 else
   log "rank1 inspect failed (Node2 unreachable or container missing); /health is 200, not healing on this alone."

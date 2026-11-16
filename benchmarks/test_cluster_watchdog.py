@@ -38,7 +38,8 @@ class TS(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
 
 
-def case(name, health=200, running=0, chat="ok", inspect: "str | None" = "running_0_t1", prev=None, expect=None, holder=False):
+def case(name, health=200, running=0, chat="ok", inspect: "str | None" = "running_0_2026-11-16T10:00:00Z", prev=None, expect=None, holder=False,
+         r0="2026-11-16T10:00:05Z"):
     Mock.cfg = {"health": health, "running": running, "chat": chat, "probes": 0}
     srv = TS(("127.0.0.1", 0), Mock); port = srv.server_address[1]
     threading.Thread(target=srv.serve_forever, daemon=True).start()
@@ -49,7 +50,7 @@ def case(name, health=200, running=0, chat="ok", inspect: "str | None" = "runnin
     env = dict(os.environ, DRY_RUN="1", LOG=log, STATE=state, PROBE_S="2",
                HEALTH_URL=f"http://127.0.0.1:{port}/health", METRICS_URL=f"http://127.0.0.1:{port}/metrics",
                CHAT_URL=f"http://127.0.0.1:{port}/v1/chat/completions",
-               RANK1_INSPECT=("false" if inspect is None else f"echo {inspect}"))
+               RANK1_INSPECT=("false" if inspect is None else f"echo {inspect}"), RANK0_STARTED=f"echo {r0}")
     hold = subprocess.Popen(["bash", "-c", "exec -a start-dsv41.sh sleep 60"]) if holder else None
     t = time.time()
     rc = subprocess.run(["bash", WD], env=env, capture_output=True, text=True, timeout=200).returncode
@@ -66,16 +67,19 @@ def case(name, health=200, running=0, chat="ok", inspect: "str | None" = "runnin
     return ok
 
 
+T1, T2, T3 = "2026-11-16T09:00:00Z", "2026-11-16T10:03:32.516676025Z", "2026-11-16T10:20:00.5Z"
+R0 = "2026-11-16T10:05:03.335028464Z"
 results = [
-    case("healthy, rank1 steady, probe ok", prev="running_0_t1"),
+    case("healthy, rank1 steady, probe ok", inspect=f"running_0_{T1}", prev=f"running_0_{T1}", r0=R0),
     case("health 503 for 60 s", health=503, expect="unhealthy for 60s"),
-    case("rank1 exited, rank0 health 200", inspect="exited_6_t2", prev="running_0_t1", expect="rank1 container is exited"),
-    case("rank1 RestartCount grew 0 -> 3", inspect="running_3_t2", prev="running_0_t1", expect="RestartCount 0 -> 3"),
-    case("first run, no state, rank1 count 6", inspect="running_6_t2", prev=None),
-    case("recreated by start-dsv41 (6 -> 0)", inspect="running_0_t3", prev="running_6_t2"),
+    case("rank1 exited, rank0 health 200", inspect=f"exited_6_{T2}", prev=f"running_0_{T1}", expect="rank1 container is exited"),
+    case("rank1 restarted AFTER rank0 (0 -> 3)", inspect=f"running_3_{T3}", prev=f"running_0_{T1}", r0=R0, expect="rank1 restarted after rank0 started"),
+    case("rank1 restarted BEFORE rank0 (Node1 reboot)", inspect=f"running_1_{T2}", prev=f"running_0_{T1}", r0=R0),
+    case("first run, no state, rank1 count 6", inspect=f"running_6_{T2}", prev=None, r0=R0),
+    case("recreated by start-dsv41 (6 -> 0)", inspect=f"running_0_{T3}", prev=f"running_6_{T2}", r0=R0),
     case("idle and probe hangs twice", chat="hang", expect="no answer within 2s twice"),
     case("busy (running 3), probe would hang", running=3, chat="hang"),
-    case("Node2 unreachable, health 200", inspect=None, prev="running_0_t1"),
+    case("Node2 unreachable, health 200", inspect=None, prev=f"running_0_{T1}"),
     case("start-dsv41.sh running", health=503, holder=True, expect="skip"),
 ]
 print(f"{sum(results)}/{len(results)} passed")
