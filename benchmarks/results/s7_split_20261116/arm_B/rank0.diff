@@ -1,0 +1,4 @@
+11c11
+< export MALLOC_ARENA_MAX=4  # glibc kept 49 x 64 MiB per-thread arenas (1.6 GiB RSS) on rank0 after a day of requests; rank1 uses 75 MiB
+---
+> # S7 arm B: MALLOC_ARENA_MAX unset

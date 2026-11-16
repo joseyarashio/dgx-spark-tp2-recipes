@@ -1,0 +1,37 @@
+sweep 0 0 90.0 279/377 ext 0
+sweep 0 1 91.9 284/373 ext 0
+sweep 0 2 84.3 268/381 ext 0
+sweep 0 3 86.9 274/380 ext 0
+sweep 0 4 88.8 277/379 ext 0
+sweep 0 5 95.3 287/358 ext 0
+sweep 0 6 83.2 270/397 ext 0
+sweep 0 7 86.9 275/372 ext 0
+sweep 0 8 75.0 260/405 ext 0
+sweep 1 0 89.5 279/377 ext 0
+sweep 1 1 93.6 284/373 ext 0
+sweep 1 2 83.8 268/381 ext 0
+sweep 1 3 86.1 274/380 ext 0
+sweep 1 4 88.3 277/379 ext 0
+sweep 1 5 94.4 287/358 ext 0
+sweep 1 6 82.5 270/397 ext 0
+sweep 1 7 86.2 275/372 ext 0
+sweep 1 8 78.0 260/404 ext 0
+sweep 2 0 90.2 279/377 ext 0
+sweep 2 1 93.5 284/374 ext 0
+sweep 2 2 84.2 268/381 ext 0
+sweep 2 3 85.9 274/380 ext 0
+sweep 2 4 85.4 277/379 ext 0
+sweep 2 5 94.6 287/358 ext 0
+sweep 2 6 83.1 270/397 ext 0
+sweep 2 7 86.7 275/372 ext 0
+sweep 2 8 78.0 260/404 ext 0
+c2 0 112.3 2/2 streams ok ext 0
+c4 0 141.7 4/4 streams ok ext 0
+c8 0 159.4 8/8 streams ok ext 0
+c2 1 113.7 2/2 streams ok ext 0
+c4 1 140.9 4/4 streams ok ext 0
+c8 1 159.5 8/8 streams ok ext 0
+c2 2 103.3 2/2 streams ok ext 0
+c4 2 146.0 4/4 streams ok ext 0
+c8 2 158.1 8/8 streams ok ext 0
+{"verdict": "pass", "sweep_prompts_clean": 9, "sweep_greedy_tps": 86.71, "sweep_mtp_accept": 0.7309, "sweep_greedy_min": 77.96, "sweep_greedy_max": 94.58, "c2_agg": 112.28, "c2_streams_ok": true, "c4_agg": 141.67, "c4_streams_ok": true, "c8_agg": 159.44, "c8_streams_ok": true, "checks": {"sweep_greedy_tps": {"value": 86.71, "need": 83.695, "baseline": 88.1, "ok": true}, "sweep_mtp_accept": {"value": 0.7309, "need": 0.6944, "baseline": 0.7309, "ok": true}, "c2_agg": {"value": 112.28, "need": 111.454, "baseline": 117.32, "ok": true}, "c4_agg": {"value": 141.67, "need": 136.2585, "baseline": 143.43, "ok": true}, "c8_agg": {"value": 159.44, "need": 149.207, "baseline": 157.06, "ok": true}}}

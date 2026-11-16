@@ -1,0 +1,21 @@
+2026-11-16 14:00:09 === S7 start; arm A saved as rank0.sh.bak.before-s7 (sha c2bbd9b0); n1 4.50 GiB, n2 7.77 GiB ===
+2026-11-16 14:00:09 arm B rank0.sh diff: 11c11 < export MALLOC_ARENA_MAX=4  # glibc kept 49 x 64 MiB per-thread arenas (1.6 GiB RSS) on rank0 after a day of requests; rank1 uses 75 MiB --- > # S7 arm B: MALLOC_ARENA_MAX unset 
+2026-11-16 14:00:10 arm B before restart: n1 4.49 GiB, n2 7.76 GiB
+2026-11-16 14:01:03 restart rc=0 (=== DeepSeek-V4.1-Flash-1017-TF is LIVE on port 8888! ===)
+2026-11-16 14:01:03 arm B engine: TF_DS_WINDOW=2097152 --prompt-cache-gib 2.0 
+2026-11-16 14:02:03 arm B idle 60 s: n1 5.38 GiB, n2 8.44 GiB
+2026-11-16 14:51:33 arm B scenario rc=0 ([14:51:33 + 49.5m] run_done {"elapsed_min": 49.5, "abort": []})
+2026-11-16 14:55:33 arm B decode gate rc=0 ({"verdict": "pass", "sweep_prompts_clean": 9, "sweep_greedy_tps": 86.98, "sweep_mtp_accept": 0.7309, "sweep_greedy_min": 77.34, "sweep_greedy_max": 94.93, "c2_a)
+2026-11-16 15:05:34 arm B idle tail end: n1 3.10 GiB, n2 6.09 GiB
+2026-11-16 15:05:35 arm C rank0.sh diff: 24c24 <   --prompt-cache-gib 2.0 \ --- >   --prompt-cache-gib 2.5 \ 
+2026-11-16 15:05:35 arm C before restart: n1 3.11 GiB, n2 6.06 GiB
+2026-11-16 15:06:24 restart rc=0 (=== DeepSeek-V4.1-Flash-1017-TF is LIVE on port 8888! ===)
+2026-11-16 15:06:24 arm C engine: MALLOC_ARENA_MAX=4 TF_DS_WINDOW=2097152 --prompt-cache-gib 2.5 
+2026-11-16 15:07:24 arm C idle 60 s: n1 5.44 GiB, n2 8.42 GiB
+2026-11-16 15:57:43 arm C scenario rc=0 ([15:57:43 + 50.3m] run_done {"elapsed_min": 50.3, "abort": []})
+2026-11-16 16:02:43 arm C decode gate rc=0 ({"verdict": "pass", "sweep_prompts_clean": 9, "sweep_greedy_tps": 86.71, "sweep_mtp_accept": 0.7309, "sweep_greedy_min": 77.96, "sweep_greedy_max": 94.58, "c2_a)
+2026-11-16 16:12:44 arm C idle tail end: n1 3.63 GiB, n2 6.06 GiB
+2026-11-16 16:12:46 restoring arm A (sha c2bbd9b0)
+2026-11-16 16:13:36 restart rc=0 (=== DeepSeek-V4.1-Flash-1017-TF is LIVE on port 8888! ===)
+2026-11-16 16:14:06 restored: n1 5.31 GiB, n2 8.41 GiB; engine 3378db64
+2026-11-16 16:14:06 === S7 done ===

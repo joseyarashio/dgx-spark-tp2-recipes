@@ -1,0 +1,40 @@
+{"kind": "preflight_start", "t": 3.1, "wall": "15:07:28"}
+{"int_effort_400": true, "xhigh_200": true, "xhigh_engine": {"prompt": 40, "cached": 0, "thinking": true, "effort": "xhigh", "tokens": 15, "finish": "stop"}, "over_context_4xx": true, "over_context_status": 400, "malformed_json_4xx": true, "malformed_json_status": 400, "cancel_32k_release_s": 13.12, "cancel_32k_cancelled": "prefill", "cancel_100k_release_s": 5.84, "cancel_100k_cancelled": "prefill", "bad_lines": 0, "kind": "preflight_done", "t": 51.0, "wall": "15:08:16"}
+{"kind": "omni_standard_start", "t": 51.0, "wall": "15:08:16"}
+{"rc": 0, "s": 32.5, "kind": "omni_standard_done", "t": 83.4, "wall": "15:08:48"}
+{"kind": "full_eval_start", "t": 83.4, "wall": "15:08:48"}
+{"rc": 0, "s": 277.0, "kind": "full_eval_done", "t": 360.4, "wall": "15:13:25"}
+{"kind": "M1_start", "t": 360.4, "wall": "15:13:25"}
+{"ok": 20, "n": 20, "fails": [], "kind": "M1_done", "t": 367.6, "wall": "15:13:32"}
+{"kind": "M3_start", "t": 367.6, "wall": "15:13:32"}
+{"ok": 13, "n": 13, "fails": [], "kind": "M3_done", "t": 374.6, "wall": "15:13:39"}
+{"kind": "M6_start", "t": 374.6, "wall": "15:13:39"}
+{"rc": 0, "summary": "mock loop fallback: 7/7 pass", "kind": "M6_done", "t": 379.7, "wall": "15:13:44"}
+{"kind": "M245_start", "t": 379.7, "wall": "15:13:44"}
+{"rows": [["auto|low", "tool_calls", 1, true, false], ["auto|high", "tool_calls", 1, true, false], ["required|low", "tool_calls", 1, true, false], ["required|high", "tool_calls", 1, true, false], ["function|low", "tool_calls", 1, true, false], ["function|high", "tool_calls", 1, true, false], ["none|low", "stop", 0, false, true], ["none|high", "stop", 0, false, true], ["budget0|tools=True", "tool_calls", 1, true, false], ["budget0|tools=False", "stop", 0, false, true], ["budget1024|tools=True", "tool_calls", 1, true, false], ["budget1024|tools=False", "stop", 0, false, true]], "kind": "M4_done", "t": 443.9, "wall": "15:14:48"}
+{"turns": [[24328, 0, 2, true], [24899, 22528, 2, true], [25268, 24576, 2, true], [29789, 22528, 2, true], [30274, 22528, 2, true], [31100, 24576, 2, true], [34201, 24576, 2, true], [41475, 28672, 0, true], [42749, 28672, 2, true], [43487, 30720, 2, true]], "kind": "M5_done", "t": 674.9, "wall": "15:18:39"}
+{"reasoning_tokens_by_effort": {"none": [0, 0, 0, 0], "minimal": [347, 591, 631, 1288], "low": [344, 485, 602, 2048], "medium": [282, 618, 760, 2048], "high": [379, 707, 1050, 2048], "xhigh": [476, 606, 950, 2048], "max": [644, 842, 2048, 2048]}, "correct": {"none": 4, "minimal": 4, "low": 3, "medium": 3, "high": 3, "xhigh": 3, "max": 2}, "vision": [true, true], "kind": "M2_done", "t": 684.2, "wall": "15:18:49"}
+{"minutes": 37.0, "kind": "main_load_start", "t": 684.2, "wall": "15:18:49"}
+{"kind": "mark_revisit_A_fire", "t": 894.3, "wall": "15:22:19"}
+{"kind": "burst1_fire", "t": 924.4, "wall": "15:22:49"}
+{"px_active": 5, "px_wait": 0, "kind": "burst1_start", "t": 924.4, "wall": "15:22:49"}
+{"status_by_prio": {"p2:200": 8, "p2:429": 8, "p0:200": 2}, "reject_wall_s": [0.004, 0.005, 0.005, 0.005, 0.006, 0.006, 0.008, 0.009], "p0_rejected": 0, "kind": "burst1_done", "t": 932.1, "wall": "15:22:57"}
+{"kind": "mark_revisit_B_fire", "t": 984.4, "wall": "15:23:49"}
+{"kind": "needle_fire", "t": 1104.5, "wall": "15:25:49"}
+{"est_tokens": 216034, "long_inflight": 2, "kind": "needle_start", "t": 1104.5, "wall": "15:25:49"}
+{"found": true, "ttft": 149.34, "prompt_tokens": 252217, "min_n1_mem": 3.620342254638672, "min_n2_mem": 6.342967987060547, "kind": "needle_done", "t": 1255.1, "wall": "15:28:20"}
+{"kind": "cancel100k_20_fire", "t": 1644.4, "wall": "15:34:49"}
+{"after": 20.0, "cancelled": "prefill", "status": 200, "wall": "15:36:44", "eng_conn_at_cancel": 7, "bad_lines": 0, "kind": "cancel100k_done", "t": 1759.8}
+{"kind": "cancel100k_40_fire", "t": 1824.5, "wall": "15:37:49"}
+{"after": 40.0, "cancelled": "prefill", "status": 200, "wall": "15:40:23", "eng_conn_at_cancel": 7, "bad_lines": 0, "kind": "cancel100k_done", "t": 1978.2}
+{"kind": "revisit_A_fire", "t": 2124.2, "wall": "15:42:49"}
+{"session": "sess0_30k", "idle_s": 1242, "prompt": 46653, "cached": 36864, "ttft": 10.223, "disk_reads": [[2125.7, 36864], [2136.4, 8192]], "kind": "revisit_done", "t": 2187.7, "wall": "15:43:52"}
+{"kind": "burst2_fire", "t": 2244.3, "wall": "15:44:49"}
+{"px_active": 7, "px_wait": 0, "kind": "burst2_start", "t": 2244.3, "wall": "15:44:49"}
+{"status_by_prio": {"p0:200": 5, "p0:429": 1, "p1:429": 3, "p1:200": 3, "p2:429": 6}, "reject_wall_s": [0.003, 0.004, 0.005, 0.005, 0.006, 0.006, 0.006, 0.006, 0.007, 0.011], "p0_rejected": 1, "kind": "burst2_done", "t": 2257.1, "wall": "15:45:02"}
+{"kind": "revisit_B_fire", "t": 2604.6, "wall": "15:50:49"}
+{"session": "sess1_50k", "idle_s": 1601, "prompt": 75627, "cached": 61440, "ttft": 23.989, "disk_reads": [[2607.6, 61440]], "kind": "revisit_done", "t": 2638.9, "wall": "15:51:23"}
+{"kind": "main_load_stop_admit", "t": 2904.3, "wall": "15:55:49"}
+{"kind": "main_load_done", "t": 2969.3, "wall": "15:56:54"}
+{"close_wait_8888_8889": 0, "probes": [0.097, 0.087, 0.086, 0.088, 0.086], "cutin_short_ttft": 0.843, "n1_mem": 3.498210906982422, "n1_swap": 359.46484375, "n2_mem": 6.009723663330078, "n2_swap": 0.03125, "imprint_files": 3790, "kind": "final_checks", "t": 3018.8, "wall": "15:57:43"}
+{"elapsed_min": 50.3, "abort": [], "kind": "run_done", "t": 3018.8, "wall": "15:57:43"}
