@@ -1,0 +1,20 @@
+token map ok: de40bcdd71f24430 matches engram.json
+=== Starting DeepSeek-V4.1-Flash-1017-TF (Native Zig TP=2) ===
+checkpoint ok: 44 EXL3 shards, 1017 Engram 47+48
+RoCE v2 GID index: head 3, worker 3
+[1/5] Stopping any running GLM-5.3 or previous DeepSeek...
+[stop.sh] No container named glm53-flash-tf on either Spark: nothing to stop
+dsv41-rank0
+dsv41-rank1
+[2/5] Launching Rank 1 on Worker (10.100.184.1)...
+9d07a3035d2edd435d18ca0599ab9a97d217a59f31d13904c99f0b2c05309a6e
+[3/5] Launching Rank 0 on Head (10.100.184.2)...
+6de5ddc6c94d99bc5e708f7073cd960f0ed4dc237521c6fa54e6155c65c97932
+[4/5] Waiting for server to become healthy on port 8888...
+.......
+[5/5] Updating OpenCodex provider dgx_spark...
+Provider edit: provider configuration saved.
+Catalog committed with degraded provider observations.
+Subagent roster: dgx_spark/DeepSeek-V4.1-Flash-TF
+=== DeepSeek-V4.1-Flash-1017-TF is LIVE on port 8888! ===
+RC=0

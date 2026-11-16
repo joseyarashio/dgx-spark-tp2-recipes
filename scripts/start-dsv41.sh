@@ -63,6 +63,18 @@ if missing or bad:
 print(f"checkpoint ok: {len(set(idx['weight_map'].values()))} EXL3 shards, 1017 Engram 47+48")
 PY
 
+# GID index for the served ring and NCCL, looked up per node: the RoCE v2 entry of each rail's IPv4 address.
+# It is not always 3. When the peer reboots, the link flaps and the GID table can come back without that entry
+# or with it at another index (2026-11-16: rank1 crash-looped on ncclAllGather). --repair re-activates the
+# rail's NetworkManager connection when the entry is missing. Both nodes must agree. Done before step 1, so an
+# unusable fabric stops a manual restart before it removes the running containers.
+GID_PY=/home/joseyarashio/.cache/dsv41-1017-logs/roce_gid.py
+HEAD_GID="$(python3 "$GID_PY" rocep1s0f0,roceP2p1s0f0 --repair)" || { echo "ERROR: head RoCE v2 GID index not found"; exit 1; }
+WORKER_GID="$(ssh -o BatchMode=yes joseyarashio@"$WORKER_IP" "python3 $GID_PY rocep1s0f1,roceP2p1s0f1 --repair")" || { echo "ERROR: worker RoCE v2 GID index not found"; exit 1; }
+echo "RoCE v2 GID index: head $HEAD_GID, worker $WORKER_GID"
+[ "$HEAD_GID" = "$WORKER_GID" ] || { echo "ERROR: head and worker RoCE v2 GID index differ ($HEAD_GID vs $WORKER_GID)"; exit 1; }
+GID_INDEX="$HEAD_GID"
+
 # 1. Stop GLM-5.3 or any DeepSeek if running. Does not touch the 0909 weight dirs.
 echo "[1/5] Stopping any running GLM-5.3 or previous DeepSeek..."
 cd /home/joseyarashio/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold && ./stop.sh 2>/dev/null || true
@@ -90,9 +102,9 @@ ssh -o BatchMode=yes joseyarashio@"$WORKER_IP" "
     -e TF_DS_REPLAY_FLOOR=1 \
     -e TF_DS_STREAMS=8 \
     -e NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1 \
-    -e NCCL_IB_GID_INDEX=3 \
+    -e NCCL_IB_GID_INDEX=$GID_INDEX \
     -e NCCL_SOCKET_IFNAME=enp1s0f1np1 \
-    -e TF_RDMA_GID_INDEX=3 \
+    -e TF_RDMA_GID_INDEX=$GID_INDEX \
     --entrypoint /opt/nvidia/nvidia_entrypoint.sh \
     $IMAGE \
     /bin/bash -lc /home/joseyarashio/.cache/dsv41-1017-logs/rank1.sh
@@ -117,7 +129,7 @@ docker run -d --restart unless-stopped --name dsv41-rank0 \
   -e TF_DS_ENGRAM=$ENGRAM_DIR \
   -e TF_DS_TOKEN_MAP=$TOKEN_MAP \
   -e TF_RDMA_DEVICES=rocep1s0f0,roceP2p1s0f0 \
-  -e TF_RDMA_GID_INDEX=3 \
+  -e TF_RDMA_GID_INDEX=$GID_INDEX \
   -e TF_DS_GRAPHS=1 \
   -e TF_DS_HC_SIDE=1 \
   -e TF_DS_L2_PREFETCH=1 \
@@ -125,7 +137,7 @@ docker run -d --restart unless-stopped --name dsv41-rank0 \
   -e TF_SEED_RANDOM=1 \
   -e TF_TOP_K_MAX=56 \
   -e NCCL_IB_HCA=rocep1s0f0,roceP2p1s0f0 \
-  -e NCCL_IB_GID_INDEX=3 \
+  -e NCCL_IB_GID_INDEX=$GID_INDEX \
   -e NCCL_SOCKET_IFNAME=enp1s0f0np0 \
   --entrypoint /opt/nvidia/nvidia_entrypoint.sh \
   $IMAGE \

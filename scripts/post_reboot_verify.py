@@ -159,6 +159,12 @@ def run(require_reboot=True):
                "cat /sys/module/nvidia/srcversion")
     _, km1 = sh(mod_cmd); _, km2 = n2(mod_cmd)
     add("nvidia 模組檔與 srcversion 雙機一致", bool(km1.strip()) and km1.split() == km2.split(), f"N1={km1.split()} N2={km2.split()}")
+    # 5a2. RoCE v2 GID index (start-dsv41.sh looks it up per node since 2026-11-16) found on every rail, same on both nodes
+    gid_py = f"{LOGS}/roce_gid.py"
+    _, gi1 = sh(f"python3 {gid_py} rocep1s0f0,roceP2p1s0f0"); _, gi2 = n2(f"python3 {gid_py} rocep1s0f1,roceP2p1s0f1")
+    _, genv = sh("docker inspect dsv41-rank0 --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -E '^(TF_RDMA|NCCL_IB)_GID_INDEX='")
+    add("RoCE v2 GID index 雙機一致且為服務所用", gi1.isdigit() and gi1 == gi2 and genv.split() == [f"TF_RDMA_GID_INDEX={gi1}", f"NCCL_IB_GID_INDEX={gi1}"],
+        f"N1={gi1} N2={gi2} rank0 env={genv.split()}")
     _, gl = sh(f"tail -n 1 {HOME}/.cache/ms_dtc_governor.log")
     _, clk1 = sh("nvidia-smi --query-gpu=clocks.gr,temperature.gpu --format=csv,noheader,nounits")
     _, clk2 = n2("nvidia-smi --query-gpu=clocks.gr,temperature.gpu --format=csv,noheader,nounits")

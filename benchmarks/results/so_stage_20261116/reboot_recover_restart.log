@@ -1,0 +1,13 @@
+token map ok: de40bcdd71f24430 matches engram.json
+=== Starting DeepSeek-V4.1-Flash-1017-TF (Native Zig TP=2) ===
+checkpoint ok: 44 EXL3 shards, 1017 Engram 47+48
+[1/5] Stopping any running GLM-5.3 or previous DeepSeek...
+[stop.sh] No container named glm53-flash-tf on either Spark: nothing to stop
+dsv41-rank0
+dsv41-rank1
+[2/5] Launching Rank 1 on Worker (10.100.184.1)...
+fc8e86a2a9fbbffc21330c771367aff3ac782a96e1814f0a4a189ba5df224881
+[3/5] Launching Rank 0 on Head (10.100.184.2)...
+7f8c5864f689a62a03a0afc8b582e135ca1152d1c6e81fe7998f90f319abd362
+[4/5] Waiting for server to become healthy on port 8888...
+................................................RC=143
