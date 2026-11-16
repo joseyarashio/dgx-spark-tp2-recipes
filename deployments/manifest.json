@@ -10,28 +10,28 @@
     "cpu_pinning": "5-9,15-19 (10x Cortex-X925 Super-Cores)"
   },
   "cryptographic_hashes": {
-    "recipe_commit": "2ddb297fdf45d3346320ca45d5b420fa89be097d",
-    "engine_commit": "e772dec667a5bcb1ee04d6765ab3187a6ec18b04",
-    "patchset_sha256": "6355357d7eb9857991f15a156f2b5314e854d8b44d68124b5580d8de1350a608",
+    "recipe_commit": "2f6c31930f895e5d7af0406bf8f82afc0a3db623",
+    "engine_commit": "bd1802772ff0e4e38e56f8fb45f9fea0a7efff99",
+    "patchset_sha256": "f85e08f7eed3de3c2700f27946fd4661599e0bdffa0b9e47e80421ca25daf220",
     "kernel_manifest_sha256": "23910cedc7772d855a3bbd9eccd4404c73a96f2ad4ec8cbe9865a267d7c47c33",
-    "launch_config_sha256": "be2c5b3ab3ea065e355cc0bbd4801dfb117fc2f97215a421c2aaaaac0c3486b0",
+    "launch_config_sha256": "784a0a8f7079f84ff29ba03f6d3397cde4bf4cd02bed467d7840050b9fa361e6",
     "proxy_sha256": "dbc02a5c1e3e6ce30295755e47144e58b52a1a3719dc2b116db4641067a36c44"
   },
   "engine_binaries": {
-    "rank0_tensorfold_native_sha256": "10d41f91174b005eca43108ac0d894c34473492422bf03688b5e720db253433b",
+    "rank0_tensorfold_native_sha256": "20a48ca4def1c86f846182c5af1df7dd66c6a44af40f0ab315fa69174a7577a5",
     "rank1_tf_dsv41_lanes_sha256": "c35d6a8342a80b3c836065f115df659f8858113f727ed2db7515ea7367290aed",
     "node2_tf_dsv41_lanes_sha256": "c35d6a8342a80b3c836065f115df659f8858113f727ed2db7515ea7367290aed",
     "rank1_binary_synced": true
   },
   "memory_audit_ledger": {
-    "measured_at": "2026-11-15 17:59:35 +0800",
-    "rank0_engine_active_gib": 105.73,
+    "measured_at": "2026-11-16 13:40:05 +0800",
+    "rank0_engine_active_gib": 105.43,
     "parallel_slots": 8,
     "kv_pool_allocated_tokens": 2097152,
-    "host_prompt_cache_budget_gib": 2.5,
+    "host_prompt_cache_budget_gib": 2.0,
     "cuda_graph_lru_cap": 128,
-    "node1_available_memory_gib": 3.1,
-    "node2_available_memory_gib": 5.93,
+    "node1_available_memory_gib": 5.02,
+    "node2_available_memory_gib": 8.25,
     "engram_mode": "O_DIRECT Linux AIO from local NVMe (203 GB tables)"
   }
 }
