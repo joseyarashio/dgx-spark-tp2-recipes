@@ -154,6 +154,11 @@ def run(require_reboot=True):
     add("swappiness=1 雙機", s1 == "1" and s2 == "1", f"N1={s1} N2={s2}")
     _, ip1 = sh("ip -br a"); _, ip2 = n2("ip -br a")
     add("RoCE 位址（10.100.184/185）雙機", "10.100.184.2" in ip1 and "10.100.185.2" in ip1 and "10.100.184.1" in ip2 and "10.100.185.1" in ip2)
+    # 5a. nvidia kernel module files identical on both nodes (S3 2026-11-16: Node1 aligned +1 -> +2), and loaded
+    mod_cmd = ("cd /lib/modules/$(uname -r)/kernel/nvidia-580-open && md5sum *.ko | sort -k2 | md5sum | cut -c1-12; "
+               "cat /sys/module/nvidia/srcversion")
+    _, km1 = sh(mod_cmd); _, km2 = n2(mod_cmd)
+    add("nvidia 模組檔與 srcversion 雙機一致", bool(km1.strip()) and km1.split() == km2.split(), f"N1={km1.split()} N2={km2.split()}")
     _, gl = sh(f"tail -n 1 {HOME}/.cache/ms_dtc_governor.log")
     _, clk1 = sh("nvidia-smi --query-gpu=clocks.gr,temperature.gpu --format=csv,noheader,nounits")
     _, clk2 = n2("nvidia-smi --query-gpu=clocks.gr,temperature.gpu --format=csv,noheader,nounits")
